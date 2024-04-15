@@ -86,6 +86,7 @@ tareas/tw_2_todo/done.txt
 utilities/pihole.db
 utilities/pihole
 
-wordpress/data.json
-wordpress/canciones.txt
+utilities/wordpress/data.json
+utilities/wordpress/canciones.txt
 
+utilities/wordpress/cache-pollolpc
