@@ -1,0 +1,17 @@
+gg    "Google Search"                 https://www.google.com/search?q=
+dd    "DuckDuckGo"                    https://duckduckgo.com/?q=
+bc    "Bandcamp"                      https://bandcamp.com/search?q=
+yt    "Youtube"                       https://www.youtube.com/results?search_query=
+we    "Wikipedia (en)"                https://en.wikipedia.org/wiki/
+we    "Wikipedia (es)"                https://es.wikipedia.org/wiki/
+so    "Stack Overflow"                https://stackoverflow.com/search?q=
+hg    "Github"                        https://github.com/search?q=
+gl    "Gitlab"                        https://gitlab.com/search?search=
+aw    "Arch Wiki"                     https://wiki.archlinux.org/index.php?search=
+rd    "Reddit"                        https://www.reddit.com/search/?q=
+gt    "Google Translate"              https://translate.google.com.es/?text=
+dl    "DeepL Translator"              https://www.deepl.com/translator#en/es/
+rd    "Reverso Context Dictionay"     https://context.reverso.net/traduccion/ingles-espanol/
+az    "Amazon"                        https://www.amazon.com/s?k=
+ax    "Arxiv"                         https://arxiv.org/search/?searchtype=all&source=header&query=
+sp    "Spotify"                       https://open.spotify.com/search/"

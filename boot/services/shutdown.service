@@ -1,0 +1,11 @@
+[Unit]
+Description=/etc/rc.local.shutdown Compatibility
+Before=shutdown.target
+
+[Service]
+ExecStart=/usr/bin/bash /home/huan/Scripts/boot/shutdown.sh
+#ExecStop=/etc/rc.local.shutdown
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
