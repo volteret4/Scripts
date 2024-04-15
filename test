@@ -1,0 +1,14 @@
+{
+  "errors": [
+    {
+      "code": "DIS1036",
+      "detail": "Query param \"size\" must be less than 200 ",
+      "status": "400",
+      "_links": {
+        "about": {
+          "href": "/discovery/v2/errors.html#DIS1036"
+        }
+      }
+    }
+  ]
+}

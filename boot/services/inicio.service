@@ -1,0 +1,8 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/home/huan/Scripts/boot/services/at_boot.sh
+
+[Install]
+WantedBy=multi-user.target
