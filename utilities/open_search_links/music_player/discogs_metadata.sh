@@ -12,12 +12,13 @@
 #
 
 # Establecer Variables
-
 deadbeef="$(deadbeef --nowplaying-tf "%artist%")"
-strawberry=$(playerctl -p strawberry status)
-player_active=$(playerctl -l | awk 'NR==1')
-playing=$(playerctl -p "${player_active}" status)
+strawberry="$(playerctl -p strawberry status)"
+player_active="$(playerctl -l | awk 'NR==1')"
+playing="$(playerctl -p "${player_active}" status)"
 
+
+# Buscar reproductor activo
 if [[ ${strawberry} =~ 'Playing' ]]
     then
         player_active='strawberry'
@@ -29,32 +30,33 @@ if [[ ${strawberry} =~ 'Playing' ]]
             album="$(deadbeef --nowplaying-tf "%album%")"
     elif [[ ${playing} =~ 'Playing' ]]
         then
-            echo "player is ${player_active}"
+            echo "player is ""${player_active}"""
         else
             player_active=$(playerctl -l | awk 'NR==2')
 fi
 
-app_actual=$(xdotool getactivewindow getwindowname)
-firefox="Mozilla Firefox$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
-
 
 # Obtener metadata del reproductor actual
-
-if [[ $player_active != 'deadbeef' ]]; then
-    artista=$(playerctl -p "${player_active}" metadata xesam:artist)
-    cancion=$(playerctl -p "${player_active}" metadata xesam:title)
-    album=$(playerctl -p "${player_active}" metadata xesam:album)
+if [[ $player_active != 'deadbeef' ]]
+    then
+        artista="$(playerctl -p "${player_active}" metadata xesam:artist)"
+        cancion="$(playerctl -p "${player_active}" metadata xesam:title)"
+        album="$(playerctl -p "${player_active}" metadata xesam:album)"
 fi
 
+
+# Unir parámetros de búsqueda
 busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
+
+
+# Variables para poder ver si existe un navegador activo.
+app_actual=$(xdotool getactivewindow getwindowname)
+thorium="Thorium$"
+chromium="Chromium"
+firefox="Mozilla Firefox"
 url="https://discogs.com/search/?q=${busqueda}"
 
-
-
-# Abrir busqueda en discogs
-
+# Abrir busqueda en Bandcamp, ya sea en el navegador activo si lo hubiera, o en Qutebrowser.
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &

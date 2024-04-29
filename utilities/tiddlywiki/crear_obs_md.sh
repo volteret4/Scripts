@@ -13,22 +13,22 @@
 
 
 # Variable para indicar si ocurrió un error
-error_ocurrido=false
+# error_ocurrido=false
 
-# Función para manejar la señal ERR
-handle_error() {
-    # Solo ejecutar el script2 si ocurrió un error real
-    if [ "$error_ocurrido" = true ]; then
-        $HOME/Scripts/utilities/debug_scripts.sh "$@" 2>&1
-        exit 1
-    fi
-}
+# # Función para manejar la señal ERR
+# handle_error() {
+#     # Solo ejecutar el script2 si ocurrió un error real
+#     if [ "$error_ocurrido" = true ]; then
+#         $HOME/Scripts/utilities/debug_scripts.sh "$@" 2>&1
+#         exit 1
+#     fi
+# }
 
-# Asociar la función handle_error a la señal ERR
-trap 'error_ocurrido=true' ERR
+# # Asociar la función handle_error a la señal ERR
+# trap 'error_ocurrido=true' ERR
 
 # Comprobar si la ventana activa pertenece a uno de estos navegadores.
-var="$(xdotool getactivewindoow getwindowname)"
+var="$(xdotool getactivewindow getwindowname)"
 dir="/mnt/Datos/FTP/Wiki/Obsidian/Notas/Wiki"
 firefox="Mozilla Firefox$"
 chromium="\- Chromium$"
@@ -77,70 +77,51 @@ titulo=$(copyq read 1)
 content=$(copyq read 0 )
 
 
-# Ruta de la carpeta que contiene las subcarpetas
-ruta_carpeta="$dir"
-
 # Array para almacenar los nombres de las subcarpetas
 subcarpetas=()
 
 # Leer las subcarpetas y almacenar sus nombres en el array
 while IFS= read -r subcarpeta; do
-    if [[ "$subcarpeta" != ".stfolder" ]]; then
+    if [[ "$subcarpeta" != ".space" ]]; then
         subcarpetas+=("$subcarpeta")
     fi
-done < <(find "$ruta_carpeta" -mindepth 1 -maxdepth 1 -type d -printf "%f\n")
+done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -printf "%f\n")
 
 # Agregar un botón para cada subcarpeta
 botones=""
 for subcarpeta in "${subcarpetas[@]}"; do
-    botones+="--extra-button $subcarpeta "
+#    botones+="--extra-button $subcarpeta "
+    primera_letra="${subcarpeta:0:1}"
+    botones+="${subcarpeta}:${primera_letra} "
 done
+echo "primera letra__$primera_letra"
+echo "botones_$botones"
+tag="$(python3 $HOME/Scripts/utilities/menu_pollo2.py ${botones} | awk 'NR==1 {print $1}')"
 
 
 # Elegir TAG.
-tag=$(zenity --info --title 'Copiando a Mixx' \
-            --text "En qué carpeta creamos $titulo" \
-            --extra-button "|___...Añadir Otro Tag / Carpeta...___|"\
-            --ok-label "En verdad paso..." \
-            $botones)
+# tag=$(zenity --info --title 'Copiando a Mixx' \
+#             --text "En qué carpeta creamos $titulo" \
+#             --extra-button "|___...Añadir Otro Tag / Carpeta...___|"\
+#             --ok-label "En verdad paso..." \
+#             $botones)
+# Ruta de la carpeta que contiene las subcarpetas
+
 
 
 # Si se presiona "Añadir carpeta...", solicitar al usuario el nombre de la nueva carpeta
-if [[ "$tag" == *"Otro"* ]]; then
+if [[ "$tag" == *"Otra_Carpeta"* ]]; then
     nombre_nueva_carpeta=$(zenity --entry --title "Crear nueva carpeta")
     if [[ -n "$nombre_nueva_carpeta" ]]; then
-        nueva_carpeta="$ruta_carpeta/$nombre_nueva_carpeta"
+        nueva_carpeta="$dir/$nombre_nueva_carpeta"
         mkdir -p "$nueva_carpeta"
         tag="$nombre_nueva_carpeta"
     fi
 fi
 
-# tag="$(zenity --info --title "tw"\
-#     --text "¿En donde quieres guardar el documento de Obsidian? T: $titulo C: $contenido"\
-#     --extra-button "Linux"\
-#     --extra-button "AHK"\
-#     --extra-button "Docker"\
-#     --extra-button "Tasker"\
-#     --extra-button "Raspberry"\
-#     --extra-button "Tiddlywiki"\
-#     --extra-button "Vim"\
-#     --extra-button "NixOS"\
-#     --extra-button "ArchLinux"\
-#     --ok-label "paso"\
-# )"
-
-#  Preparar contenido
-# contenido="#${titulo}
-# ---
-# ${tag}
-# ---
-# > ${url}
-# ${content}"
-
-
 # Añadir la línea de la URL solo si la variable no está vacía
 if [ -n "${url}" ]; then
-    contenido="${url}"
+    contenido="> ${url}"
     contenido="${contenido}\n${content}"
     else
     contenido="${content}"
