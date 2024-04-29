@@ -10,7 +10,7 @@
 #     La idea de este script es poder tener en una carpeta aparte una selección de música con otro criterio (género por ej.)
 #
 
-mixxx="/mnt/Datos/Mix"        # CHANGE!!
+mixxx="/mnt/windows/Mix"        # CHANGE!!
 
 
 # function urldecode() { : "${*//+/ }"; echo -e "${_//%/\\x}"; }
@@ -33,19 +33,21 @@ if [ -z "$deadbeef" ]
             # fi
 
             archivo=$(echo "${dir2}" | sed -n 's/^\(.*\/\)*\(.*\)/\2/p') # deja solo la ultima carpeta de una ruta, tras el último /
-            archivo2="${archivo//&/and/}"
+            archivo="$(echo ${archivo} | sed 's/[\":]//g')"
+            #archivo2="${archivo//&/and/}"
             cancion=$(playerctl -p strawberry metadata title) # obtener titulo de la canción
             dup=$(find /mnt/A26A-AAE7/Mix -iname "*$cancion*") # comprobar duplicados
       else
             dir2=$(deadbeef --nowplaying-tf "%path%")
             archivo=$(deadbeef --nowplaying-tf "%filename_ext%")
+            archivo="$(echo ${archivo} | sed 's/[\":]//g')"
             cancion=$(deadbeef --nowplaying-tf "%filename_ext%")
-            dup=$(find /mnt/Datos/Mix -iname "*${cancion}*") # comprobar duplicados
+            dup=$(find ${mixxx} -iname "*${cancion}*") # comprobar duplicados
 fi
 
 
 # Ruta de la carpeta que contiene las subcarpetas
-ruta_carpeta="$mixxx"
+ruta_carpeta="/mnt/windows/Mix"
 
 # Array para almacenar los nombres de las subcarpetas
 subcarpetas=()
@@ -78,6 +80,7 @@ if [ -z "$dup" ]
             # --extra-button "|___...Añadir Otra Carpeta...___|"\
             # --ok-label "En verdad paso..." \
             # $botones)
+            echo "BOTONES_ $botones"
             carpeta_seleccionada="$(python3 $HOME/Scripts/utilities/menu_pollo2.py $botones | awk 'NR==1 {print $1}')"
 
             echo "AAAAAAAAAAAAAAA>>>>   $carpeta_seleccionada"
@@ -92,7 +95,7 @@ if [ -z "$dup" ]
             fi
 
             # Copiar archivo en carpeta de Mixxx
-            destino="/mnt/Datos/Mix/$carpeta_seleccionada"
+            destino="$mixxx/$carpeta_seleccionada"
             echo "carpeta destino: ${carpeta_seleccionada}"
             if [ ! -z "$carpeta_seleccionada" ]
                   then
@@ -105,8 +108,9 @@ if [ -z "$dup" ]
             echo "copia: ${copia}"
             echo "esperando 5s a que se copie para renombrar archivo"
             sleep 5
-            tagutil -Yp rename:"%artist - %title [%year - %album]" "$copia" # renombra nueva canción
+            tagutil -Yp rename:"%artist - %title [%date - %album]" "$copia" # renombra nueva canción
 
+            
       else
             # En caso de existir la canción en Mixxx
             porcohone=$(zenity --info --title 'Canción en Mixxx'\
@@ -139,7 +143,7 @@ if [[ "${porcohone}" =~ 'Copiar' ]]
             fi
 
             # Copiar archivo
-            destino="/mnt/Datos/Mix/${carpeta_seleccionada}"
+            destino="${mixxx}/${carpeta_seleccionada}"
             echo "${carpeta_seleccionada}"
             if [ ! -z "${carpeta_seleccionada}" ]
                   then
@@ -153,3 +157,9 @@ if [[ "${porcohone}" =~ 'Copiar' ]]
             sleep 5
             tagutil -Yp rename:"%artist - %title [%date - %album]" "$copia"
 fi
+
+# Actualizar playlists para Mixxx
+rm ${mixxx}/*.m3u
+cd ${mixxx}
+for dir in *; do find "$dir" -type f > "${dir}.m3u"; done
+
