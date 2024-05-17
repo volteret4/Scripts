@@ -3,8 +3,9 @@
 tareas/tw_2_todo/
 test/
 gits/
-
+python_envs/
 # .env files
+*.env
 .env
 android/.env
 android/gasolineras/.env
@@ -18,29 +19,45 @@ links/music_player/.env
 maquinas-virtuales/.env
 menus/.env
 menus/dmenu/.env
+Musica/blog/vvmm/post/.env
+Musica/blog/vvmm/post/enlaces/.env
 Musica/conciertos/ticketmaster/.env
 Musica/estadisticas/lastfm/.env
 Musica/lidarr/.env
 Musica/MoverMusica/.env
 Musica/orpheus-api/.env
 Musica/MoverMusica/NewPipe/.env
+Musica/
+Musica/playlist/spotify/.env
 mpv/.env
-musica/.env
-musica/conciertos/.env
-musica/estadísticas/.env
-orpheus-api/,env
+Musica/playlist/youtube/.env
+Musica/.env
+Musica/conciertos/.env
+Musica/estadísticas/.env
+Musica/orpheus-api/,env
+Musica/playlist/.env
 path/.env
 pihole/.env
+utilities/server/.env
 snippets/.env
 tareas/.env
 tareas/escuchar_tareas/.env
 tareas/tw_2_todo/.env
 tiddlywiki/.env
+utilities/aliases/.env
+utilities/awesome/.env
 utilities/.env
+utilities/comic/.env
+utilities/maquinas-virtuales/.env
+utilities/open_search_links/.env
+utilities/open_search_links/music_player/.env
+utilities/open_search_links/busqueda_api/.env
+utilities/pihole/.env
 utilities/pomodoro/.env
+
 wireshark/.env
 wordpress/.env
-
+wordpress/.cache-pollolpc
 # files
 .pollo.sh
 Discord-0.0.17-x86_64.AppImage
@@ -48,6 +65,8 @@ android/joinserver/deviceId
 
 menus/dmenu/dmenu_mpd.sh
 menus/dmenu/.{gs}hist
+
+Musica/blog/enlaces/.env
 
 Musica/conciertos/ticketmaster/seis-meses.txt
 Musica/conciertos/ticketmaster/filtrado.json
@@ -89,4 +108,5 @@ utilities/pihole
 utilities/wordpress/data.json
 utilities/wordpress/canciones.txt
 
-utilities/wordpress/cache-pollolpc
+utilities/wordpress/.cache-pollolpc
+
