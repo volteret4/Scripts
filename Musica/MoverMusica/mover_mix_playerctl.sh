@@ -36,7 +36,7 @@ if [ -z "$deadbeef" ]
             archivo="$(echo ${archivo} | sed 's/[\":]//g')"
             #archivo2="${archivo//&/and/}"
             cancion=$(playerctl -p strawberry metadata title) # obtener titulo de la canción
-            dup=$(find /mnt/A26A-AAE7/Mix -iname "*$cancion*") # comprobar duplicados
+            dup=$(find $mixxx -iname "*$cancion*") # comprobar duplicados
       else
             dir2=$(deadbeef --nowplaying-tf "%path%")
             archivo=$(deadbeef --nowplaying-tf "%filename_ext%")
