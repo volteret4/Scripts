@@ -12,21 +12,24 @@
 #
 busqueda="$(xclip -o)"
 busqueda="${busqueda//&/and/}"
+
 url="https://www.discogs.com/search/?q=${busqueda}"
 
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox$"
+app=$(xdotool getactivewindow getwindowname)
 
-if [[ ${app_actual} =~ ${thorium} ]]
+
+if [[ "${app}" =~ 'strawberry' ]]
     then
+        bash $HOME/Scripts/utilities/open_search_links/music_player/discogs_metadata.sh
+    elif [[ ${app} =~ 'Thorium' ]]; then
         thorium-browser "${url}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
+    elif [[ ${app} =~ 'Firefox' ]]; then
         firefox "${url}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
+    elif [[ ${app} =~ 'Chromium' ]]; then
         chromium "${url}" &
+    elif [[ ${app} =~ 'Floorp' ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
-        qutebrowser --target window "${url}"
+        qutebrowser --target window "${url}" &
 fi

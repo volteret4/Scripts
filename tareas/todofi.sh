@@ -10,6 +10,9 @@
 #
 #
 
+#pollo edits
+ruta="/mnt/Datos/FTP/Wiki/Obsidian/Important/todotxt/todo/"
+
 
 VERSION="1.0.0"
 
@@ -107,7 +110,7 @@ mark_as_done() {
     selection="$1"
     number=$(getlinenumber "$selection")
     lineno=$(getlinenumber "$selection")
-    echo "NUMBERRRRR ____ ${selection}"
+    echo "NUMBERRRRR ____ ${lineno}"
     # confirm "mark as done" "$selection" && runtodo do "$lineno"
     # Resto de tu código...
 }
@@ -118,11 +121,17 @@ cleanup() {
     # Coloca aquí el comando que deseas ejecutar al cerrar la ventana
     echo "La ventana se ha cerrado. Ejecutando el comando de limpieza..."
     # Puedes agregar más comandos si es necesario
-    ruta="/mnt/A26A-AAE7/FTP/Wiki/todotxt/todo"
-    perl ${HOME}/Scripts/tareas/json_a_todotxt.pl ${ruta}/t_todo.txt > ${ruta}/tw_from_t_todo.json
+    perl ${HOME}/Scripts/tareas/json_a_todotxt.pl ${ruta}/t_todo.todotxt > ${ruta}/tw_from_t_todo.json
     cat ${ruta}/tw_from_t_todo.json | task import
     echo "importado en taskwarrior"
-    
+    raya="$(tail --lines 1 /mnt/Datos/FTP/Wiki/Obsidian/Important/todotxt/todo/t_done.txt)"
+    titulito="$(echo $raya | awk -F ' ' '{for (i=4; $i !~ /@|due/; i++) printf "%s ", $i}')"
+    codigo="$(todo list | grep $titulito | awk '{print $3}')"
+    todo done $codigo
+    vdirsyncer sync
+    id_todotxt="a98e9b72-891d-4827-bac8-1a2c4e1ba47d"
+    curl -X "POST" -H "x-api-user:67897ba5-3a4b-4556-93fe-5d3fa94dc8db" -H "x-api-key:02734383-9029-4025-92c1-2c80f48f10be" https://habitica.com/api/v3/tasks/$id_todotxt/score/up
+
     exit 0
 }
 
@@ -155,6 +164,7 @@ ${projcon}" -p "> ")
       runtodo add $new_todo
       echo $new_todo
       bash ${HOME}/Scripts/tareas/crear_tarea_caldav.sh ${new_todo} & # añade la tarea a caldav tambien
+      
       echo "creando tarea caldav"
     fi
 }

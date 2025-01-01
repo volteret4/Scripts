@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>Tasker Web UI Proof Of Concept</title>
+	<style>
+		body {
+			display: flex;
+			flex-direction: column;
+			height: 100vh;
+			font-family: Arial, sans-serif;
+		}
+
+		input,
+		button {
+			margin: 10px;
+		}
+
+		.control-button {
+			padding: 10px 20px;
+			font-size: 20px;
+			cursor: pointer;
+			background-color: #007BFF;
+			color: #fff;
+			border: none;
+			border-radius: 5px;
+		}
+
+		.control-button:hover {
+			background-color: #0056b3;
+		}
+
+		.command {
+			background-color: antiquewhite;
+			margin: 8px;
+			padding: 8px;
+		}
+
+		.task_action {
+			background-color: beige;
+			margin: 4px;
+			padding: 8px;
+			border-radius: 8px;
+		}
+
+		.action_name {
+			font-weight: bold;
+			margin-bottom: 8px;
+			font-size: larger;
+		}
+
+		.action_args {
+			display: inline;
+		}
+
+		.action_arg_name {
+			font-weight: bold;
+			display: inline;
+			margin-bottom: 8px;
+		}
+
+		.action_arg_value {
+			font-style: italic;
+			display: inline;
+		}
+
+		.hidden {
+			display: none;
+		}
+
+		#actions_wrapper {
+			font-size: larger;
+		}
+
+		#actions_wrapper {
+			position: fixed;
+			background-color: white;
+			right: 8px;
+			bottom: 8px;
+			max-height: 500px;
+			width: 400px;
+			overflow-y: auto;
+			padding: 8px;
+			border: 1px black solid;
+		}
+
+		#actions_wrapper::-webkit-scrollbar {
+			width: 5px;
+		}
+
+		/* Track */
+		#actions_wrapper::-webkit-scrollbar-track {
+			background: #f1f1f1;
+		}
+
+		/* Handle */
+		#actions_wrapper::-webkit-scrollbar-thumb {
+			background: #888;
+		}
+
+		/* Handle on hover */
+		#actions_wrapper::-webkit-scrollbar-thumb:hover {
+			background: #555;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="command">
+		<h3>Tasker WebUI URL</h3>
+		<input type="text" id="tasker_base_url" placeholder="URL">
+		<div>In Tasker, edit a task and make sure you're using the new UI. Press the menu on the bottom-left and enable WebUI. Enter the address shown there above.</div>
+	</div>
+	<div class="command">
+		<h3>Move Action</h3>
+		<input type="number" id="from" placeholder="from" />
+		<input type="number" id="to" placeholder="to" />
+		<button class="control-button" onclick="moveAction()">Move</button>
+	</div>
+	<div class="command">
+		<input type="number" id="delete_action_index" placeholder="Number To Delete" />
+		<button class="control-button" onclick="deleteAction()">Delete Action</button>
+	</div>
+	<div class="command">
+		<h3>Add Flash Action</h3>
+		<input type="text" id="flash_title" placeholder="Title" />
+		<input type="text" id="flash_text" placeholder="Text" />
+		<button class="control-button" onclick="insertFlashAction()">Add</button>
+	</div>
+	<div class="command">
+		<h3>Add Any Action</h3>
+		<select id="action_types"></select>
+		<div id="action_args"></div>
+		<button class="control-button" id="button_add_any_action" onclick="addAnyAction()">Add</button>
+	</div>
+	<div id="actions_wrapper">
+		<div>Task Actions</div>
+		<div id="actions"></div>
+	</div>
+
+	<script>
+		const elementBaseUrl = document.querySelector("#tasker_base_url");
+		elementBaseUrl.value = localStorage["baseUrl"] ? localStorage["baseUrl"] : "";
+		elementBaseUrl.onkeyup = () => {
+			localStorage["baseUrl"] = elementBaseUrl.value;
+			populateActionTypes();
+			refreshActions();
+		}
+		const baseUrl = () => {
+			let url = document.querySelector("#tasker_base_url").value;
+			url = url.replace(/\/+$/, "");
+			return url;
+		};
+		const buildActionListFromResponse = (fetchPromise) => fetchPromise
+			.then(response => response.json())
+			.then(data => {
+				console.log(data);
+				const elementActions = document.querySelector("#actions");
+				elementActions.innerHTML = "";
+				var count = 1;
+				data.forEach(action => {
+					const elementAction = document.createElement("div");
+					elementAction.classList.add("task_action");
+					elementAction.id = action.id;
+					elementAction.innerHTML = `<div class="action_name">${count}. ${action.name}</div><div class="action_args">${action.args.map(arg => arg.value ? `<div class="action_arg_name">${arg.name}</div>: <div class="action_arg_value">${arg.value}</div>` : "").filter(text => text).join(", ")}</div>`;
+					elementActions.appendChild(elementAction);
+					count++;
+				});
+			})
+			.catch((error) => {
+				console.error('Error:', error);
+			});
+		const addAction = (actionJson) => {
+			var url = `${baseUrl()}/actions`;
+			buildActionListFromResponse(fetch(url,
+				{
+					method: "PATCH",
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify(actionJson)
+				}));
+		}
+		function moveAction() {
+			var from = document.getElementById('from').value;
+			var to = document.getElementById('to').value;
+			var url = `${baseUrl()}/move?from=${from - 1}&to=${to - 1}`;
+
+			buildActionListFromResponse(fetch(url));
+		}
+		function deleteAction() {
+			var number = parseInt(document.getElementById('delete_action_index').value);
+			var url = `${baseUrl()}/delete?index=${number - 1}`;
+
+			buildActionListFromResponse(fetch(url));
+		}
+		function insertFlashAction() {
+			var text = document.getElementById('flash_text').value;
+			var title = document.getElementById('flash_title').value;
+
+			addAction(
+				{
+					"action": {
+						"code": 548,
+						"args": [
+							{
+								"id": 0,
+								"value": text
+							},
+							{
+								"id": 2,
+								"value": true
+							},
+							{
+								"id": 3,
+								"value": title
+							}
+						]
+					}
+				}
+			);
+		}
+		buildActionListFromResponse(fetch(`${baseUrl()}/actions`));
+
+
+		const elementActionType = document.querySelector("#action_types");
+		const elementArgs = document.querySelector("#action_args");
+		const refreshActions = async () => {
+			buildActionListFromResponse(fetch(`${baseUrl()}/actions`))
+		}
+		const populateActionTypes = async () => {
+			elementActionType.innerHTML = "";
+			elementArgs.innerHTML = "";
+			const buttonAddAnyAction = document.querySelector("#button_add_any_action");
+			// buttonAddAnyAction.classList.add("hidden");
+			const actionSpecsJson = await (await fetch(`${baseUrl()}/action_specs`)).json();
+			const argTypeSpecJson = await (await fetch(`${baseUrl()}/arg_specs`)).json();
+			actionSpecsJson.forEach(actionSpec => {
+				var option = document.createElement('option');
+				option.args = actionSpec.args;
+				option.value = actionSpec.code;
+				option.text = actionSpec.name;
+				elementActionType.add(option);
+			});
+			elementActionType.onchange = (e) => {
+				elementArgs.innerHTML = "";
+				e.target.selectedOptions[0].args.forEach(arg => {
+					if (arg.type == 5) return; //ignore Bundle args for this example
+
+					const elementArg = document.createElement("div");
+
+					const elementArgLabel = document.createElement("div");
+					elementArgLabel.innerHTML = arg.name;
+					elementArg.appendChild(elementArgLabel);
+
+					const elementArgInput = document.createElement("input");
+
+					elementArgInput.taskerId = arg.id;
+					elementArgInput.placeholder = argTypeSpecJson[arg.type];
+					if (arg.type == 0 && arg.spec.indexOf(":") > 0) {
+						const range = arg.spec.split(":");
+						elementArgInput.placeholder += ` (${range[0]} - ${range[1]})`
+					}
+					elementArgInput.classList.add("tasker_input");
+					elementArg.appendChild(elementArgInput);
+
+					elementArgs.appendChild(elementArg);
+				});
+			};
+			elementActionType.onchange({ target: elementActionType });
+		}
+		function addAnyAction() {
+			const actionJson = {
+				code: elementActionType.value
+			}
+			const elementsArgs = document.querySelectorAll(".tasker_input");
+			const args = Array.from(elementsArgs).map(elementArg => {
+				return {
+					id: elementArg.taskerId,
+					value: elementArg.value ? elementArg.value : null
+				}
+			}).filter(arg => arg.value != null);
+			actionJson.args = args;
+			addAction({ action: actionJson });
+		}
+		populateActionTypes();
+
+
+	</script>
+</body>
+
+</html>

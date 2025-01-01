@@ -41,6 +41,8 @@ app_actual=$(xdotool getactivewindow getwindowname)
 thorium="Thorium$"
 chromium="Chromium"
 firefox="Mozilla Firefox"
+floorp="Floorp"
+
 
 busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
 
@@ -51,6 +53,8 @@ url="https://rateyourmusic.com/search?searchterm=${busqueda}"
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &
+    elif [[ ${app_actual} =~ ${floorp} ]]; then
+        floorp "${url}" &
     elif [[ ${app_actual} =~ ${firefox} ]]; then
         firefox "${url}" &
     elif [[ ${app_actual} =~ ${chromium} ]]; then

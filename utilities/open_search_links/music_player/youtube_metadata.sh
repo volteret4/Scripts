@@ -37,22 +37,42 @@ app_actual=$(xdotool getactivewindow getwindowname)
 thorium="Thorium$"
 chromium="Chromium"
 firefox="Mozilla Firefox"
+floorp="Floorp"
 
 # Obtener metadata del reproductor actual
 
-artista=$(playerctl -p "${player_active}" metadata xesam:artist)
-cancion=$(playerctl -p "${player_active}" metadata xesam:title)
-album=$(playerctl -p "${player_active}" metadata xesam:album)
+# Obtener metadata del reproductor actual
+if [[ -z $deadbeef ]] ; then
+    artista=$(playerctl -p "${player_active}" metadata xesam:artist)
+    cancion=$(playerctl -p "${player_active}" metadata xesam:title)
+    album=$(playerctl -p "${player_active}" metadata xesam:album)
+fi
 
 busqueda=$(echo "${artista} ${cancion}" | sed 's/&/and/g')
 
 url="https://www.youtube.com/results?search_query=${busqueda}"
+
+
+comando="python3 /home/ansible/scripts/blog/vvmm/post/enlaces/youtube-1arg.py "${busqueda}""
+echo "com: $comando"
+url_api="$(ssh hugo "$comando")"
+echo "url $url_api"
+
+if [[ -z $url_api ]]; then
+    echo "no se encontró nada en la api"
+else
+    copyq add ${url}
+    url="${url_api}"
+    echo "cambiando a url de la api. guardada la anterior en el portapapeles"
+fi
 
 # Abrir busqueda en wikipedia
 
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &
+    elif [[ ${app_actual} =~ ${floorp} ]]; then
+        floorp "${url}" &
     elif [[ ${app_actual} =~ ${firefox} ]]; then
         firefox "${url}" &
     elif [[ ${app_actual} =~ ${chromium} ]]; then

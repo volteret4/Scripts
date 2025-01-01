@@ -15,19 +15,33 @@ busqueda=${busqueda//&/and/}
 
 url="https://www.youtube.com/results?search_query=${busqueda}"
 
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
+comando="python3 /home/ansible/scripts/blog/vvmm/post/enlaces/youtube-1arg.py "${busqueda}""
+echo "com: $comando"
+url_api="$(ssh hugo "$comando")"
+echo "url $url_api"
 
-if [[ ${app_actual} =~ ${thorium} ]]
-    then
+if [[ -z $url_api ]]; then
+    echo "no se encontró nada en la api"
+else
+    copyq add ${url}
+    url="${url_api}"
+    echo "cambiando a url de la api. guardada la anterior en el portapapeles"
+fi
+
+
+app="$(bash "${HOME}"/Scripts/snippets/if_firefox_active.sh)"  # > $resultado
+
+if [[ "${app}" =~ "strawberry|DeaDBeef" ]]; then
+        bash $HOME/Scripts/utilities/open_search_links/music_player/google_metadata.sh
+    elif [[ ${app} =~ 'Thorium' ]]; then
         thorium-browser "${url}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
+    elif [[ ${app} =~ 'Firefox' ]]; then
         firefox "${url}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
+    elif [[ ${app} =~ 'Chromium' ]]; then
         chromium "${url}" &
+    elif [[ ${app} =~ 'Floorp' ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
-        qutebrowser --target window "${url}"
+        qutebrowser --target window "${url}" &
 fi

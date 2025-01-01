@@ -5,54 +5,169 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
+# TODO:   AConfigurar playerctl y mpc.  
 # Notes:
+#requisitos="xdotool deadbeef firefox|floorp|chromium|'thorium browser'"
 #
 #
 
+# # Comprueba OS
+# apt="$(which apt)"
+# pacman="$(which pacman)"
+# if [[ -z $pacman ]];then
+#     pm=apt
+# elif [[ -z apt ]];then
+#     pm=error
+# elif [[ -n $pacman ]];then
+#     pm=pacman
+# fi
+
+# #  Comprueba requisitos
+
+# # Dividir la cadena de requisitos en un array basado en espacios
+# IFS=' ' read -ra REQUISITOS <<< "$requisitos"
+
+# # Iterar sobre cada requisito
+# for requisito in "${REQUISITOS[@]}"; do
+#     # Verificar si el requisito contiene '|', lo que indica una elección entre varias aplicaciones
+#     if [[ $requisito == *'|'* ]]; then
+#         # Dividir el requisito en partes usando '|' como separador
+#         IFS='|' read -ra OPCIONES <<< "$requisito"
+        
+#         for opcion in "${OPCIONES[@]}"; do
+#              ((intentos++))
+#             app_instalada="$(which $opcion)"
+#             if [[ -z $app_instalada ]] ;then
+#                 echo ""
+#                 echo "No tienes $opcion instalado, seguiremos buscando...($intentos de 5)"
+#             else
+#                 echo ""
+#                 echo "$opcion instalada en $app_instalada"
+#             fi
+#         done
+#     else
+#         app_instalada="$(which $requisito)"
+#         if [[ -z $app_instalada ]] ;then
+#             echo ""
+#             echo "No tienes $requisito instalado, prueba con $instalar"
+#         else
+#             echo ""
+#             echo "$requisito instalad en $app_instalada"
+#         fi
+#     fi
+# done
 
 
-app=$(xdotool getactivewindow getwindowname)
-export "${app?}"
+
+busqueda="$(xclip -o)"
+
+applic="$(xdotool getactivewindow getwindowname)"
+app="$(echo $applic | awk -F/ '{print $NF}')"
+#export "${app?}"
 firefox="Mozilla Firefox$"
-chromium="\- Chromium$"
+chromium="Chromium$"
 qutebrowser="qutebrowser$"
-#export strawberry="$(xdotool getactivewindow getwindowclassname)"
-sleep 0.2
+thorium="Thorium$"
+floorp="Floorp$"
 
-if [[ ${app} =~ ${firefox} ]]
-                then
-                        echo "firefox"
-                        wid=$(xdotool search --name "Mozilla Firefox$")
-                        xdotool windowfocus "${wid}"
-                        sleep 0.2
-                        xdotool key ctrl+l
-                        xdotool key ctrl+c
-                        xdotool key Escape
-        elif [[ ${app} =~ ${chromium} ]]
-                then
-                        echo "chromium"
-                        wid=$(xdotool search --name "\- Chromium$")
-                        xdotool windowfocus "${wid}"
-                        sleep 0.2
-                        xdotool key ctrl+l
-                        xdotool key ctrl+c
-                        xdotool key Escape
-        elif [[ ${app} =~ ${qutebrowser} ]]
-                then
-                        echo "qutebrowser"
-                        wid=$(xdotool search --name ${qutebrowser})
-                        xdotool windowfocus "${wid}"
-                        xdotool key y
-                        xdotool key y
-        elif [[ ${app} =~ 'strawberry' ]]
-                then
-                        echo "strawberry"
-                        artista=$(playerctl -p strawberry  metadata xesam:albumArtist)
-                        cancion=$(playerctl -p strawberry  metadata title)
-                        album=$(playerctl -p strawberry  metadata album)
-                        printf '\n%s\n' "${artista}" "${album}" "${cancion}"
-                else
-                        echo "other"
+deadbeef="DeaDBeeF"
+strawberry=""
+
+# Obtener el nombre de la ventana activa
+active_window_id=$(xdotool getactivewindow)
+active_window_name=$(xdotool getwindowname "$active_window_id")
+#export strawberry="$(xdotool getactivewindow getwindowclassname)"
+
+# if [[ ${app} =~ ${firefox}|${chromium}|${floorp}|${thorium} ]]; then
+#         wid=$(xdotool search --name "${app}")
+#         xdotool windowfocus --sync "${wid}"
+#         xdotool key --window "${wid}" ctrl+l
+#         xdotool key --window "${wid}" ctrl+c
+#         xdotool key --clearmodifiers  --window "${wid}" Escape
+# if [[ ${app} =~ ${firefox} ]]; then
+#         wid=$(xdotool search --name "Mozilla Firefox$")
+#         xdotool windowfocus --sync "${wid}"
+#         xdotool key --window "${wid}" ctrl+l
+#         xdotool key --window "${wid}" ctrl+c
+#         xdotool key --clearmodifiers  --window "${wid}" Escape
+#     elif [[ ${app} =~ ${chromium} ]]; then
+#         wid=$(xdotool search --name "\- Chromium$")
+#         xdotool windowfocus --sync "${wid}"
+#         xdotool key --window "${wid}" ctrl+l
+#         xdotool key --window "${wid}" ctrl+c
+#         #sleep 0.1
+#         xdotool key --clearmodifiers --window "${wid}" Escape
+#     elif [[ ${app} =~ ${floorp} ]]; then
+#         echo "floorp es la acitva"
+#         wid=$(xdotool search --name "Floorp$")
+#         xdotool windowfocus --sync "${wid}"
+#         xdotool key --window "${wid}" ctrl+l
+#         xdotool key --window "${wid}" ctrl+c
+#         xdotool key --clearmodifiers --window "${wid}" Escape
+#     elif [[ ${app} =~ ${thorium} ]]; then
+#         wid=$(xdotool search --name "Thorium$")
+#         xdotool windowfocus "${wid}"
+#         xdotool key --window "${wid}" ctrl+l
+#         xdotool key --window "${wid}" ctrl+c
+#         xdotool key --clearmodifiers  --window "${wid}" Escape
+
+# Define una lista de aplicaciones y sus nombres de ventana
+declare -A browser
+browser=(
+    ["firefox"]="Mozilla Firefox$"
+    ["chromium"]="\\- Chromium$"
+    ["floorp"]="Floorp$"
+    ["thorium"]="Thorium$"
+)
+
+# Itera sobre las aplicaciones
+for browser_name in "${!browser[@]}"; do
+    if [[ "$active_window_name" =~ ${browser[$browser_name]} ]]; then
+        echo "App name: $browser_name"
+        # Utilizar el ID de la ventana activa directamente
+        wid=$active_window_id
+        if [[ -n "$wid" ]]; then
+            xdotool windowfocus --sync "${wid}"
+            sleep 0.2
+            xdotool key --window "${wid}" ctrl+l
+            xdotool key --window "${wid}" ctrl+c
+            xdotool key --clearmodifiers Escape
+        else
+            echo "No se encontró la ventana para ${browser_name}"
+        fi
+        break
+    fi
+done
+
+if [[ ${app} =~ ${qutebrowser} ]]; then
+    echo "qutebrowser es la que esta activa wtf"
+    wid=$(xdotool search --name ${qutebrowser})
+    xdotool windowfocus --sync "${wid}" 
+    xdotool key --window "${wid}" key y
+    xdotool key --window "${wid}" key y
+elif [[ ${app} =~ ${deadbeef} ]]; then
+    # wid=$(xdotool search --name "DeaDBeeF$")
+    # xdotool windowfocus --sync "${wid}"
+    musica="$(deadbeef --now-playing-tf "%artist - %title (%year - %album)")"
+elif [[ ${app} =~ 'strawberry' ]]; then
+    #pendiente de corregir
+    artista=$(playerctl -p strawberry  metadata xesam:albumArtist)
+    cancion=$(playerctl -p strawberry  metadata title)
+    album=$(playerctl -p strawberry  metadata album)
+    date=$(playerctl -p strawberry  metadata date)
+    musica="${artista} - ${cancion} (${date} - ${album})"
+else
+    echo "other"
 fi
-"$(xclip -o)"
+
+
+# debug time
+url="$(xclip -o)"
+
+
+if [[ -z $musica ]]; then
+        echo "${app} ${url}"
+        #notify-send -t 100000 "app $app \n url $url"
+else
+        echo "${app} - $musica"
+fi

@@ -36,13 +36,15 @@ app_actual=$(xdotool getactivewindow getwindowname)
 thorium="Thorium$"
 chromium="Chromium"
 firefox="Mozilla Firefox"
+floorp="Floorp"
 
 
 # Obtener metadata del reproductor actual
-
-artista=$(playerctl -p "${player_active}" metadata xesam:artist)
-cancion=$(playerctl -p "${player_active}" metadata xesam:title)
-album=$(playerctl -p "${player_active}" metadata xesam:album)
+if [[ -z $deadbeef ]] ; then
+    artista=$(playerctl -p "${player_active}" metadata xesam:artist)
+    cancion=$(playerctl -p "${player_active}" metadata xesam:title)
+    album=$(playerctl -p "${player_active}" metadata xesam:album)
+fi
 
 busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
 
@@ -54,6 +56,8 @@ url="https://rutracker.org/forum/tracker.php?nm=${busqueda}"
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &
+    elif [[ ${app_actual} =~ ${floorp} ]]; then
+        floorp "${url}" &
     elif [[ ${app_actual} =~ ${firefox} ]]; then
         firefox "${url}" &
     elif [[ ${app_actual} =~ ${chromium} ]]; then

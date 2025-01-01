@@ -11,10 +11,12 @@
 #		ffprobe
 #
 
-
-
 #variables
-flacs="${HOME}/Musica/Arch/Musica/"
+server="aws"
+flacs="${1}"
+if [[ -z $flacs ]]; then
+	flacs="${HOME}/Musica/Arch/Musica/"
+fi
 # oracle="ubuntu@143.47.33.148 -i ${HOME}/.ssh/config" 			#si esta configurado .ssh/config no se necesita esta linea
 
 
@@ -28,7 +30,7 @@ tag=$(zenity --info --title "enviar disco subsonic"\
     --text "¿Quieres enviar este disco a subsonic?"\
     --extra-button "aro pish"\
     --ok-label "paso"\
-) &
+)
 
 
 # seleccionar un archivo de la carpeta
@@ -64,14 +66,21 @@ echo "${album}"
 
 
 # crear carpeta de destino_mp3 del mp3
-destino_mp3="/home/huan/Musica/Arch/mp3/${artist}/${year} - ${album}"
-echo "${destino_mp3}"
-mkdir -p "${destino_mp3}"
-carpeta="/home/huan/Musica/Arch/mp3/${artist}"
+
+if [[ $flacs =~ '/Musica/Arch/Musica/' ]]; then
+	destino_mp3="/home/huan/Musica/Arch/mp3/${artist}/${year} - ${album}"
+	echo "${destino_mp3}"
+	mkdir -p "${destino_mp3}"
+	carpeta="/home/huan/Musica/Arch/mp3/${artist}"
+fi
 
 
 # convertir a mp3 en la ruta elegida, con el mismo nombre de archivo
 for f in "${source}"/*.flac ; do
+	if [[ $flacs =~ '/mnt/windows/Mix/' ]]; then
+		genre="$(dirname $f)"
+		destino_mp3="/home/huan/Musica/Arch/mp3/mixxx/${genre}"
+	fi
 	nombre_archivo=$(basename "$f")
 	archivo_destino="${destino_mp3}/${nombre_archivo%.*}.mp3"
 	ffmpeg -n -i "$f" -acodec libmp3lame -b:a 320k "$archivo_destino"
@@ -97,14 +106,17 @@ fi
 
 
 # declarar destino en servidor
-destino="/home/ubuntu/contenedores/musica/archivos/albums/"
-
+if [[ $server =~ 'oracle' ]]; then
+	destino="/home/ubuntu/contenedores/musica/archivos/albums/"
+elif [[ $server =~ 'aws' ]]; then
+	destino="/home/ubuntu/contenedores/azuracast/musica/"
+fi
 
 # enviar en caso afirmativo
 if [[ "${tag}" =~ "aro pish" ]]
 	then
 		#ssh oracle mkdir -p "${destino}"
-		rsync -avzh "${carpeta}" oracle:"${destino}"
+		rsync -avzh "${carpeta}" ${server}:"${destino}"
 		echo "archivos enviados"
 
 		# borrar archivos mp3

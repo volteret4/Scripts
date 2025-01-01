@@ -18,10 +18,12 @@ if [ -z "$deadbeef" ]
             archivo="$(echo ${archivo} | sed 's/[\":]//g')"
             artista=$(deadbeef --nowplaying-tf "%artist%")
             cancion=$(deadbeef --nowplaying-tf "%title%")
+            album=$(deadbeef --nowplaying-tf "%album%")
 #            dup=$(find ${mixxx} -iname "*${cancion}*") # comprobar duplicados
 fi
 
 art="$(echo "$artista" | sed 's/ /-/g')"
 can="$(echo "$cancion" | sed 's/ /-/g')"
+alb="$(echo "$album" | sed 's/ /-/g')"
 
-echo "${art} ${can}"
+echo "${art} ${can} ${album}"

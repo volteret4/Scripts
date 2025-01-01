@@ -19,5 +19,5 @@ source "${carpeta}/.env"
 clipboard="$(copyq read 0)"
 clipboard="${clipboard// /%20/}"
 
-curl "https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${APIKEY}&clipboard=${clipboard}&deviceId=${POCOX3}"
-notify-send 'Clipboard enviado a' 'Poco X3 NFC' -t 10000
+curl "https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${APIKEY}&clipboard=${clipboard}&deviceId=${POCOF6}"
+notify-send 'Clipboard enviado a' 'Poco F6' -t 10000

@@ -6,7 +6,7 @@
 # Repository: https://github.com/volteret4/
 # License: 
 # TODO: 
-#   - Change "find" for a faster option.
+#   - Change "fd" for a faster option.
 #   - Change termite
 # Notes:
 #   Dependencies:
@@ -22,11 +22,10 @@ ssgen_path="$HOME/Scripts/menus/dmenu"      # CHANTE!!
 
 # list only executable non-binay files
 
-list="$(find "${script_path}" -type f -executable \
-    -exec grep -Iq . {} \; -print \
-    | sed 's|^'"${script_path}"/'||' \
-    | sort \
-    )"
+list="$(fd . "${script_path}" -t x \
+    | sed "s|.*/||" \
+    | sort
+)"
 
 # output list to dmenu
 
@@ -36,7 +35,7 @@ select="$(dmenu -l -i -p 'Lanza Script: ' <<< "${list}")"
 # run 'ssgen' with the selected file name
 
 if [[ ! -z "${select}" ]]; then
-    ruta="$(find "${script_path}" -iname "${select}")"
+    ruta="$(fd "${script_path}" -i "${select}")"
     eval "termite -e  ${script_path}/${select} --hold"
 fi
 
