@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Script Name: crear_tarea_caldav.sh 
-# Description: Añadir tarea a calenario Musica
+# Description: Añadir tarea a calenario Tareas, a todotxc de obsidian y todofi.sh y a taskwarrior
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
@@ -11,6 +11,9 @@
 #		vdirsyncer
 #		copyq
 #		todo
+#		taskwarrior
+#		todofi.sh
+#		servidor caldav
 #
 
 
@@ -27,7 +30,7 @@ discos="d1573ec1-e837-6918-1dfe-bc0b6c04681d"		# CHANGE!!!
 tareas="7c44de6e-69ac-8496-f46d-d6753c9eab1f"		# CHANGE!!!
 musica="e2e4e951-3599-8f21-de6c-105ec980b1ec"		# CHANGE!!!
 
-tododir="/mnt/Datos/FTP/Wiki/todotxt/"				# CHANGE!!!
+tododir="/mnt/windows/FTP/Wiki/Obsidian/Important/todotxt"				# CHANGE!!!
 
 # Pasar portapapeles al script
 contenido=$(copyq clipboard)
@@ -39,17 +42,20 @@ if echo "$url" | grep -E -q "(youtu\.be|youtube\.com|bandcamp\.com|soundcloud\.c
 		calendario="discos"
 		echo "calendario: discos"
 		todofile="${tododir}/albums/a_todo.txt"
-		titulo=$(zenity --entry --entry-text "+" --text 'Tags @ | Categorias +')
+		titulo="$(yad --entry --entry-text "+" --text 'Tags @ | Categorias +')"
+		titulo="$(echo $titulo | tr -d '\n' | tr -d '\r' )"
 		album="$(yt-dlp --get-title ${contenido})"
 	elif [[ -n ${arg} ]]; then
 		calendario="tareas"
-		todofile="${tododir}/todo/t_todo.txt"
+		todofile="${tododir}/todo/t_todo.todotxt"
 		titulo="${arg}"
+		titulo="$(echo $titulo | tr -d '\n' | tr -d '\r' )"
 	else
 		calendario="tareas"
 		echo "calendario: tareas"
-		todofile="${tododir}/todo/t_todo.txt"
-		titulo=$(zenity --entry --text 'Tarea')
+		todofile="${tododir}/todo/t_todo.todotxt"
+		titulo="$(yad --entry --text 'Tarea')"
+		titulo="$(echo $titulo | tr -d '\n' | tr -d '\r' )"
 fi
 
 
@@ -73,8 +79,8 @@ done
 # done
 
 # Establecer fechas
-fecha_hoy=$(date +%Y/%m/%d)
-nextyear=$(date -d "+1 year" +%Y/%m/%d)
+fecha_hoy=$(date +%Y-%m-%d)
+nextyear=$(date -d "+1 year" +%Y-%m-%d)
 
 
 # Sincronizar y comprobar errores
@@ -93,28 +99,50 @@ if [ ${ans} -eq 0 ]
 	then
 		if [[ ${calendario} = tareas ]]
 			then
-				# enviar="${titulo} ${contenido}"
-				echo "${fecha_hoy} ${titulo} due:${nextyear}" >> "${todofile}"
-				# Iterar sobre el array y eliminar cada @word del titulo
-				for categoria in "${categorias[@]}"; do
-				    titulo=${titulo//$categoria/}
-				done
-				# todo new -l "$musica" -s "today" -d "one year" -c "$categoria" -r "$titulo" &
+				# enviar al todotxt. (rofi y obsidian dependen de el)
+				txt_cmd="${fecha_hoy} ${titulo}"
+				# Iterar sobre el array y eliminar cada @categoria del titulo
+				if [[ -z $categorias_unicas ]]; then
+					echo "sin tags"
+				else
+					for categoria in "${categorias[@]}"; do
+						txt_cmd+=" \"$categoria\""
+					done
+				fi
+				txt_cmd="$txt_cmd due:$nextyear"
+				echo "$txt_cmd" >> "$todofile"
+				
+				# Exportar a json para luego importar a taskwarrior
+				perl ${HOME}/Scripts/tareas/json_a_todotxt.pl ${tododir}/t_todo.todotxt > ${tododir}/tw_from_t_todo.json
+    			cat ${tododir}/tw_from_t_todo.json | task import
+    			echo "importado en taskwarrior"
+
 
 				# Llamar a todo new con las categorías
-				todo_command="todo new -l \"$tareas\" -s \"today\" -d \"one year\" -r \"$titulo\""
-				for categoria in "${!categorias_unicas[@]}"; do
-			    	todo_command+=" -c \"$categoria\""
-				done
+				todo_command="todo --config $HOME/.config/todoman/config_tareas.py new -l \"$tareas\" -s \"today\" -d \"one year\" -r \"$titulo\""
+				
+				# añadir categorias si existen
+				if [[ -z $categorias_unicas ]]; then
+					echo "sin tags"
+				else
+					for categoria in "${!categorias_unicas[@]}"; do
+						todo_command+=" -c \"$categoria\""
+					done
+				fi
+				
+				# debug time
 				echo "titulo: $titulo"
 				echo "categoria: $categoria"
 				echo "todocmd: $todo_command"
 				eval "$todo_command" &
 				notify-send "enviada tarea: ${titulo} ${categoria}"
 				echo "enviad tarea: ${titulo} ${categoria}"
+				
 			elif [[ $calendario = discos ]]
 				then
-					echo D1
+					echo DISCOS
+					todo_command="todo new -l \"discos\" -s \"today\" -d \"one year\" -r \"$titulo\""
+					eval "$todo_command" &
 					notify-send "enviado disco: ${album} ${contenido} ${titulo}"
 					echo "${fecha_hoy} ${album} ${contenido} ${titulo}" >> "${todofile}"
 					echo "enviado disco: ${album} ${contenido} ${titulo}"
@@ -132,6 +160,8 @@ echo "${pid_mostrar_barra}"
 wait "${pid_mostrar_barra}"
 echo "fin"
 #sleep 50
+
+
 
 # Sincronizar con vdirsyncer
 vdirsyncer sync

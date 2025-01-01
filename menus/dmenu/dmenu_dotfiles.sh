@@ -8,8 +8,7 @@
 # Repository: https://github.com/volteret4/
 # License: 
 # TODO: 
-#   - Change "find" for a faster option
-#   - Change helix to "$editor"
+#   
 # Notes:
 #   Dependencies:
 #       helix
@@ -25,21 +24,38 @@ ssgen_path="$HOME/Scripts/menus/dmenu"
 
 # list only executable non-binay files
 
-list="$(find "${dot_path}" -type f \
-    -exec grep -Iq . {} \; -print \
-    | sed 's|^'"${dot_path}"/'||' \
-    | sort \
-    )"
+list="$(fd . "${dot_path}" -t f \
+    | sed "s|.*/||" \
+    | sort
+)"
+
 
 # output list to dmenu
 
 #__1__ select="$(dmenu $prompt $font $colors $lines <<< $list)"
 select="$(dmenu -l -i -p 'Elige dotfile: ' <<< "${list}")"
 file="$(basename ${select})"
+path="$(fd "$select" "$dot_path" | sed 's/^\.//' )" #path del script seleccionado
+file="$(basename ${select})"
 
-tmux_sesion="$(tmux list-sessions | awk 'NR==1 {print $1}' | sed 's/://')"
+# Verificar si hay sesiones activas
+if ! tmux ls &>/dev/null; then
+    kitty -e sh -c 'byobu -f ~/.byobu/.tmux.conf' &
+    sleep 0.5  # Esperar un poco para que tmux se inicie
+fi
 
-comando="helix  ${select}"
+# Esperar a que tmux esté disponible y obtener la primera sesión
+for i in {1..5}; do
+    tmux_sesion="$(tmux list-sessions 2>/dev/null | awk 'NR==1 {print $1}' | sed 's/://')"
+    if [[ -n $tmux_sesion ]]; then
+        break
+    fi
+    sleep 1
+done
+
+#tmux_sesion="$(tmux list-sessions | awk 'NR==1 {print $1}' | sed 's/://')"
+
+comando="helix ${path}"
 
 
 #__2__ run 'ssgen' with the selected file name

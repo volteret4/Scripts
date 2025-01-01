@@ -28,27 +28,43 @@ ssgen_path="$HOME/Scripts/menus/dmenu"      # CHANGE!!
 
 # list only executable non-binay files
 
-list="$(find "${script_path}" -type f -executable \
-    -exec grep -Iq . {} \; -print \
-    | sed 's|^'"${script_path}"/'||' \
-    | sort \
-    )"
+list="$(fd . "${script_path}" -t x \
+    | sed "s|.*/||" \
+    | sort
+)"
 
 # output list to dmenu
 
 #select="$(dmenu $prompt $font $colors $lines <<< $list)"
 select="$(dmenu -l -i -p 'Edita Script: ' <<< "${list}")"
+path="$(fd "$select" "$script_path" | sed 's/^\.//' )" #path del script seleccionado
 file="$(basename ${select})"
 
-tmux_sesion="$(tmux list-sessions | awk 'NR==1 {print $1}' | sed 's/://')"
+# Verificar si hay sesiones activas
+if ! tmux ls &>/dev/null; then
+    kitty -e sh -c 'byobu -f ~/.byobu/.tmux.conf' &
+    #sleep 2  # Esperar un poco para que tmux se inicie
+fi
 
-comando="helix  ${script_path}/${select}"
+# Esperar a que tmux esté disponible y obtener la primera sesión
+for i in {1..5}; do
+    tmux_sesion="$(tmux list-sessions 2>/dev/null | awk 'NR==1 {print $1}' | sed 's/://')"
+    if [[ -n $tmux_sesion ]]; then
+        break
+    fi
+    sleep 0.2
+done
+
+#tmux_sesion="$(tmux list-sessions | awk 'NR==1 {print $1}' | sed 's/://')"
+
+#notify-send "t-sess $tmux_sesion ."
+comando="helix ${path}"
 
 
 # run 'ssgen' with the selected file name
 
 if [[ -n "${select}" ]]; then
-    eval "tmux attach -t $tmux_session ; tmux new-window -n $file"
+    eval "tmux attach -t $tmux_sesion ; tmux new-window -n $file"
     tmux send-keys  "$comando" C-m
 fi
 

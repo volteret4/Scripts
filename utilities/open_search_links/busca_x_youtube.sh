@@ -13,21 +13,22 @@
 
 busq=$(zenity --entry --title "Qué vas a buscar en YouTube")
 
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
+app="$(bash "${HOME}"/Scripts/snippets/if_firefox_active.sh)"  # > $resultado
+
+
 
 url="https://www.youtube.com/results?search_query=${busq}"
 
-if [[ ${app_actual} =~ ${thorium} ]]
+if [[ ${app} =~ 'Thorium' ]]
     then
         thorium-browser "${url}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
+    elif [[ ${app} =~ 'Firefox' ]]; then
         firefox "${url}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
+    elif [[ ${app} =~ 'Chromium' ]]; then
         chromium "${url}" &
+    elif [[ ${app} =~ 'Floorp' ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
-        thorium-browser "https://www.youtube.com/results?search_query=${busq}" &
+        qutebrowser "https://www.youtube.com/results?search_query=${busq}" &
 fi

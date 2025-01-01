@@ -25,7 +25,7 @@ if [[ ${var} =~ ${regex} ]]
                 xdotool key "ctrl+c"
         else
                 xdotool key "ctrl + c"
-
+fi
 url=$(xclip -o)
 echo "${url}"
 firefox "${url}" &

@@ -14,20 +14,21 @@
 busqueda="$(xclip -o)"
 busqueda=${busqueda//&/and/}
 
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
 url="https://rateyourmusic.com/search?searchterm=${busqueda}"
 
-if [[ ${app_actual} =~ ${thorium} ]]
-    then
+app="$(bash "${HOME}"/Scripts/snippets/if_firefox_active.sh)"  # > $resultado
+
+if [[ "${app}" =~ "strawberry|DeaDBeef" ]]; then
+        bash $HOME/Scripts/utilities/open_search_links/music_player/rym_metadata.sh
+    elif [[ ${app} =~ 'Thorium' ]]; then
         thorium-browser "${url}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
+    elif [[ ${app} =~ 'Firefox' ]]; then
         firefox "${url}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
+    elif [[ ${app} =~ 'Chromium' ]]; then
         chromium "${url}" &
+    elif [[ ${app} =~ 'Floorp' ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
-        qutebrowser --target window "${url}"
+        qutebrowser --target window "${url}" &
 fi

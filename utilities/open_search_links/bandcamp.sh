@@ -15,30 +15,29 @@ busqueda="$(xclip -o)"
 # resultado=$(mktemp)
 busqueda=$(echo "${busqueda}" | sed 's/&/and/g' | sed 's/;\|:\|,\|\.\|\[\|\]\|{\|}\|-\|_\|(\|)/\ /g' )
 
-source "${HOME}"/Scripts/snippets/if_firefox_active.sh  # > $resultado
+app="$(bash "${HOME}"/Scripts/snippets/if_firefox_active.sh)"  # > $resultado
 
 # wait $! #esperar a que acabe el script hijo
 # vars=$(cat $resultado)
 # printf '\n%s\n' $vars
 # echo $strawberry
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
+#app=$(xdotool getactivewindow getwindowname)
+
+
 
 url="https://bandcamp.com/search?q=${busqueda}"
 
-if [[ "${app}" =~ 'strawberry' ]]
+if [[ "${app}" =~ "strawberry|DeaDBeef" ]]
     then
-        echo "${cancion}"
-        busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
-        qutebrowser "${url}" &
-    elif [[ ${app_actual} =~ ${thorium} ]]; then
+        bash $HOME/Scripts/utilities/open_search_links/music_player/bandcamp_metadata.sh
+    elif [[ ${app} =~ 'Thorium' ]]; then
         thorium-browser "${url}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
+    elif [[ ${app} =~ 'Firefox' ]]; then
         firefox "${url}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
+    elif [[ ${app} =~ Chromium ]]; then
         chromium "${url}" &
+    elif [[ ${app} =~ Floorp ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
         qutebrowser --target window "${url}" &

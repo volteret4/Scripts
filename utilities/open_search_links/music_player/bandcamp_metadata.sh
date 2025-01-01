@@ -54,12 +54,15 @@ app_actual=$(xdotool getactivewindow getwindowname)
 thorium="Thorium$"
 chromium="Chromium"
 firefox="Mozilla Firefox"
+floorp="Floorp"
 url="https://bandcamp.com/search?q=${busqueda}"
 
 # Abrir busqueda en Bandcamp, ya sea en el navegador activo si lo hubiera, o en Qutebrowser.
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &
+    elif [[ ${app_actual} =~ ${floorp} ]]; then
+        floorp "${url}" &
     elif [[ ${app_actual} =~ ${firefox} ]]; then
         firefox "${url}" &
     elif [[ ${app_actual} =~ ${chromium} ]]; then

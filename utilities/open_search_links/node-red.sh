@@ -13,28 +13,24 @@
 
 #busqueda=$(xclip -o)
 node-red
-app_actual=$(xdotool getactivewindow getwindowname)
-thorium="Thorium$"
-chromium="Chromium"
-firefox="Mozilla Firefox"
 
-url_1="https://localhost:1880"
-url_2="https://192.168.1.132:1880"
+url_1="https://nodos.pollete.duckdns.org"
 
-if [[ ${app_actual} =~ ${thorium} ]]
-    then
-        thorium-browser "${url_1}" &
-        thorium-browser "${url_2}" &
-    elif [[ ${app_actual} =~ ${firefox} ]]; then
-        firefox "${url_2}" &
-        firefox "${url_1}" &
-    elif [[ ${app_actual} =~ ${chromium} ]]; then
-        chromium "${url_1}" &
-        firefox "${url_2}" &
+app="$(bash "${HOME}"/Scripts/snippets/if_firefox_active.sh)"  # > $resultado
+
+if [[ "${app}" =~ "strawberry|DeaDBeef" ]]; then
+        bash $HOME/Scripts/utilities/open_search_links/music_player/google_metadata.sh
+    elif [[ ${app} =~ 'Thorium' ]]; then
+        thorium-browser "${url}" &
+    elif [[ ${app} =~ 'Firefox' ]]; then
+        firefox "${url}" &
+    elif [[ ${app} =~ 'Chromium' ]]; then
+        chromium "${url}" &
+    elif [[ ${app} =~ 'Floorp' ]]; then
+        floorp "${url}" &
     else
         echo "${busqueda}"
-        qutebrowser --target window "${url_1}" &
-        qutebrowser --target window "${url_2}" &
+        qutebrowser --target window "${url}" &
 fi
 
 

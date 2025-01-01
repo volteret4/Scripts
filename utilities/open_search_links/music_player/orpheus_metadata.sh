@@ -39,16 +39,20 @@ app_actual=$(xdotool getactivewindow getwindowname)
 thorium="Thorium$"
 chromium="Chromium"
 firefox="Mozilla Firefox"
+floorp="Floorp"
 
 url="https://orpheus.network/torrents.php?searchstr=${busqueda}"
 
 # Obtener metadata del reproductor actual
 
-artista=$(playerctl -p "${player_active}" metadata xesam:artist)
-cancion=$(playerctl -p "${player_active}" metadata xesam:title)
-album=$(playerctl -p "${player_active}" metadata xesam:album)
+# Obtener metadata del reproductor actual
+if [[ -z $deadbeef ]] ; then
+    artista=$(playerctl -p "${player_active}" metadata xesam:artist)
+    cancion=$(playerctl -p "${player_active}" metadata xesam:title)
+    album=$(playerctl -p "${player_active}" metadata xesam:album)
+fi
 
-busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
+busqueda=$(echo "${artista}" | sed 's/&/and/g')
 
 
 # Abrir busqueda en orpheus
@@ -57,6 +61,8 @@ busqueda=$(echo "${artista} ${album}" | sed 's/&/and/g')
 if [[ ${app_actual} =~ ${thorium} ]]
     then
         thorium-browser "${url}" &
+    elif [[ ${app_actual} =~ ${floorp} ]]; then
+        floorp "${url}" &
     elif [[ ${app_actual} =~ ${firefox} ]]; then
         firefox "${url}" &
     elif [[ ${app_actual} =~ ${chromium} ]]; then

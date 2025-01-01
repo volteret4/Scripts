@@ -110,3 +110,7 @@ utilities/wordpress/canciones.txt
 
 utilities/wordpress/.cache-pollolpc
 
+python_venv
+content
+results.txt
+.content/*

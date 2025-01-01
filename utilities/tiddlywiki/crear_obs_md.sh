@@ -5,7 +5,7 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
+# TODO: Manejo de errores
 # Notes:
 #
 #
@@ -28,57 +28,20 @@
 # trap 'error_ocurrido=true' ERR
 
 # Comprobar si la ventana activa pertenece a uno de estos navegadores.
-var="$(xdotool getactivewindow getwindowname)"
-dir="/mnt/Datos/FTP/Wiki/Obsidian/Notas/Wiki"
-firefox="Mozilla Firefox$"
-chromium="\- Chromium$"
-thorium="Thorium$"
-
-
-# En dicho caso copiar URL al portapapeles.
-if [[ $var =~ $firefox ]]
-    then
-                wid=$(xdotool search --name "Mozilla Firefox$")
-                xdotool windowfocus $wid
-                sleep 0.3
-                xdotool key ctrl+l
-                xdotool key ctrl+c
-                xdotool key Escape
-                url=$(copyq read 0)
-                copyq remove 0
-    elif [[ $var =~ $chromium ]]
-        then
-                wid=$(xdotool search --name "\- Chromium$")
-                xdotool windowfocus $wid
-                sleep 0.3
-                xdotool key ctrl+l
-                xdotool key ctrl+c
-                xdotool key Escape
-                url=$(copyq read 0)
-                copyq remove 0
-    elif [[ $var =~ $thorium ]]
-        then
-                wid=$(xdotool search --name "\- Thorium$")
-                xdotool windowfocus $wid
-                sleep 0.3
-                xdotool key ctrl+l
-                xdotool key ctrl+c
-                xdotool key Escape
-                url=$(copyq read 0)
-                copyq remove 0
-                echo "browser thorium"
-fi
-
-
-sleep 0.5
+browser="$(xdotool getactivewindow getwindowname)"
+dir="/mnt/Datos/FTP/Wiki/Obsidian/Spaces/Wiki"
 
 # Crear nuevas variables para título y contenido.
 titulo=$(copyq read 1)
-content=$(copyq read 0 )
+content=$(copyq read 0)
 
+# Obtener el nombre de la ventana activa
+active_window_id=$(xdotool getactivewindow)
+active_window_name=$(xdotool getwindowname "$active_window_id")
 
-# Array para almacenar los nombres de las subcarpetas
+# Crear array para almacenar los nombres de las subcarpetas
 subcarpetas=()
+
 
 # Leer las subcarpetas y almacenar sus nombres en el array
 while IFS= read -r subcarpeta; do
@@ -86,6 +49,12 @@ while IFS= read -r subcarpeta; do
         subcarpetas+=("$subcarpeta")
     fi
 done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -printf "%f\n")
+
+
+# Ordenar las subcarpetas
+IFS=$'\n' sorted_subcarpetas=($(sort <<<"${subcarpetas[*]}"))
+unset IFS
+
 
 # Agregar un botón para cada subcarpeta
 botones=""
@@ -98,26 +67,51 @@ echo "primera letra__$primera_letra"
 echo "botones_$botones"
 tag="$(python3 $HOME/Scripts/utilities/menu_pollo2.py ${botones} | awk 'NR==1 {print $1}')"
 
-
-# Elegir TAG.
-# tag=$(zenity --info --title 'Copiando a Mixx' \
-#             --text "En qué carpeta creamos $titulo" \
-#             --extra-button "|___...Añadir Otro Tag / Carpeta...___|"\
-#             --ok-label "En verdad paso..." \
-#             $botones)
-# Ruta de la carpeta que contiene las subcarpetas
-
+if [[ -z $tag ]]; then
+    exit 0
+fi
 
 
 # Si se presiona "Añadir carpeta...", solicitar al usuario el nombre de la nueva carpeta
 if [[ "$tag" == *"Otra_Carpeta"* ]]; then
-    nombre_nueva_carpeta=$(zenity --entry --title "Crear nueva carpeta")
+    nombre_nueva_carpeta=$(yad --entry --text "Crear nueva carpeta")
     if [[ -n "$nombre_nueva_carpeta" ]]; then
         nueva_carpeta="$dir/$nombre_nueva_carpeta"
         mkdir -p "$nueva_carpeta"
         tag="$nombre_nueva_carpeta"
     fi
 fi
+
+# Define una lista de aplicaciones y sus nombres de ventana
+declare -A apps
+apps=(
+    ["firefox"]="Mozilla Firefox$"
+    ["chromium"]="\\- Chromium$"
+    ["floorp"]="Floorp$"
+    ["thorium"]="Thorium$"
+)
+
+# Itera sobre las aplicaciones
+for app_name in "${!apps[@]}"; do
+    if [[ "$active_window_name" =~ ${apps[$app_name]} ]]; then
+        echo "App name: $app_name"
+        # Utilizar el ID de la ventana activa directamente
+        wid=$active_window_id
+        if [[ -n "$wid" ]]; then
+            xdotool windowfocus --sync "${wid}"
+            sleep 0.2
+            xdotool key --window "${wid}" ctrl+l
+            xdotool key --window "${wid}" ctrl+c
+            sleep 2
+            url=$(copyq read 0)
+            xdotool key --clearmodifiers --window "${wid}" Escape
+        else
+            echo "No se encontró la ventana para ${app_name}"
+        fi
+        break
+    fi
+done
+
 
 # Añadir la línea de la URL solo si la variable no está vacía
 if [ -n "${url}" ]; then
@@ -141,3 +135,11 @@ nota="${dir}/${tag}/${titulo}.md"
 
 echo -e "${contenido}" >> "${nota}"
 echo "FILE: ${nota}"
+if [[ -z $url ]]; then
+    elementos=2
+else
+    elementos=3
+fi
+for i in {1..$elementos}; do
+    copyq remove 0
+done

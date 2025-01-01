@@ -13,7 +13,17 @@
 #
 
 
-carpeta=$(dirname $(readlink "$0"))
-source "${carpeta}/.env"
+#carpeta=$(dirname $(readlink "$0"))
+carpeta="${HOME}/Scripts/android/.env"
+# source "${carpeta}/.env"
 
-curl "https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${APIKEY}&find=true&deviceId=${POCOX3}"
+
+
+export $(awk -F= '{output=output" "$1"="$2} END {print output}' $carpeta)
+echo "api $API_KEY"
+echo "poco $POCOX3"
+echo ""
+url="https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${API_KEY}&find=true&deviceId=${POCOX3}"
+echo $url
+echo ""
+curl $url
