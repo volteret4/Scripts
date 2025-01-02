@@ -169,52 +169,117 @@ class MusicLibrarySearchApp:
         # Variable para mantener referencia a la imagen
         self.current_photo = None
 
-    def create_music_index(self):
-        """Crear un índice de la biblioteca musical usando mutagen para extraer metadatos."""
-        print("Generando índice de música... (esto puede tardar unos minutos)")
-        music_index = []
+    def create_music_index(self, force_update=False):
+        """
+        Crear o actualizar el índice de la biblioteca musical por disco.
         
-        # Procesar todos los archivos FLAC dentro de la ruta de la biblioteca
+        Args:
+            force_update (bool): Si es True, fuerza la actualización completa del índice
+        """
+        from datetime import datetime
+        import os.path
+        
+        # Verificar si necesitamos actualizar
+        need_update = force_update
+        if not need_update and os.path.exists(MUSIC_LIBRARY_PATH):
+            # Verificar la fecha de última modificación del archivo
+            last_modified = datetime.fromtimestamp(os.path.getmtime(MUSIC_LIBRARY_PATH))
+            today = datetime.now()
+            if last_modified.date() < today.date():
+                need_update = True
+        
+        # Cargar índice existente si existe
+        existing_index = {}
+        if os.path.exists(MUSIC_LIBRARY_PATH) and not force_update:
+            try:
+                with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                    # Convertir la lista a diccionario usando la ruta como clave
+                    existing_index = {item['path']: item for item in existing_data}
+            except Exception as e:
+                print(f"Error loading existing index: {e}")
+                existing_index = {}
+        
+        if not need_update and existing_index:
+            print("El índice está actualizado")
+            self.library = list(existing_index.values())
+            return
+        
+        print("Actualizando índice de música...")
+        music_index = {}
+        
         for root, dirs, files in os.walk(RUTA_LIBRERIA):
-            for file in files:
-                if file.lower().endswith('.flac'):
-                    flac_file_path = os.path.join(root, file)
-                    try:
-                        # Usar mutagen para leer los metadatos del archivo FLAC
-                        audio_file = FLAC(flac_file_path)
-                        
-                        # Extraer los metadatos: artista, álbum, fecha, sello discográfico
-                        artist = audio_file.get('artist', ['Desconocido'])[0]
-                        album = audio_file.get('album', ['Desconocido'])[0]
-                        date = audio_file.get('date', ['Desconocida'])[0]
-                        label = audio_file.get('label', ['Desconocido'])[0]
-                        
-                        # Verificar si ya existe en el índice
-                        if not any(item['path'] == flac_file_path for item in music_index):
-                            music_index.append({
+            # Verificar si estamos en un directorio "Disc X"
+            if os.path.basename(root).startswith("Disc "):
+                try:
+                    # Tomar el primer archivo FLAC para obtener los metadatos
+                    flac_files = [f for f in files if f.lower().endswith('.flac')]
+                    if not flac_files:
+                        continue
+                    
+                    sample_file = os.path.join(root, flac_files[0])
+                    audio_file = FLAC(sample_file)
+                    
+                    # Extraer los metadatos
+                    artist = audio_file.get('artist', ['Desconocido'])[0]
+                    album = audio_file.get('album', ['Desconocido'])[0]
+                    date = audio_file.get('date', ['Desconocida'])[0]
+                    label = audio_file.get('label', ['Desconocido'])[0]
+                    
+                    # Usar el directorio padre como clave (contiene todos los discos del álbum)
+                    album_dir = os.path.dirname(root)
+                    
+                    if album_dir not in music_index:
+                        # Verificar si ya existe en el índice anterior
+                        if album_dir in existing_index and not force_update:
+                            music_index[album_dir] = existing_index[album_dir]
+                        else:
+                            music_index[album_dir] = {
                                 'artist': artist,
                                 'album': album,
                                 'date': date,
                                 'label': label,
-                                'path': flac_file_path
-                            })
-                    except Exception as e:
-                        print(f"Error al procesar {flac_file_path}: {e}")
+                                'path': album_dir,
+                                'discs': []
+                            }
+                    
+                    # Añadir información del disco
+                    disc_number = os.path.basename(root).split()[1]
+                    if disc_number not in music_index[album_dir]['discs']:
+                        music_index[album_dir]['discs'].append(disc_number)
+                    
+                except Exception as e:
+                    print(f"Error al procesar {root}: {e}")
         
-        # Guardar el índice en un archivo JSON
+        # Convertir el diccionario a lista para mantener el formato original
+        final_index = list(music_index.values())
+        
+        # Guardar el índice actualizado
         with open(MUSIC_LIBRARY_PATH, 'w', encoding='utf-8') as f:
-            json.dump(music_index, f, indent=2)
-
-        # Asignar índice a la variable de instancia
-        self.library = music_index
+            json.dump(final_index, f, indent=2)
+        
+        # Actualizar la biblioteca en memoria
+        self.library = final_index
 
     def load_library(self):
-        """Load the music library from JSON file."""
-        if not os.path.exists(MUSIC_LIBRARY_PATH):
-            self.create_music_index()
+        """Load the music library from JSON file and sort it."""
         try:
-            with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as file:
-                self.library = json.load(file)
+            if not os.path.exists(MUSIC_LIBRARY_PATH):
+                self.create_music_index()
+            else:
+                with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as file:
+                    self.library = json.load(file)
+                    
+                    # Ordenar la biblioteca al cargarla
+                    self.library.sort(key=lambda x: f"{x['artist'].lower()} - {x['album'].lower()}")
+                    
+                # Verificar si necesita actualización por fecha
+                from datetime import datetime
+                last_modified = datetime.fromtimestamp(os.path.getmtime(MUSIC_LIBRARY_PATH))
+                if last_modified.date() < datetime.now().date():
+                    print("Índice desactualizado, actualizando...")
+                    self.create_music_index()
+                    
         except Exception as e:
             print(f"Error loading library: {e}")
             self.library = []
@@ -287,40 +352,60 @@ class MusicLibrarySearchApp:
     def find_cover_image(self, album_path):
         """Find cover image in album directory."""
         try:
-            disc1_path = os.path.join(album_path, "Disc 1")
-            if not os.path.exists(disc1_path):
-                return None
-
-            # Lista de posibles nombres de archivo
+            # Primero buscar en el directorio del álbum
             cover_names = ['cover', 'folder', 'front', 'artwork', 'albumart']
             image_extensions = ['.jpg', '.jpeg', '.png']
 
-            # Primero buscar nombres específicos
-            for name in cover_names:
-                for ext in image_extensions:
-                    file_path = os.path.join(disc1_path, name + ext)
-                    if os.path.exists(file_path):
+            # Buscar en el directorio del álbum y en sus subdirectorios inmediatos
+            search_paths = [album_path]
+            # Añadir subdirectorios que empiecen con "Disc"
+            for item in os.listdir(album_path):
+                if item.startswith("Disc ") and os.path.isdir(os.path.join(album_path, item)):
+                    search_paths.append(os.path.join(album_path, item))
+
+            # Buscar en todas las rutas
+            for search_path in search_paths:
+                # Primero buscar nombres específicos
+                for name in cover_names:
+                    for ext in image_extensions:
+                        file_path = os.path.join(search_path, name + ext)
+                        if os.path.exists(file_path):
+                            print(f"Found cover image: {file_path}")  # Debug
+                            return file_path
+
+                # Si no se encuentra, buscar cualquier imagen
+                for file in os.listdir(search_path):
+                    if any(file.lower().endswith(ext) for ext in image_extensions):
+                        file_path = os.path.join(search_path, file)
+                        print(f"Found generic image: {file_path}")  # Debug
                         return file_path
 
-            # Si no se encuentra, buscar cualquier imagen
-            for file in os.listdir(disc1_path):
-                if any(file.lower().endswith(ext) for ext in image_extensions):
-                    return os.path.join(disc1_path, file)
-
+            print("No cover image found")  # Debug
             return None
         except Exception as e:
             print(f"Error finding cover image: {e}")
             return None
-  
+
     def display_cover_image(self, image_path):
         """Display cover image in the cover frame."""
         try:
             if image_path and os.path.exists(image_path):
+                print(f"Loading image from: {image_path}")  # Debug
                 # Cargar y redimensionar la imagen
                 image = Image.open(image_path)
-                # Mantener la proporción de aspecto
-                max_size = (300, 300)
-                image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                
+                # Obtener dimensiones originales
+                width, height = image.size
+                print(f"Original dimensions: {width}x{height}")  # Debug
+                
+                # Calcular nueva dimensión manteniendo proporción
+                max_size = (500, 500)
+                ratio = min(max_size[0]/width, max_size[1]/height)
+                new_size = (int(width * ratio), int(height * ratio))
+                print(f"New dimensions: {new_size}")  # Debug
+                
+                # Redimensionar
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
                 
                 # Convertir a PhotoImage
                 photo = ImageTk.PhotoImage(image)
@@ -330,8 +415,9 @@ class MusicLibrarySearchApp:
                 
                 # Mostrar la imagen
                 self.cover_frame.configure(image=photo)
+                print("Image displayed successfully")  # Debug
             else:
-                # Si no hay imagen, limpiar el frame
+                print(f"Invalid image path: {image_path}")  # Debug
                 self.cover_frame.configure(image='')
                 self.current_photo = None
         except Exception as e:
@@ -372,13 +458,16 @@ class MusicLibrarySearchApp:
             open_with_default_app(folder_path, is_folder=True)
 
     def update_results(self, event=None):
-        """Update search results based on query."""
+        """Update search results based on query and sort alphabetically."""
         query = self.search_entry.get().lower()
         
         # Clear previous results
         self.result_list.delete(0, tk.END)
         
-        # Search through library
+        # Create a list to store matching albums with their display strings
+        matching_albums = []
+        
+        # Search through library and create display strings
         for album in self.library:
             # Check if query matches any field
             if (query in album['artist'].lower() or 
@@ -386,9 +475,18 @@ class MusicLibrarySearchApp:
                 query in album.get('label', '').lower() or 
                 query in album.get('date', '').lower()):
                 
-                # Format display string
+                # Create a tuple with the sort key and display string
+                # Using artist and album for sorting
+                sort_key = f"{album['artist'].lower()} - {album['album'].lower()}"
                 display = f"{album['artist']} - {album['album']} ({album.get('date', 'No date')})"
-                self.result_list.insert(tk.END, display)
+                matching_albums.append((sort_key, display))
+        
+        # Sort the results alphabetically
+        matching_albums.sort(key=lambda x: x[0])
+        
+        # Insert sorted results into listbox
+        for _, display in matching_albums:
+            self.result_list.insert(tk.END, display)
 
     def on_select(self, event):
         """Display details of selected album."""
@@ -399,27 +497,29 @@ class MusicLibrarySearchApp:
             
             # Display album details
             details = (f"Artist: {album['artist']}\n"
-                      f"Album: {album['album']}\n"
-                      f"Date: {album.get('date', 'Unknown')}\n"
-                      f"Label: {album.get('label', 'Unknown')}\n"
-                      f"Path: {album.get('path', 'Unknown')}")
+                    f"Album: {album['album']}\n"
+                    f"Date: {album.get('date', 'Unknown')}\n"
+                    f"Label: {album.get('label', 'Unknown')}\n"
+                    f"Path: {album.get('path', 'Unknown')}")
             
             self.details_text.insert(tk.END, details)
 
             # Buscar y mostrar la imagen de portada
             if 'path' in album:
-                cover_path = self.find_cover_image(os.path.dirname(album['path']))
+                album_path = album['path']  # Esta es la ruta completa del álbum
+                print(f"Searching for cover in: {album_path}")  # Debug
+                cover_path = self.find_cover_image(album_path)
+                if cover_path:
+                    print(f"Cover found: {cover_path}")  # Debug
+                else:
+                    print("No cover found")  # Debug
                 self.display_cover_image(cover_path)
-
-    # def add_keyboard_shortcuts(self):
-    #     """Add keyboard shortcuts."""
-    #     self.root.bind("<Control-f>", lambda e: self.search_entry.focus_set())
-    #     self.root.bind("<Control-p>", lambda e: self.play_selected_album())
-    #     self.root.bind("<Control-o>", lambda e: self.open_selected_folder())
-    #     self.root.bind("<Control-a>", self.select_all)
 
     def add_keyboard_shortcuts(self):
         """Add keyboard shortcuts."""
+        # Atajo ESC para cerrar la aplicación
+        self.root.bind("<Escape>", lambda e: self.root.destroy())
+        
         # Control + F para focus en búsqueda
         self.root.bind("<Control-f>", lambda e: self.search_entry.focus_set())
         # Control + O para abrir carpeta
@@ -428,8 +528,22 @@ class MusicLibrarySearchApp:
         
         # Asegurarse de que estos atajos funcionen también cuando el foco está en el listbox
         self.result_list.bind("<Control-f>", lambda e: self.search_entry.focus_set())
-        #self.result_list.bind("<Control-o>", lambda e: self.open_selected_folder())
         self.result_list.bind("<Return>", lambda e: self.play_selected_album())
+        self.result_list.bind("<Escape>", lambda e: self.root.destroy())
+        
+        # Atajos específicos para la caja de búsqueda
+        self.search_entry.bind("<Return>", self.move_focus_to_list)
+        self.search_entry.bind("<Escape>", lambda e: self.root.destroy())
+
+    def move_focus_to_list(self, event=None):
+        """Move focus to the results list and select first item if available."""
+        if self.result_list.size() > 0:  # Si hay elementos en la lista
+            self.result_list.focus_set()  # Mover el foco a la lista
+            self.result_list.selection_clear(0, tk.END)  # Limpiar selección actual
+            self.result_list.selection_set(0)  # Seleccionar primer elemento
+            self.result_list.see(0)  # Asegurar que el elemento sea visible
+            # Disparar el evento de selección para actualizar los detalles
+            self.on_select(None)
 
     def select_all(self, event=None):
         """Select all text in the search entry."""
