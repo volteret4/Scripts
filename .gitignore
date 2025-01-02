@@ -27,7 +27,6 @@ Musica/lidarr/.env
 Musica/MoverMusica/.env
 Musica/orpheus-api/.env
 Musica/MoverMusica/NewPipe/.env
-Musica/
 Musica/playlist/spotify/.env
 mpv/.env
 Musica/playlist/youtube/.env
@@ -111,6 +110,5 @@ utilities/wordpress/canciones.txt
 utilities/wordpress/.cache-pollolpc
 
 python_venv
-content
 results.txt
 .content/*

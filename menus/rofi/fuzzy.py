@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 # Script Name: fuzzy.py
-# Description:
+# Description: Consulta en el contenido de los archivos de la wiki
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
 # TODO: 
-# - No muestra coincidencias por contenido
-# - No coinciden indices de archivo y contenido en grupos >2
 # 
 # Notes:
-# Dependencies: - python3,
+# Dependencies: - python3, tk
 
 import os
 import tkinter as tk
