@@ -7,9 +7,15 @@ from PIL import Image, ImageTk  # Necesitamos añadir esta importación
 import subprocess
 import platform
 import re
+from mutagen.easyid3 import EasyID3
+from mutagen.mp3 import MP3
+from mutagen.flac import FLAC
+from mutagen import File 
+
 
 # Path to your music library JSON file
 MUSIC_LIBRARY_PATH = "/home/huan/.music_library_index.json"
+RUTA_LIBRERIA="/mnt/NFS/moode/moode"
 
 # Define preferred applications (can be customized)
 MUSIC_PLAYERS = {
@@ -96,6 +102,45 @@ def open_with_default_app(path, is_folder=False):
         print(f"Error opening {path}: {e}")
         return False
 
+# def create_music_index(self):
+#     """Crear un índice de la biblioteca musical usando mutagen para extraer metadatos de los archivos FLAC"""
+#     print("Generando índice de música... (esto puede tardar unos minutos)")
+#     music_index = []
+    
+#     for base_path in self.base_paths:
+#         # Buscar archivos FLAC en la estructura
+#         for root, dirs, files in os.walk(base_path):
+#             for file in files:
+#                 if file.lower().endswith('.flac'):
+#                     flac_file_path = os.path.join(root, file)
+#                     try:
+#                         # Usar mutagen para leer los metadatos del archivo FLAC
+#                         audio_file = FLAC(flac_file_path)
+                        
+#                         # Extraer los metadatos: artista, álbum, fecha, sello discográfico
+#                         artist = audio_file.get('artist', ['Desconocido'])[0]
+#                         album = audio_file.get('album', ['Desconocido'])[0]
+#                         date = audio_file.get('date', ['Desconocida'])[0]
+#                         label = audio_file.get('label', ['Desconocido'])[0]
+                        
+#                         # Verificar si ya existe en el índice
+#                         if not any(item['path'] == flac_file_path for item in music_index):
+#                             music_index.append({
+#                                 'artist': artist,
+#                                 'album': album,
+#                                 'date': date,
+#                                 'label': label,
+#                                 'path': flac_file_path
+#                             })
+#                     except Exception as e:
+#                         print(f"Error al procesar {flac_file_path}: {e}")
+    
+#     # Guardar índice en el atributo de la clase
+#     self.music_index = music_index  # Guardamos el índice en self.music_index
+#     with open(self.index_file, 'w') as f:
+#         json.dump(music_index, f, indent=2)
+    
+    return music_index
 class MusicLibrarySearchApp:
     def __init__(self, root):
         self.root = root
@@ -124,8 +169,49 @@ class MusicLibrarySearchApp:
         # Variable para mantener referencia a la imagen
         self.current_photo = None
 
+    def create_music_index(self):
+        """Crear un índice de la biblioteca musical usando mutagen para extraer metadatos."""
+        print("Generando índice de música... (esto puede tardar unos minutos)")
+        music_index = []
+        
+        # Procesar todos los archivos FLAC dentro de la ruta de la biblioteca
+        for root, dirs, files in os.walk(RUTA_LIBRERIA):
+            for file in files:
+                if file.lower().endswith('.flac'):
+                    flac_file_path = os.path.join(root, file)
+                    try:
+                        # Usar mutagen para leer los metadatos del archivo FLAC
+                        audio_file = FLAC(flac_file_path)
+                        
+                        # Extraer los metadatos: artista, álbum, fecha, sello discográfico
+                        artist = audio_file.get('artist', ['Desconocido'])[0]
+                        album = audio_file.get('album', ['Desconocido'])[0]
+                        date = audio_file.get('date', ['Desconocida'])[0]
+                        label = audio_file.get('label', ['Desconocido'])[0]
+                        
+                        # Verificar si ya existe en el índice
+                        if not any(item['path'] == flac_file_path for item in music_index):
+                            music_index.append({
+                                'artist': artist,
+                                'album': album,
+                                'date': date,
+                                'label': label,
+                                'path': flac_file_path
+                            })
+                    except Exception as e:
+                        print(f"Error al procesar {flac_file_path}: {e}")
+        
+        # Guardar el índice en un archivo JSON
+        with open(MUSIC_LIBRARY_PATH, 'w', encoding='utf-8') as f:
+            json.dump(music_index, f, indent=2)
+
+        # Asignar índice a la variable de instancia
+        self.library = music_index
+
     def load_library(self):
         """Load the music library from JSON file."""
+        if not os.path.exists(MUSIC_LIBRARY_PATH):
+            self.create_music_index()
         try:
             with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as file:
                 self.library = json.load(file)

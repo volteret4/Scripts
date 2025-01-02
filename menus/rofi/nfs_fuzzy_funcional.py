@@ -1,3 +1,16 @@
+
+#!/usr/bin/env python
+#
+# Script Name: nfs_fuzzy_funcional.py
+# Description: Buscador de discos en la ruta /mnt/NFS/moode
+# Author: volteret4
+# Repository: https://github.com/volteret4/
+# License:
+# TODO: 
+# Notes:
+#   Dependencies:  - python3, 
+#
+
 import sys
 import os
 import json

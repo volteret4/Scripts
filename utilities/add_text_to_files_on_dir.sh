@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Script Name: install_docker.sh
-# Description: Install docker on debian based systems
+# Script Name: 
+# Description: 
 # Author: volteret4
-# Repository: Link to the GitHub repository or any other version control repository where the script is located.
+# Repository: 
 # License: 
-# TODO: Adapt for arch systems (pacman)
+# TODO: 
 # Notes:
 #
 
@@ -50,7 +50,7 @@ header_python_correcto="#!/usr/bin/env python
 PROJECT_DIR="$1"
 
 # Recorrer todos los archivos en el directorio del proyecto
-find "$PROJECT_DIR" -type f -exec bash -c
+find "$PROJECT_DIR" -type f -exec bash -c '
     for file do
         # Verificar si el archivo es un archivo regular y tiene permisos de escritura
         if [ -f "$file" ] && [ -w "$file" ]; then
