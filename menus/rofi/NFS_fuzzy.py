@@ -11,11 +11,402 @@ from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen import File 
+import sqlite3
+from datetime import datetime
+from dataclasses import dataclass
+from typing import Optional, List, Dict
+import discogs_client
+import time
+import musicbrainzngs as mb
 
 
-# Path to your music library JSON file
-MUSIC_LIBRARY_PATH = "/home/huan/.music_library_index.json"
-RUTA_LIBRERIA="/mnt/NFS/moode/moode"
+# Configuración
+db_path = "/home/huan/Scripts/.content/musica.db"
+RATE_LIMIT_DELAY = 1.0
+MUSIC_LIBRARY_DB = "/home/huan/.music_library.db"
+RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
+
+mb.set_useragent("MusicLibraryApp", "1.0", "frodobolson@disrot.org")
+
+
+@dataclass
+class Album:
+    artist: str
+    album: str
+    date: str
+    label: str
+    path: str
+    discs: List[str]
+    last_modified: float
+
+@dataclass
+class DiscogsMetadata:
+    artist_id: int
+    album_id: int
+    genres: List[str]
+    styles: List[str]
+    country: str
+    year: str
+    personnel: List[Dict[str, str]]
+    labels: List[str]
+    format: str
+    credits: List[Dict[str, str]]
+
+class MusicBrainzUpdater:
+    def __init__(self):
+        self.db = MusicLibraryDB(db_path)
+
+    def search_and_update(self, artist: str, album: str, album_path: str):
+        try:
+            # Buscar artista
+            result = mb.search_artists(artist=artist, limit=1)
+            if result['artist-list']:
+                artist_data = result['artist-list'][0]
+                
+                # Buscar álbum
+                album_result = mb.search_releases(artist=artist, release=album, limit=1)
+                album_mbid = album_result['release-list'][0]['id'] if album_result['release-list'] else None
+                
+                # Preparar datos
+                metadata = {
+                    'artist_mbid': artist_data.get('id'),
+                    'album_mbid': album_mbid,
+                    'artist_type': artist_data.get('type'),
+                    'artist_country': artist_data.get('country'),
+                    'artist_begin': artist_data.get('life-span', {}).get('begin'),
+                    'artist_end': artist_data.get('life-span', {}).get('end'),
+                    'artist_tags': ','.join([t['name'] for t in artist_data.get('tag-list', [])])
+                }
+                
+                # Actualizar base de datos
+                self.db.conn.execute("""
+                    INSERT OR REPLACE INTO musicbrainz_metadata 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (album_path, metadata['artist_mbid'], metadata['album_mbid'],
+                     metadata['artist_type'], metadata['artist_country'],
+                     metadata['artist_begin'], metadata['artist_end'],
+                     metadata['artist_tags']))
+                self.db.conn.commit()
+                
+                return metadata
+            return None
+        except Exception as e:
+            print(f"Error en MusicBrainz para {artist} - {album}: {e}")
+            return None
+
+
+class MusicLibraryDB:
+    def __init__(self, db_path: str):
+        self.conn = sqlite3.connect(db_path)
+        self.create_tables()
+    
+    def create_tables(self):
+        self.conn.executescript('''
+            -- Existing tables...
+            CREATE TABLE IF NOT EXISTS albums (
+                path TEXT PRIMARY KEY,
+                artist TEXT,
+                album TEXT,
+                date TEXT,
+                label TEXT,
+                last_modified REAL
+            );
+            
+            CREATE TABLE IF NOT EXISTS discs (
+                album_path TEXT,
+                disc_number TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, disc_number)
+            );
+            
+            -- Discogs metadata tables
+            CREATE TABLE IF NOT EXISTS discogs_metadata (
+                album_path TEXT PRIMARY KEY,
+                artist_id INTEGER,
+                album_id INTEGER,
+                country TEXT,
+                year TEXT,
+                format TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path)
+            );
+            
+            -- New MusicBrainz metadata tables
+            CREATE TABLE IF NOT EXISTS musicbrainz_metadata (
+                album_path TEXT PRIMARY KEY,
+                artist_mbid TEXT,
+                album_mbid TEXT,
+                artist_type TEXT,
+                artist_country TEXT,
+                artist_begin TEXT,
+                artist_end TEXT,
+                artist_tags TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path)
+            );
+        ''')
+        self.conn.commit()
+
+
+    def get_all_albums(self) -> List[Dict]:
+        cursor = self.conn.execute('''
+            SELECT a.*, GROUP_CONCAT(d.disc_number) as discs 
+            FROM albums a 
+            LEFT JOIN discs d ON a.path = d.album_path 
+            GROUP BY a.path
+        ''')
+        albums = []
+        for row in cursor.fetchall():
+            album = {
+                'artist': row[1],
+                'album': row[2],
+                'date': row[3],
+                'label': row[4],
+                'path': row[0],
+                'discs': row[6].split(',') if row[6] else []
+            }
+            albums.append(album)
+        return albums
+
+    def search_albums(self, query: str) -> List[Dict]:
+        query = f"%{query.lower()}%"
+        cursor = self.conn.execute('''
+            SELECT a.*, GROUP_CONCAT(d.disc_number) as discs 
+            FROM albums a 
+            LEFT JOIN discs d ON a.path = d.album_path 
+            WHERE LOWER(artist) LIKE ? OR LOWER(album) LIKE ? 
+            GROUP BY a.path
+        ''', (query, query))
+        return [dict(zip(['path', 'artist', 'album', 'date', 'label', '_', 'discs'], row)) 
+                for row in cursor.fetchall()]
+
+    def update_album(self, album: Album):
+        self.conn.execute('''
+            INSERT OR REPLACE INTO albums VALUES (?, ?, ?, ?, ?, ?)
+        ''', (album.path, album.artist, album.album, album.date, 
+              album.label, album.last_modified))
+        
+        self.conn.execute("DELETE FROM discs WHERE album_path = ?", (album.path,))
+        self.conn.executemany('''
+            INSERT INTO discs VALUES (?, ?)
+        ''', [(album.path, disc) for disc in album.discs])
+        
+        self.conn.commit()
+
+    def scan_library(self, force_update=True):
+        for root, dirs, files in os.walk(RUTA_LIBRERIA):
+            if os.path.basename(root).startswith("Disc "):
+                try:
+                    flac_files = [f for f in files if f.lower().endswith('.flac')]
+                    if not flac_files:
+                        continue
+                    
+                    album_dir = os.path.dirname(root)
+                    last_modified = os.path.getmtime(root)
+                    
+                    # Skip if not forced and already up to date
+                    if not force_update:
+                        cursor = self.conn.execute(
+                            "SELECT last_modified FROM albums WHERE path = ?", 
+                            (album_dir,))
+                        result = cursor.fetchone()
+                        if result and result[0] >= last_modified:
+                            continue
+                    
+                    audio = FLAC(os.path.join(root, flac_files[0]))
+                    album = Album(
+                        artist=audio.get('artist', ['Unknown'])[0],
+                        album=audio.get('album', ['Unknown'])[0],
+                        date=audio.get('date', ['Unknown'])[0],
+                        label=audio.get('label', ['Unknown'])[0],
+                        path=album_dir,
+                        discs=[os.path.basename(root).split()[1]],
+                        last_modified=last_modified
+                    )
+                    self.update_album(album)
+                    
+                except Exception as e:
+                    print(f"Error processing {root}: {e}")
+
+    def update_discogs_metadata(self, album_path: str, metadata: DiscogsMetadata):
+        try:
+            self.conn.execute('''
+                INSERT OR REPLACE INTO discogs_metadata VALUES (?, ?, ?, ?, ?, ?)
+            ''', (album_path, metadata.artist_id, metadata.album_id, 
+                 metadata.country, metadata.year, metadata.format))
+            
+            # Update genres
+            self.conn.execute("DELETE FROM genres WHERE album_path = ?", (album_path,))
+            self.conn.executemany('''
+                INSERT INTO genres VALUES (?, ?)
+            ''', [(album_path, genre) for genre in metadata.genres])
+            
+            # Update styles
+            self.conn.execute("DELETE FROM styles WHERE album_path = ?", (album_path,))
+            self.conn.executemany('''
+                INSERT INTO styles VALUES (?, ?)
+            ''', [(album_path, style) for style in metadata.styles])
+            
+            # Update personnel
+            self.conn.execute("DELETE FROM personnel WHERE album_path = ?", (album_path,))
+            self.conn.executemany('''
+                INSERT INTO personnel VALUES (?, ?, ?)
+            ''', [(album_path, p['name'], p['role']) for p in metadata.personnel])
+            
+            # Update credits
+            self.conn.execute("DELETE FROM credits WHERE album_path = ?", (album_path,))
+            self.conn.executemany('''
+                INSERT INTO credits VALUES (?, ?, ?)
+            ''', [(album_path, c['type'], c['name']) for c in metadata.credits])
+            
+            self.conn.commit()
+            
+        except Exception as e:
+            print(f"Error updating Discogs metadata for {album_path}: {e}")
+            self.conn.rollback()
+
+
+    def get_discogs_metadata(self, album_path: str) -> Optional[Dict]:
+        cursor = self.conn.execute("""
+            SELECT d.*, GROUP_CONCAT(g.genre) as genres, GROUP_CONCAT(s.style) as styles
+            FROM discogs_metadata d
+            LEFT JOIN genres g ON d.album_path = g.album_path
+            LEFT JOIN styles s ON d.album_path = s.album_path
+            WHERE d.album_path = ?
+            GROUP BY d.album_path
+        """, (album_path,))
+        row = cursor.fetchone()
+        if row:
+            return {
+                'artist_id': row[1],
+                'album_id': row[2],
+                'country': row[3],
+                'year': row[4],
+                'format': row[5],
+                'genres': row[6].split(',') if row[6] else [],
+                'styles': row[7].split(',') if row[7] else []
+            }
+        return None
+
+    def get_musicbrainz_metadata(self, album_path: str) -> Optional[Dict]:
+        cursor = self.conn.execute("""
+            SELECT * FROM musicbrainz_metadata WHERE album_path = ?
+        """, (album_path,))
+        row = cursor.fetchone()
+        if row:
+            return {
+                'artist_mbid': row[1],
+                'album_mbid': row[2],
+                'artist_type': row[3],
+                'artist_country': row[4],
+                'artist_begin': row[5],
+                'artist_end': row[6],
+                'artist_tags': row[7].split(',') if row[7] else []
+            }
+        return None
+
+
+class DiscogsUpdater:
+    def __init__(self, token: str):
+        self.client = discogs_client.Client('MusicLibrary/1.0', user_token=token)
+        self.db = MusicLibraryDB(db_path)
+    
+    def search_release(self, artist: str, album: str) -> Optional[DiscogsMetadata]:
+        try:
+            results = self.client.search(f"{artist} - {album}", type='release')
+            if not results:
+                return None
+            
+            release = results[0]
+            time.sleep(RATE_LIMIT_DELAY)
+            
+            # Obtener release completo para acceder a todos los datos
+            full_release = self.client.release(release.id)
+            
+            metadata = DiscogsMetadata(
+                artist_id=full_release.artists[0].id,
+                album_id=full_release.id,
+                genres=full_release.genres,
+                styles=full_release.styles if hasattr(full_release, 'styles') else [],
+                country=full_release.country,
+                year=full_release.year,
+                format=full_release.formats[0]['name'] if full_release.formats else 'Unknown',
+                personnel=self._extract_personnel(full_release),
+                labels=[l.name for l in full_release.labels],
+                credits=self._extract_credits(full_release)
+            )
+            
+            return metadata
+            
+        except Exception as e:
+            print(f"Error en Discogs para {artist} - {album}: {e}")
+            return None
+
+    def _extract_personnel(self, release) -> List[Dict[str, str]]:
+        personnel = []
+        
+        # Extraer de tracklist credits
+        for track in release.tracklist:
+            if hasattr(track, 'extraartists'):
+                for artist in track.extraartists:
+                    personnel.append({
+                        'name': artist.name,
+                        'role': artist.role
+                    })
+        
+        # Extraer de release credits
+        if hasattr(release, 'extraartists'):
+            for artist in release.extraartists:
+                personnel.append({
+                    'name': artist.name,
+                    'role': artist.role
+                })
+        
+        return personnel
+
+    def _extract_credits(self, release) -> List[Dict[str, str]]:
+        credits = []
+        
+        if hasattr(release, 'credits'):
+            for credit in release.credits:
+                credits.append({
+                    'type': credit.role,
+                    'name': credit.name
+                })
+                
+        return credits
+    
+    def update_library(self):
+        cursor = self.db.conn.execute("""
+            SELECT artist, album, path 
+            FROM albums 
+            WHERE path NOT IN (SELECT album_path FROM discogs_metadata)
+        """)
+        
+        for artist, album, path in cursor:
+            try:
+                metadata = self.search_release(artist, album)
+                if metadata:
+                    self.db.update_discogs_metadata(path, metadata)
+                    print(f"✓ {artist} - {album}")
+                else:
+                    print(f"✗ No Discogs match: {artist} - {album}")
+                time.sleep(RATE_LIMIT_DELAY)
+            except Exception as e:
+                print(f"Error processing {artist} - {album}: {e}")
+                continue
+
+    def has_discogs_data(self, album_path: str) -> bool:
+        try:
+            cursor = self.db.conn.execute("""
+                SELECT EXISTS(
+                    SELECT 1 FROM discogs_metadata 
+                    WHERE album_path = ? 
+                    AND album_id IS NOT NULL
+                )
+            """, (album_path,))
+            return bool(cursor.fetchone()[0])
+        except Exception as e:
+            print(f"Error checking Discogs data: {e}")
+            return False
 
 # Define preferred applications (can be customized)
 MUSIC_PLAYERS = {
@@ -102,48 +493,15 @@ def open_with_default_app(path, is_folder=False):
         print(f"Error opening {path}: {e}")
         return False
 
-# def create_music_index(self):
-#     """Crear un índice de la biblioteca musical usando mutagen para extraer metadatos de los archivos FLAC"""
-#     print("Generando índice de música... (esto puede tardar unos minutos)")
-#     music_index = []
+
     
-#     for base_path in self.base_paths:
-#         # Buscar archivos FLAC en la estructura
-#         for root, dirs, files in os.walk(base_path):
-#             for file in files:
-#                 if file.lower().endswith('.flac'):
-#                     flac_file_path = os.path.join(root, file)
-#                     try:
-#                         # Usar mutagen para leer los metadatos del archivo FLAC
-#                         audio_file = FLAC(flac_file_path)
-                        
-#                         # Extraer los metadatos: artista, álbum, fecha, sello discográfico
-#                         artist = audio_file.get('artist', ['Desconocido'])[0]
-#                         album = audio_file.get('album', ['Desconocido'])[0]
-#                         date = audio_file.get('date', ['Desconocida'])[0]
-#                         label = audio_file.get('label', ['Desconocido'])[0]
-                        
-#                         # Verificar si ya existe en el índice
-#                         if not any(item['path'] == flac_file_path for item in music_index):
-#                             music_index.append({
-#                                 'artist': artist,
-#                                 'album': album,
-#                                 'date': date,
-#                                 'label': label,
-#                                 'path': flac_file_path
-#                             })
-#                     except Exception as e:
-#                         print(f"Error al procesar {flac_file_path}: {e}")
-    
-#     # Guardar índice en el atributo de la clase
-#     self.music_index = music_index  # Guardamos el índice en self.music_index
-#     with open(self.index_file, 'w') as f:
-#         json.dump(music_index, f, indent=2)
-    
-    return music_index
+    # return music_index
 class MusicLibrarySearchApp:
     def __init__(self, root):
         self.root = root
+        self.db = MusicLibraryDB(MUSIC_LIBRARY_DB)
+        self.discogs_updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
+        self.musicbrainz_updater = MusicBrainzUpdater()
         self.root.title("Music Library Search")
         self.root.geometry("1600x800")
         self.root.configure(bg='#14141e')
@@ -169,120 +527,40 @@ class MusicLibrarySearchApp:
         # Variable para mantener referencia a la imagen
         self.current_photo = None
 
-    def create_music_index(self, force_update=False):
-        """
-        Crear o actualizar el índice de la biblioteca musical por disco.
-        
-        Args:
-            force_update (bool): Si es True, fuerza la actualización completa del índice
-        """
-        from datetime import datetime
-        import os.path
-        
-        # Verificar si necesitamos actualizar
-        need_update = force_update
-        if not need_update and os.path.exists(MUSIC_LIBRARY_PATH):
-            # Verificar la fecha de última modificación del archivo
-            last_modified = datetime.fromtimestamp(os.path.getmtime(MUSIC_LIBRARY_PATH))
-            today = datetime.now()
-            if last_modified.date() < today.date():
-                need_update = True
-        
-        # Cargar índice existente si existe
-        existing_index = {}
-        if os.path.exists(MUSIC_LIBRARY_PATH) and not force_update:
-            try:
-                with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
-                    # Convertir la lista a diccionario usando la ruta como clave
-                    existing_index = {item['path']: item for item in existing_data}
-            except Exception as e:
-                print(f"Error loading existing index: {e}")
-                existing_index = {}
-        
-        if not need_update and existing_index:
-            print("El índice está actualizado")
-            self.library = list(existing_index.values())
-            return
-        
-        print("Actualizando índice de música...")
-        music_index = {}
-        
-        for root, dirs, files in os.walk(RUTA_LIBRERIA):
-            # Verificar si estamos en un directorio "Disc X"
-            if os.path.basename(root).startswith("Disc "):
-                try:
-                    # Tomar el primer archivo FLAC para obtener los metadatos
-                    flac_files = [f for f in files if f.lower().endswith('.flac')]
-                    if not flac_files:
-                        continue
-                    
-                    sample_file = os.path.join(root, flac_files[0])
-                    audio_file = FLAC(sample_file)
-                    
-                    # Extraer los metadatos
-                    artist = audio_file.get('artist', ['Desconocido'])[0]
-                    album = audio_file.get('album', ['Desconocido'])[0]
-                    date = audio_file.get('date', ['Desconocida'])[0]
-                    label = audio_file.get('label', ['Desconocido'])[0]
-                    
-                    # Usar el directorio padre como clave (contiene todos los discos del álbum)
-                    album_dir = os.path.dirname(root)
-                    
-                    if album_dir not in music_index:
-                        # Verificar si ya existe en el índice anterior
-                        if album_dir in existing_index and not force_update:
-                            music_index[album_dir] = existing_index[album_dir]
-                        else:
-                            music_index[album_dir] = {
-                                'artist': artist,
-                                'album': album,
-                                'date': date,
-                                'label': label,
-                                'path': album_dir,
-                                'discs': []
-                            }
-                    
-                    # Añadir información del disco
-                    disc_number = os.path.basename(root).split()[1]
-                    if disc_number not in music_index[album_dir]['discs']:
-                        music_index[album_dir]['discs'].append(disc_number)
-                    
-                except Exception as e:
-                    print(f"Error al procesar {root}: {e}")
-        
-        # Convertir el diccionario a lista para mantener el formato original
-        final_index = list(music_index.values())
-        
-        # Guardar el índice actualizado
-        with open(MUSIC_LIBRARY_PATH, 'w', encoding='utf-8') as f:
-            json.dump(final_index, f, indent=2)
-        
-        # Actualizar la biblioteca en memoria
-        self.library = final_index
 
     def load_library(self):
-        """Load the music library from JSON file and sort it."""
+        """Load the music library from SQLite database."""
         try:
-            if not os.path.exists(MUSIC_LIBRARY_PATH):
-                self.create_music_index()
-            else:
-                with open(MUSIC_LIBRARY_PATH, 'r', encoding='utf-8') as file:
-                    self.library = json.load(file)
-                    
-                    # Ordenar la biblioteca al cargarla
-                    self.library.sort(key=lambda x: f"{x['artist'].lower()} - {x['album'].lower()}")
-                    
-                # Verificar si necesita actualización por fecha
-                from datetime import datetime
-                last_modified = datetime.fromtimestamp(os.path.getmtime(MUSIC_LIBRARY_PATH))
-                if last_modified.date() < datetime.now().date():
-                    print("Índice desactualizado, actualizando...")
-                    self.create_music_index()
-                    
+            # Scan for updates if needed
+            last_scan = os.path.getmtime(MUSIC_LIBRARY_DB) if os.path.exists(MUSIC_LIBRARY_DB) else 0
+            if last_scan < datetime.now().timestamp() - 86400:  # 24 hours
+                print("Updating library index...")
+                self.db.scan_library()
+            
+            # Load all albums
+            self.library = self.db.get_all_albums()
+            self.library.sort(key=lambda x: f"{x['artist'].lower()} - {x['album'].lower()}")
+            
         except Exception as e:
             print(f"Error loading library: {e}")
             self.library = []
+    
+    def update_results(self, event=None):
+        """Update search results using SQLite search."""
+        query = self.search_entry.get()
+        self.result_list.delete(0, tk.END)
+        
+        if query:
+            results = self.db.search_albums(query)
+        else:
+            results = self.db.get_all_albums()
+        
+        results.sort(key=lambda x: f"{x['artist'].lower()} - {x['album'].lower()}")
+        
+        for album in results:
+            display = f"{album['artist']} - {album['album']} ({album.get('date', 'No date')})"
+            self.result_list.insert(tk.END, display)
+   
 
     def create_search_frame(self):
         """Create search input frame."""
@@ -457,36 +735,7 @@ class MusicLibrarySearchApp:
             folder_path = os.path.dirname(album['path'])
             open_with_default_app(folder_path, is_folder=True)
 
-    def update_results(self, event=None):
-        """Update search results based on query and sort alphabetically."""
-        query = self.search_entry.get().lower()
-        
-        # Clear previous results
-        self.result_list.delete(0, tk.END)
-        
-        # Create a list to store matching albums with their display strings
-        matching_albums = []
-        
-        # Search through library and create display strings
-        for album in self.library:
-            # Check if query matches any field
-            if (query in album['artist'].lower() or 
-                query in album['album'].lower() or 
-                query in album.get('label', '').lower() or 
-                query in album.get('date', '').lower()):
-                
-                # Create a tuple with the sort key and display string
-                # Using artist and album for sorting
-                sort_key = f"{album['artist'].lower()} - {album['album'].lower()}"
-                display = f"{album['artist']} - {album['album']} ({album.get('date', 'No date')})"
-                matching_albums.append((sort_key, display))
-        
-        # Sort the results alphabetically
-        matching_albums.sort(key=lambda x: x[0])
-        
-        # Insert sorted results into listbox
-        for _, display in matching_albums:
-            self.result_list.insert(tk.END, display)
+
 
     def on_select(self, event):
         """Display details of selected album."""
@@ -495,25 +744,40 @@ class MusicLibrarySearchApp:
             # Clear previous details
             self.details_text.delete(1.0, tk.END)
             
-            # Display album details
+            # Basic album details
             details = (f"Artist: {album['artist']}\n"
-                    f"Album: {album['album']}\n"
-                    f"Date: {album.get('date', 'Unknown')}\n"
-                    f"Label: {album.get('label', 'Unknown')}\n"
-                    f"Path: {album.get('path', 'Unknown')}")
+                      f"Album: {album['album']}\n"
+                      f"Date: {album.get('date', 'Unknown')}\n"
+                      f"Label: {album.get('label', 'Unknown')}\n"
+                      f"Path: {album.get('path', 'Unknown')}\n\n")
+            
+            # Obtener y mostrar metadata de Discogs
+            discogs_data = self.db.get_discogs_metadata(album['path'])
+            if discogs_data:
+                details += "Discogs Info:\n"
+                details += f"Country: {discogs_data.get('country', 'Unknown')}\n"
+                details += f"Year: {discogs_data.get('year', 'Unknown')}\n"
+                details += f"Format: {discogs_data.get('format', 'Unknown')}\n"
+                details += f"Genres: {', '.join(discogs_data.get('genres', []))}\n"
+                details += f"Styles: {', '.join(discogs_data.get('styles', []))}\n\n"
+            
+            # Obtener y mostrar metadata de MusicBrainz
+            mb_data = self.db.get_musicbrainz_metadata(album['path'])
+            if mb_data:
+                details += "MusicBrainz Info:\n"
+                details += f"Artist Type: {mb_data.get('artist_type', 'Unknown')}\n"
+                details += f"Artist Country: {mb_data.get('artist_country', 'Unknown')}\n"
+                details += f"Career Start: {mb_data.get('artist_begin', 'Unknown')}\n"
+                details += f"Career End: {mb_data.get('artist_end', 'N/A')}\n"
+                details += f"Tags: {mb_data.get('artist_tags', [])}\n"
             
             self.details_text.insert(tk.END, details)
-
-            # Buscar y mostrar la imagen de portada
+            
+            # Mostrar imagen de portada
             if 'path' in album:
-                album_path = album['path']  # Esta es la ruta completa del álbum
-                print(f"Searching for cover in: {album_path}")  # Debug
-                cover_path = self.find_cover_image(album_path)
-                if cover_path:
-                    print(f"Cover found: {cover_path}")  # Debug
-                else:
-                    print("No cover found")  # Debug
+                cover_path = self.find_cover_image(album['path'])
                 self.display_cover_image(cover_path)
+
 
     def add_keyboard_shortcuts(self):
         """Add keyboard shortcuts."""
@@ -550,7 +814,35 @@ class MusicLibrarySearchApp:
         self.search_entry.select_range(0, tk.END)
         return "break"
 
+
+ 
+
 def main():
+    # Configurar MusicBrainz
+    mb.set_useragent("MusicLibraryApp", "1.0", "your@email.com")
+    
+    # Inicializar base de datos
+    db = MusicLibraryDB(MUSIC_LIBRARY_DB)
+    
+    # Realizar escaneo inicial si es necesario
+    cursor = db.conn.execute("SELECT COUNT(*) FROM albums")
+    if cursor.fetchone()[0] == 0:
+        print("Base de datos vacía, realizando escaneo inicial...")
+        db.scan_library(force_update=True)
+    
+    # Actualizar metadata
+    print("Actualizando metadata de Discogs...")
+    updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
+    updater.update_library()
+    
+    print("Actualizando metadata de MusicBrainz...")
+    mb_updater = MusicBrainzUpdater()
+    albums = db.get_all_albums()
+    for album in albums:
+        mb_updater.search_and_update(album['artist'], album['album'], album['path'])
+        time.sleep(RATE_LIMIT_DELAY)  # Respetar límites de rata
+    
+    # Iniciar interfaz gráfica
     root = tk.Tk()
     app = MusicLibrarySearchApp(root)
     root.mainloop()
