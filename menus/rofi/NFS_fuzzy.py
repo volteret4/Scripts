@@ -26,9 +26,6 @@ RATE_LIMIT_DELAY = 1.0
 MUSIC_LIBRARY_DB = "/home/huan/.music_library.db"
 RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
 
-mb.set_useragent("MusicLibraryApp", "1.0", "frodobolson@disrot.org")
-
-
 @dataclass
 class Album:
     artist: str
@@ -55,43 +52,78 @@ class DiscogsMetadata:
 class MusicBrainzUpdater:
     def __init__(self):
         self.db = MusicLibraryDB(db_path)
+        self.total_albums = 0
+        self.current_album = 0
+        self.skipped = 0
+        self.processed = 0
+        self.errors = 0
 
     def search_and_update(self, artist: str, album: str, album_path: str):
+        self.current_album += 1
         try:
+            # Verificar si ya existe en la base de datos
+            cursor = self.db.conn.execute("""
+                SELECT artist_mbid FROM musicbrainz_metadata WHERE album_path = ?
+            """, (album_path,))
+            if cursor.fetchone():
+                self.skipped += 1
+                print(f"[{self.current_album}/{self.total_albums}] Saltando {artist} - {album} (ya existe)")
+                return None
+
+            print(f"[{self.current_album}/{self.total_albums}] Buscando {artist} - {album}...")
+            
             # Buscar artista
             result = mb.search_artists(artist=artist, limit=1)
             if result['artist-list']:
                 artist_data = result['artist-list'][0]
+                print(f"  ✓ Artista encontrado: {artist_data.get('name')}")
+                
+                # Nueva consulta a MusicBrainz, aplicamos delay
+                time.sleep(RATE_LIMIT_DELAY)
                 
                 # Buscar álbum
                 album_result = mb.search_releases(artist=artist, release=album, limit=1)
-                album_mbid = album_result['release-list'][0]['id'] if album_result['release-list'] else None
+                album_mbid = None
+                album_data = None
+                if album_result['release-list']:
+                    album_data = album_result['release-list'][0]
+                    album_mbid = album_data['id']
+                    print(f"  ✓ Álbum encontrado: {album_data.get('title')}")
+                else:
+                    print(f"  ✗ Álbum no encontrado")
                 
                 # Preparar datos
                 metadata = {
                     'artist_mbid': artist_data.get('id'),
                     'album_mbid': album_mbid,
-                    'artist_type': artist_data.get('type'),
-                    'artist_country': artist_data.get('country'),
-                    'artist_begin': artist_data.get('life-span', {}).get('begin'),
-                    'artist_end': artist_data.get('life-span', {}).get('end'),
+                    'artist_type': artist_data.get('type', 'Unknown'),
+                    'artist_country': artist_data.get('country', 'Unknown'),
+                    'artist_begin': artist_data.get('life-span', {}).get('begin', 'Unknown'),
+                    'artist_end': artist_data.get('life-span', {}).get('ended', 'No'),
                     'artist_tags': ','.join([t['name'] for t in artist_data.get('tag-list', [])])
                 }
                 
                 # Actualizar base de datos
                 self.db.conn.execute("""
                     INSERT OR REPLACE INTO musicbrainz_metadata 
+                    (album_path, artist_mbid, album_mbid, artist_type, artist_country, 
+                    artist_begin, artist_end, artist_tags)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (album_path, metadata['artist_mbid'], metadata['album_mbid'],
-                     metadata['artist_type'], metadata['artist_country'],
-                     metadata['artist_begin'], metadata['artist_end'],
-                     metadata['artist_tags']))
+                    metadata['artist_type'], metadata['artist_country'],
+                    metadata['artist_begin'], metadata['artist_end'],
+                    metadata['artist_tags']))
                 self.db.conn.commit()
                 
+                self.processed += 1
                 return metadata
+            else:
+                print(f"  ✗ Artista no encontrado")
+                self.errors += 1
             return None
         except Exception as e:
-            print(f"Error en MusicBrainz para {artist} - {album}: {e}")
+            self.errors += 1
+            print(f"  ✗ Error en MusicBrainz para {artist} - {album}: {e}")
             return None
 
 
@@ -102,7 +134,7 @@ class MusicLibraryDB:
     
     def create_tables(self):
         self.conn.executescript('''
-            -- Existing tables...
+            -- Tabla principal de álbumes
             CREATE TABLE IF NOT EXISTS albums (
                 path TEXT PRIMARY KEY,
                 artist TEXT,
@@ -112,6 +144,7 @@ class MusicLibraryDB:
                 last_modified REAL
             );
             
+            -- Tabla de discos por álbum
             CREATE TABLE IF NOT EXISTS discs (
                 album_path TEXT,
                 disc_number TEXT,
@@ -119,7 +152,7 @@ class MusicLibraryDB:
                 PRIMARY KEY(album_path, disc_number)
             );
             
-            -- Discogs metadata tables
+            -- Tablas de metadata de Discogs
             CREATE TABLE IF NOT EXISTS discogs_metadata (
                 album_path TEXT PRIMARY KEY,
                 artist_id INTEGER,
@@ -130,7 +163,37 @@ class MusicLibraryDB:
                 FOREIGN KEY(album_path) REFERENCES albums(path)
             );
             
-            -- New MusicBrainz metadata tables
+            CREATE TABLE IF NOT EXISTS genres (
+                album_path TEXT,
+                genre TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, genre)
+            );
+            
+            CREATE TABLE IF NOT EXISTS styles (
+                album_path TEXT,
+                style TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, style)
+            );
+            
+            CREATE TABLE IF NOT EXISTS personnel (
+                album_path TEXT,
+                name TEXT,
+                role TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, name, role)
+            );
+            
+            CREATE TABLE IF NOT EXISTS credits (
+                album_path TEXT,
+                type TEXT,
+                name TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, type, name)
+            );
+            
+            -- Tabla de metadata de MusicBrainz
             CREATE TABLE IF NOT EXISTS musicbrainz_metadata (
                 album_path TEXT PRIMARY KEY,
                 artist_mbid TEXT,
@@ -287,50 +350,116 @@ class MusicLibraryDB:
         return None
 
     def get_musicbrainz_metadata(self, album_path: str) -> Optional[Dict]:
-        cursor = self.conn.execute("""
-            SELECT * FROM musicbrainz_metadata WHERE album_path = ?
-        """, (album_path,))
-        row = cursor.fetchone()
-        if row:
-            return {
-                'artist_mbid': row[1],
-                'album_mbid': row[2],
-                'artist_type': row[3],
-                'artist_country': row[4],
-                'artist_begin': row[5],
-                'artist_end': row[6],
-                'artist_tags': row[7].split(',') if row[7] else []
-            }
-        return None
+        """Get MusicBrainz metadata for an album."""
+        try:
+            cursor = self.db.conn.execute("""
+                SELECT artist_mbid, album_mbid, artist_type, artist_country,
+                    artist_begin, artist_end, artist_tags
+                FROM musicbrainz_metadata 
+                WHERE album_path = ?
+            """, (album_path,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'artist_mbid': row[0],
+                    'album_mbid': row[1],
+                    'artist_type': row[2] if row[2] else 'Unknown',
+                    'artist_country': row[3] if row[3] else 'Unknown',
+                    'artist_begin': row[4] if row[4] else 'Unknown',
+                    'artist_end': row[5] if row[5] else 'N/A',
+                    'artist_tags': row[6].split(',') if row[6] else []
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting MusicBrainz metadata: {e}")
+            return None
 
 
 class DiscogsUpdater:
     def __init__(self, token: str):
         self.client = discogs_client.Client('MusicLibrary/1.0', user_token=token)
         self.db = MusicLibraryDB(db_path)
-    
+
+    def _extract_personnel(self, release) -> List[Dict[str, str]]:
+        """Extract personnel information safely handling missing attributes."""
+        personnel = []
+        
+        try:
+            # Extraer de tracklist credits si existen
+            if hasattr(release, 'tracklist'):
+                for track in release.tracklist:
+                    if hasattr(track, 'extraartists'):
+                        for artist in track.extraartists:
+                            if hasattr(artist, 'name') and hasattr(artist, 'role'):
+                                personnel.append({
+                                    'name': artist.name,
+                                    'role': artist.role
+                                })
+            
+            # Extraer de release credits si existen
+            if hasattr(release, 'extraartists'):
+                for artist in release.extraartists:
+                    if hasattr(artist, 'name') and hasattr(artist, 'role'):
+                        personnel.append({
+                            'name': artist.name,
+                            'role': artist.role
+                        })
+        except Exception as e:
+            print(f"Warning: Error extracting personnel: {e}")
+        
+        return personnel
+
+    def _extract_credits(self, release) -> List[Dict[str, str]]:
+        """Extract credits information safely handling missing attributes."""
+        credits = []
+        
+        try:
+            if hasattr(release, 'credits'):
+                for credit in release.credits:
+                    if hasattr(credit, 'name') and hasattr(credit, 'role'):
+                        credits.append({
+                            'type': credit.role,
+                            'name': credit.name
+                        })
+        except Exception as e:
+            print(f"Warning: Error extracting credits: {e}")
+            
+        return credits
+
+    def _remove_duplicates(self, items: List[str]) -> List[str]:
+        """Remove duplicates while preserving order."""
+        seen = set()
+        return [x for x in items if not (x.lower() in seen or seen.add(x.lower()))]
+
     def search_release(self, artist: str, album: str) -> Optional[DiscogsMetadata]:
+        """Search for a release in Discogs with better error handling."""
         try:
             results = self.client.search(f"{artist} - {album}", type='release')
             if not results:
+                print(f"No Discogs results found for {artist} - {album}")
                 return None
             
             release = results[0]
             time.sleep(RATE_LIMIT_DELAY)
             
-            # Obtener release completo para acceder a todos los datos
+            # Obtener release completo
             full_release = self.client.release(release.id)
             
+            # Extraer y limpiar géneros y estilos
+            genres = self._remove_duplicates(getattr(full_release, 'genres', []))
+            styles = self._remove_duplicates(getattr(full_release, 'styles', []))
+            
+            # Extraer datos con manejo seguro de atributos
             metadata = DiscogsMetadata(
-                artist_id=full_release.artists[0].id,
+                artist_id=full_release.artists[0].id if full_release.artists else 0,
                 album_id=full_release.id,
-                genres=full_release.genres,
-                styles=full_release.styles if hasattr(full_release, 'styles') else [],
-                country=full_release.country,
-                year=full_release.year,
+                genres=genres,
+                styles=styles,
+                country=getattr(full_release, 'country', 'Unknown'),
+                year=str(getattr(full_release, 'year', 'Unknown')),
                 format=full_release.formats[0]['name'] if full_release.formats else 'Unknown',
                 personnel=self._extract_personnel(full_release),
-                labels=[l.name for l in full_release.labels],
+                labels=[l.name for l in full_release.labels] if hasattr(full_release, 'labels') else [],
                 credits=self._extract_credits(full_release)
             )
             
@@ -340,39 +469,20 @@ class DiscogsUpdater:
             print(f"Error en Discogs para {artist} - {album}: {e}")
             return None
 
-    def _extract_personnel(self, release) -> List[Dict[str, str]]:
-        personnel = []
-        
-        # Extraer de tracklist credits
-        for track in release.tracklist:
-            if hasattr(track, 'extraartists'):
-                for artist in track.extraartists:
-                    personnel.append({
-                        'name': artist.name,
-                        'role': artist.role
-                    })
-        
-        # Extraer de release credits
-        if hasattr(release, 'extraartists'):
-            for artist in release.extraartists:
-                personnel.append({
-                    'name': artist.name,
-                    'role': artist.role
-                })
-        
-        return personnel
-
-    def _extract_credits(self, release) -> List[Dict[str, str]]:
-        credits = []
-        
-        if hasattr(release, 'credits'):
-            for credit in release.credits:
-                credits.append({
-                    'type': credit.role,
-                    'name': credit.name
-                })
-                
-        return credits
+    def has_discogs_data(self, album_path: str) -> bool:
+        """Check if an album already has Discogs data."""
+        try:
+            cursor = self.db.conn.execute("""
+                SELECT EXISTS(
+                    SELECT 1 FROM discogs_metadata 
+                    WHERE album_path = ? 
+                    AND album_id IS NOT NULL
+                )
+            """, (album_path,))
+            return bool(cursor.fetchone()[0])
+        except Exception as e:
+            print(f"Error checking Discogs data: {e}")
+            return False
     
     def update_library(self):
         cursor = self.db.conn.execute("""
@@ -394,19 +504,6 @@ class DiscogsUpdater:
                 print(f"Error processing {artist} - {album}: {e}")
                 continue
 
-    def has_discogs_data(self, album_path: str) -> bool:
-        try:
-            cursor = self.db.conn.execute("""
-                SELECT EXISTS(
-                    SELECT 1 FROM discogs_metadata 
-                    WHERE album_path = ? 
-                    AND album_id IS NOT NULL
-                )
-            """, (album_path,))
-            return bool(cursor.fetchone()[0])
-        except Exception as e:
-            print(f"Error checking Discogs data: {e}")
-            return False
 
 # Define preferred applications (can be customized)
 MUSIC_PLAYERS = {
@@ -506,16 +603,28 @@ class MusicLibrarySearchApp:
         self.root.geometry("1600x800")
         self.root.configure(bg='#14141e')
 
+        # Create main container
+        self.main_container = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, bg='#14141e')
+        self.main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Left side container
+        self.left_container = tk.Frame(self.main_container, bg='#14141e')
+        self.main_container.add(self.left_container, width=800)
+
+        # Right side container
+        self.right_container = tk.Frame(self.main_container, bg='#14141e')
+        self.main_container.add(self.right_container, width=800)
+
         # Load music library
         self.load_library()
 
-        # Create search frame
+        # Create search frame (in left container)
         self.create_search_frame()
 
-        # Create results listbox
+        # Create results listbox (in left container)
         self.create_results_list()
 
-        # Create details text frame
+        # Create details frame (in right container)
         self.create_details_frame()
 
         # Keyboard shortcuts
@@ -561,71 +670,172 @@ class MusicLibrarySearchApp:
             display = f"{album['artist']} - {album['album']} ({album.get('date', 'No date')})"
             self.result_list.insert(tk.END, display)
    
-
     def create_search_frame(self):
         """Create search input frame."""
-        search_frame = tk.Frame(self.root, bg='#14141e')
-        search_frame.pack(pady=(10, 10), padx=5, fill=tk.X)
+        search_frame = tk.Frame(self.left_container, bg='#14141e')
+        search_frame.pack(pady=(0, 10), fill=tk.X)
+
+        # Buttons container
+        buttons_frame = tk.Frame(search_frame, bg='#14141e')
+        buttons_frame.pack(fill=tk.X, pady=(0, 5))
 
         # Play button
-        play_button = tk.Button(search_frame, 
-                                text="▶ Reproducir", 
-                                command=self.play_selected_album, 
-                                bg='#1974D2', 
-                                fg='white')
-        play_button.pack(side=tk.LEFT, padx=(0, 10))
+        play_button = tk.Button(buttons_frame, 
+                              text="▶ Reproducir", 
+                              command=self.play_selected_album, 
+                              bg='#1974D2', 
+                              fg='white',
+                              width=15)
+        play_button.pack(side=tk.LEFT, padx=5)
 
         # Open Folder button
-        open_folder_button = tk.Button(search_frame, 
-                                       text="📁 Abrir Carpeta", 
-                                       command=self.open_selected_folder, 
-                                       bg='#f8bd9a', 
-                                       fg='black')
-        open_folder_button.pack(side=tk.LEFT, padx=(0, 10))
+        open_folder_button = tk.Button(buttons_frame, 
+                                     text="📁 Abrir Carpeta", 
+                                     command=self.open_selected_folder, 
+                                     bg='#f8bd9a', 
+                                     fg='black',
+                                     width=15)
+        open_folder_button.pack(side=tk.LEFT, padx=5)
 
-        # Search entry
-        self.search_entry = tk.Entry(search_frame, 
-                                     bg='#cba6f7', 
-                                     fg='black', 
-                                     font=('Arial', 12), 
-                                     insertbackground='black', 
-                                     width=50)
-        self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        # Search entry in its own frame
+        search_container = tk.Frame(search_frame, bg='#14141e')
+        search_container.pack(fill=tk.X, pady=(5, 0))
+
+        self.search_entry = tk.Entry(search_container, 
+                                   bg='#cba6f7', 
+                                   fg='black', 
+                                   font=('Arial', 12), 
+                                   insertbackground='black')
+        self.search_entry.pack(fill=tk.X, padx=5)
         
         # Bind events
         self.search_entry.bind("<KeyRelease>", self.update_results)
         self.search_entry.bind("<Return>", self.update_results)
+        
+    # def create_search_frame(self):
+    #     """Create search input frame."""
+    #     search_frame = tk.Frame(self.root, bg='#14141e')
+    #     search_frame.pack(pady=(10, 10), padx=5, fill=tk.X)
+
+    #     # Play button
+    #     play_button = tk.Button(search_frame, 
+    #                             text="▶ Reproducir", 
+    #                             command=self.play_selected_album, 
+    #                             bg='#1974D2', 
+    #                             fg='white')
+    #     play_button.pack(side=tk.LEFT, padx=(0, 10))
+
+    #     # Open Folder button
+    #     open_folder_button = tk.Button(search_frame, 
+    #                                    text="📁 Abrir Carpeta", 
+    #                                    command=self.open_selected_folder, 
+    #                                    bg='#f8bd9a', 
+    #                                    fg='black')
+    #     open_folder_button.pack(side=tk.LEFT, padx=(0, 10))
+
+    #     # Search entry
+    #     self.search_entry = tk.Entry(search_frame, 
+    #                                  bg='#cba6f7', 
+    #                                  fg='black', 
+    #                                  font=('Arial', 12), 
+    #                                  insertbackground='black', 
+    #                                  width=50)
+    #     self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+    #     # Bind events
+    #     self.search_entry.bind("<KeyRelease>", self.update_results)
+    #     self.search_entry.bind("<Return>", self.update_results)
 
     def create_results_list(self):
         """Create results listbox."""
-        self.result_list = tk.Listbox(self.root, 
-                                      width=50, 
-                                      height=20, 
-                                      font=('Arial', 12), 
-                                      bg='#14141e', 
-                                      fg='white')
+        # Create frame for listbox with scrollbar
+        list_frame = tk.Frame(self.left_container, bg='#14141e')
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Scrollbar
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Listbox
+        self.result_list = tk.Listbox(list_frame, 
+                                    font=('Arial', 12), 
+                                    bg='#14141e', 
+                                    fg='white',
+                                    selectmode=tk.SINGLE,
+                                    activestyle='none',
+                                    selectbackground='#1974D2',
+                                    selectforeground='white')
         self.result_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Configure scrollbar
+        scrollbar.config(command=self.result_list.yview)
+        self.result_list.config(yscrollcommand=scrollbar.set)
+        
+        # Bind selection event
         self.result_list.bind("<<ListboxSelect>>", self.on_select)
+
+
+    # def create_results_list(self):
+    #     """Create results listbox."""
+    #     self.result_list = tk.Listbox(self.root, 
+    #                                   width=50, 
+    #                                   height=20, 
+    #                                   font=('Arial', 12), 
+    #                                   bg='#14141e', 
+    #                                   fg='white')
+    #     self.result_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    #     self.result_list.bind("<<ListboxSelect>>", self.on_select)
 
     def create_details_frame(self):
         """Create frame for details and cover art."""
-        # Frame principal para detalles
-        self.details_frame = tk.Frame(self.root, bg='#14141e')
-        self.details_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # Cover frame
+        self.cover_frame = tk.Label(self.right_container, bg='#14141e')
+        self.cover_frame.pack(pady=10, padx=10)
 
-        # Frame para la imagen
-        self.cover_frame = tk.Label(self.details_frame, bg='#14141e')
-        self.cover_frame.pack(side=tk.TOP, pady=10)
+        # Create frame for details with scrollbar
+        details_container = tk.Frame(self.right_container, bg='#14141e')
+        details_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
-        # Text area para los detalles
-        self.details_text = tk.Text(self.details_frame,
-                                  width=80,
-                                  height=10,
+        # Scrollbar for details
+        details_scrollbar = tk.Scrollbar(details_container)
+        details_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Details text widget
+        self.details_text = tk.Text(details_container,
                                   wrap=tk.WORD,
                                   bg='#14141e',
                                   fg='white',
-                                  font=('Arial', 12))
-        self.details_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                                  font=('Arial', 12),
+                                  padx=10,
+                                  pady=10)
+        self.details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Configure scrollbar
+        details_scrollbar.config(command=self.details_text.yview)
+        self.details_text.config(yscrollcommand=details_scrollbar.set)
+
+        # Make details text read-only
+        self.details_text.config(state=tk.DISABLED)
+
+    # def create_details_frame(self):
+    #     """Create frame for details and cover art."""
+    #     # Frame principal para detalles
+    #     self.details_frame = tk.Frame(self.root, bg='#14141e')
+    #     self.details_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+    #     # Frame para la imagen
+    #     self.cover_frame = tk.Label(self.details_frame, bg='#14141e')
+    #     self.cover_frame.pack(side=tk.TOP, pady=10)
+
+    #     # Text area para los detalles
+    #     self.details_text = tk.Text(self.details_frame,
+    #                               width=80,
+    #                               height=10,
+    #                               wrap=tk.WORD,
+    #                               bg='#14141e',
+    #                               fg='white',
+    #                               font=('Arial', 12))
+    #     self.details_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
     def find_cover_image(self, album_path):
         """Find cover image in album directory."""
@@ -735,79 +945,145 @@ class MusicLibrarySearchApp:
             folder_path = os.path.dirname(album['path'])
             open_with_default_app(folder_path, is_folder=True)
 
-
-
     def on_select(self, event):
         """Display details of selected album."""
         album = self.get_selected_album()
         if album:
+            # Enable text widget for updating
+            self.details_text.config(state=tk.NORMAL)
+            
             # Clear previous details
             self.details_text.delete(1.0, tk.END)
             
-            # Basic album details
-            details = (f"Artist: {album['artist']}\n"
-                      f"Album: {album['album']}\n"
-                      f"Date: {album.get('date', 'Unknown')}\n"
-                      f"Label: {album.get('label', 'Unknown')}\n"
-                      f"Path: {album.get('path', 'Unknown')}\n\n")
+            # Format basic album details with better spacing and formatting
+            details = f"""{"="*50}
+ALBUM DETAILS
+{"="*50}
+
+Artist: {album['artist']}
+Album:  {album['album']}
+Date:   {album.get('date', 'Unknown')}
+Label:  {album.get('label', 'Unknown')}
+
+Location: {album.get('path', 'Unknown')}
+
+"""
             
-            # Obtener y mostrar metadata de Discogs
+            # Add Discogs metadata if available
             discogs_data = self.db.get_discogs_metadata(album['path'])
             if discogs_data:
-                details += "Discogs Info:\n"
-                details += f"Country: {discogs_data.get('country', 'Unknown')}\n"
-                details += f"Year: {discogs_data.get('year', 'Unknown')}\n"
-                details += f"Format: {discogs_data.get('format', 'Unknown')}\n"
-                details += f"Genres: {', '.join(discogs_data.get('genres', []))}\n"
-                details += f"Styles: {', '.join(discogs_data.get('styles', []))}\n\n"
+                details += f"""{"="*50}
+DISCOGS INFORMATION
+{"="*50}
+
+Country: {discogs_data.get('country', 'Unknown')}
+Year:    {discogs_data.get('year', 'Unknown')}
+Format:  {discogs_data.get('format', 'Unknown')}
+
+Genres:  {', '.join(discogs_data.get('genres', ['None']))}
+Styles:  {', '.join(discogs_data.get('styles', ['None']))}
+
+"""
             
-            # Obtener y mostrar metadata de MusicBrainz
+            # Add MusicBrainz metadata if available
             mb_data = self.db.get_musicbrainz_metadata(album['path'])
             if mb_data:
-                details += "MusicBrainz Info:\n"
-                details += f"Artist Type: {mb_data.get('artist_type', 'Unknown')}\n"
-                details += f"Artist Country: {mb_data.get('artist_country', 'Unknown')}\n"
-                details += f"Career Start: {mb_data.get('artist_begin', 'Unknown')}\n"
-                details += f"Career End: {mb_data.get('artist_end', 'N/A')}\n"
-                details += f"Tags: {mb_data.get('artist_tags', [])}\n"
+                details += f"""{"="*50}
+MUSICBRAINZ INFORMATION
+{"="*50}
+
+Artist Type:    {mb_data.get('artist_type', 'Unknown')}
+Artist Country: {mb_data.get('artist_country', 'Unknown')}
+Career Start:   {mb_data.get('artist_begin', 'Unknown')}
+Career End:     {mb_data.get('artist_end', 'N/A')}
+
+Tags: {', '.join(mb_data.get('artist_tags', ['None']))}
+"""
             
+            # Insert formatted text
             self.details_text.insert(tk.END, details)
             
-            # Mostrar imagen de portada
+            # Make text widget read-only again
+            self.details_text.config(state=tk.DISABLED)
+            
+            # Show cover image
             if 'path' in album:
                 cover_path = self.find_cover_image(album['path'])
                 self.display_cover_image(cover_path)
 
+    # def on_select(self, event):
+    #     """Display details of selected album."""
+    #     album = self.get_selected_album()
+    #     if album:
+    #         # Clear previous details
+    #         self.details_text.delete(1.0, tk.END)
+            
+    #         # Basic album details
+    #         details = (f"Artist: {album['artist']}\n"
+    #                   f"Album: {album['album']}\n"
+    #                   f"Date: {album.get('date', 'Unknown')}\n"
+    #                   f"Label: {album.get('label', 'Unknown')}\n"
+    #                   f"Path: {album.get('path', 'Unknown')}\n\n")
+            
+    #         # Obtener y mostrar metadata de Discogs
+    #         discogs_data = self.db.get_discogs_metadata(album['path'])
+    #         if discogs_data:
+    #             details += "Discogs Info:\n"
+    #             details += f"Country: {discogs_data.get('country', 'Unknown')}\n"
+    #             details += f"Year: {discogs_data.get('year', 'Unknown')}\n"
+    #             details += f"Format: {discogs_data.get('format', 'Unknown')}\n"
+    #             details += f"Genres: {', '.join(discogs_data.get('genres', []))}\n"
+    #             details += f"Styles: {', '.join(discogs_data.get('styles', []))}\n\n"
+            
+    #         # Obtener y mostrar metadata de MusicBrainz
+    #         mb_data = self.db.get_musicbrainz_metadata(album['path'])
+    #         if mb_data:
+    #             details += "MusicBrainz Info:\n"
+    #             details += f"Artist Type: {mb_data.get('artist_type', 'Unknown')}\n"
+    #             details += f"Artist Country: {mb_data.get('artist_country', 'Unknown')}\n"
+    #             details += f"Career Start: {mb_data.get('artist_begin', 'Unknown')}\n"
+    #             details += f"Career End: {mb_data.get('artist_end', 'N/A')}\n"
+    #             details += f"Tags: {mb_data.get('artist_tags', [])}\n"
+            
+    #         self.details_text.insert(tk.END, details)
+            
+    #         # Mostrar imagen de portada
+    #         if 'path' in album:
+    #             cover_path = self.find_cover_image(album['path'])
+    #             self.display_cover_image(cover_path)
+
 
     def add_keyboard_shortcuts(self):
         """Add keyboard shortcuts."""
-        # Atajo ESC para cerrar la aplicación
+        # Atajos existentes
         self.root.bind("<Escape>", lambda e: self.root.destroy())
-        
-        # Control + F para focus en búsqueda
         self.root.bind("<Control-f>", lambda e: self.search_entry.focus_set())
-        # Control + O para abrir carpeta
         self.root.bind("<Control-o>", lambda e: self.open_selected_folder())
         self.root.bind("<Control-a>", self.select_all)
         
-        # Asegurarse de que estos atajos funcionen también cuando el foco está en el listbox
-        self.result_list.bind("<Control-f>", lambda e: self.search_entry.focus_set())
-        self.result_list.bind("<Return>", lambda e: self.play_selected_album())
-        self.result_list.bind("<Escape>", lambda e: self.root.destroy())
-        
-        # Atajos específicos para la caja de búsqueda
+        # Navegación mejorada
+        self.search_entry.bind("<Tab>", self.move_focus_to_list)
         self.search_entry.bind("<Return>", self.move_focus_to_list)
-        self.search_entry.bind("<Escape>", lambda e: self.root.destroy())
+        
+        # Atajos para el listbox
+        self.result_list.bind("<Return>", lambda e: self.play_selected_album())
+        self.result_list.bind("<Double-Button-1>", lambda e: self.play_selected_album())
+        self.result_list.bind("<space>", lambda e: self.play_selected_album())
+        
+        # Permitir que las flechas funcionen en el listbox
+        self.result_list.bind("<Up>", lambda e: self.on_select(None))
+        self.result_list.bind("<Down>", lambda e: self.on_select(None))
 
     def move_focus_to_list(self, event=None):
         """Move focus to the results list and select first item if available."""
-        if self.result_list.size() > 0:  # Si hay elementos en la lista
-            self.result_list.focus_set()  # Mover el foco a la lista
-            self.result_list.selection_clear(0, tk.END)  # Limpiar selección actual
-            self.result_list.selection_set(0)  # Seleccionar primer elemento
-            self.result_list.see(0)  # Asegurar que el elemento sea visible
-            # Disparar el evento de selección para actualizar los detalles
-            self.on_select(None)
+        if self.result_list.size() > 0:
+            self.result_list.focus_set()
+            self.result_list.selection_clear(0, tk.END)
+            self.result_list.selection_set(0)
+            self.result_list.see(0)
+            self.result_list.event_generate('<<ListboxSelect>>')  # Esto es crucial
+            return "break"  # Esto evita que el evento se propague
+
 
     def select_all(self, event=None):
         """Select all text in the search entry."""
@@ -818,8 +1094,9 @@ class MusicLibrarySearchApp:
  
 
 def main():
+    """Función principal con mejor manejo de metadata"""
     # Configurar MusicBrainz
-    mb.set_useragent("MusicLibraryApp", "1.0", "your@email.com")
+    mb.set_useragent("MusicLibraryApp", "1.0", "frodobolson@disroot.org")
     
     # Inicializar base de datos
     db = MusicLibraryDB(MUSIC_LIBRARY_DB)
@@ -830,22 +1107,46 @@ def main():
         print("Base de datos vacía, realizando escaneo inicial...")
         db.scan_library(force_update=True)
     
-    # Actualizar metadata
-    print("Actualizando metadata de Discogs...")
-    updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
-    updater.update_library()
-    
-    print("Actualizando metadata de MusicBrainz...")
-    mb_updater = MusicBrainzUpdater()
+    # Verificar y actualizar metadata faltante
+    print("\nVerificando metadata...")
     albums = db.get_all_albums()
-    for album in albums:
-        mb_updater.search_and_update(album['artist'], album['album'], album['path'])
-        time.sleep(RATE_LIMIT_DELAY)  # Respetar límites de rata
+    total_albums = len(albums)
+    
+    # Inicializar actualizadores
+    discogs_updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
+    mb_updater = MusicBrainzUpdater()
+    mb_updater.total_albums = total_albums
+    
+    for i, album in enumerate(albums, 1):
+        print(f"\nProcesando álbum {i}/{total_albums}: {album['artist']} - {album['album']}")
+        
+        # Verificar y actualizar Discogs
+        if not discogs_updater.has_discogs_data(album['path']):
+            print("Buscando en Discogs...")
+            metadata = discogs_updater.search_release(album['artist'], album['album'])
+            if metadata:
+                db.update_discogs_metadata(album['path'], metadata)
+                print("✓ Metadata de Discogs actualizada")
+            time.sleep(RATE_LIMIT_DELAY)
+        
+        # Verificar y actualizar MusicBrainz
+        cursor = db.conn.execute(
+            "SELECT 1 FROM musicbrainz_metadata WHERE album_path = ?", 
+            (album['path'],)
+        )
+        if not cursor.fetchone():
+            print("Buscando en MusicBrainz...")
+            mb_updater.search_and_update(album['artist'], album['album'], album['path'])
+            time.sleep(RATE_LIMIT_DELAY)
+    
+    print("\nActualización de metadata completada")
+    print(f"Total de álbumes procesados: {total_albums}")
+    print(f"Errores en MusicBrainz: {mb_updater.errors}")
     
     # Iniciar interfaz gráfica
     root = tk.Tk()
     app = MusicLibrarySearchApp(root)
     root.mainloop()
-
+    
 if __name__ == "__main__":
     main()
