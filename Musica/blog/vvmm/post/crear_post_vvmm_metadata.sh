@@ -97,7 +97,7 @@ if [[ $tags =~ 'pollo' ]]; then
 fi
 
 
-ssh moode "bash /home/pi/hugo/scripts/blog/vvmm/post/get-links.sh ${artista} ${albuma} $tags"
+ssh moode "bash /home/pi/hugo/hugo_scripts//blog/vvmm/post/get-links.sh ${artista} ${albuma} $tags"
 check_status $? "Links obtenidos." "Error al obtener links."
 
 #copyq add "https://volteret4.github.io/vvmm/posts/${artista}-_-${albuma}"
