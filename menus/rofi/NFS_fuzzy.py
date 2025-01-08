@@ -18,13 +18,21 @@ from typing import Optional, List, Dict
 import discogs_client
 import time
 import musicbrainzngs as mb
+from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+import wikipedia
+import requests
 
+# Cargar las variables de entorno desde el archivo .env
+load_dotenv()
 
 # Configuración
-db_path = "/home/huan/Scripts/.content/musica.db"
-RATE_LIMIT_DELAY = 1.0
-MUSIC_LIBRARY_DB = "/home/huan/.music_library.db"
+MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica.db"
+#MUSIC_LIBRARY_DB = "/home/huan/Música/flac/musica.db"
+RATE_LIMIT_DELAY = 0.2
+LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')
 RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
+#RUTA_LIBRERIA = "/mnt/NFS/moode/moode/I/"
 
 @dataclass
 class Album:
@@ -48,15 +56,262 @@ class DiscogsMetadata:
     labels: List[str]
     format: str
     credits: List[Dict[str, str]]
+def update_descriptions(db, artist_name, album_path):
+    """Actualizar todas las descripciones disponibles para un artista y álbum."""
+    # Inicializar clientes
+    lastfm_client = LastFMClient(LASTFM_API_KEY)
+    wiki_client = WikipediaClient()
+    allmusic_client = AllMusicClient()
+    
+    # Obtener información del artista
+    artist_lastfm = lastfm_client.get_artist_info(artist_name)
+    if artist_lastfm:
+        db.update_artist_description(artist_name, 'lastfm', artist_lastfm)
+        time.sleep(RATE_LIMIT_DELAY)
+    
+    artist_wiki = wiki_client.get_artist_info(artist_name)
+    if artist_wiki:
+        db.update_artist_description(artist_name, 'wikipedia', artist_wiki)
+        time.sleep(RATE_LIMIT_DELAY)
+    
+    artist_allmusic = allmusic_client.get_artist_info(artist_name)
+    if artist_allmusic:
+        db.update_artist_description(artist_name, 'allmusic', artist_allmusic)
+        time.sleep(RATE_LIMIT_DELAY)
+    
+    # Obtener información del álbum si tenemos la ruta
+    if album_path:
+        album_name = os.path.basename(os.path.dirname(album_path))
+        
+        album_lastfm = lastfm_client.get_album_info(artist_name, album_name)
+        if album_lastfm:
+            db.update_album_description(album_path, 'lastfm', album_lastfm)
+            time.sleep(RATE_LIMIT_DELAY)
+        
+        album_wiki = wiki_client.get_album_info(artist_name, album_name)
+        if album_wiki:
+            db.update_album_description(album_path, 'wikipedia', album_wiki)
+            time.sleep(RATE_LIMIT_DELAY)
+        
+        album_allmusic = allmusic_client.get_album_info(artist_name, album_name)
+        if album_allmusic:
+            db.update_album_description(album_path, 'allmusic', album_allmusic)
+            time.sleep(RATE_LIMIT_DELAY)
+
+class WikipediaClient:
+    def __init__(self):
+        wikipedia.set_lang('es')
+    
+    def _is_exact_artist_match(self, page_title, artist_name):
+        """Verifica si el título de la página coincide exactamente con el nombre del artista."""
+        # Normaliza ambas cadenas: convierte a minúsculas y elimina espacios extras
+        page_title = ' '.join(page_title.lower().split())
+        artist_name = ' '.join(artist_name.lower().split())
+        
+        # Lista de palabras comunes que pueden aparecer en títulos de Wikipedia
+        common_suffixes = [
+            'musician', 'singer', 'artist', 'band', 
+            'músico', 'cantante', 'artista', 'grupo musical'
+        ]
+        
+        # Elimina los sufijos comunes del título de la página
+        clean_title = page_title
+        for suffix in common_suffixes:
+            clean_title = clean_title.replace(f" ({suffix})", "")
+            clean_title = clean_title.replace(f" {suffix}", "")
+        
+        return clean_title == artist_name
+
+    def get_artist_info(self, artist_name):
+        """Obtener información del artista desde Wikipedia con coincidencia exacta."""
+        try:
+            # Buscar más resultados para tener mayor probabilidad de encontrar la coincidencia exacta
+            search_results = wikipedia.search(f"{artist_name} musician", results=5)
+            
+            for result in search_results:
+                if self._is_exact_artist_match(result, artist_name):
+                    page = wikipedia.page(result, auto_suggest=False)
+                    return page.content[:1500]
+            
+            return None
+        except Exception as e:
+            print(f"Error getting Wikipedia artist info: {e}")
+            return None
+    
+    def get_album_info(self, artist_name, album_name):
+        """Obtener información del álbum desde Wikipedia con validación mejorada."""
+        try:
+            search_query = f"{artist_name} {album_name} album"
+            search_results = wikipedia.search(search_query, results=5)
+            
+            # Normaliza los nombres para la comparación
+            artist_name_norm = ' '.join(artist_name.lower().split())
+            album_name_norm = ' '.join(album_name.lower().split())
+            
+            for result in search_results:
+                result_lower = result.lower()
+                # Verifica que tanto el nombre del artista como del álbum estén en el título
+                if (artist_name_norm in result_lower and 
+                    album_name_norm in result_lower and 
+                    'album' in result_lower):
+                    page = wikipedia.page(result, auto_suggest=False)
+                    return page.content[:1500]
+            
+            return None
+        except Exception as e:
+            print(f"Error getting Wikipedia album info: {e}")
+            return None
+
+class AllMusicClient:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+    
+    def _search_url(self, query):
+        """Genera URL de búsqueda para AllMusic."""
+        return f"https://www.allmusic.com/search/all/{query.replace(' ', '%20')}"
+    
+    def get_artist_info(self, artist_name):
+        """Obtener información del artista desde AllMusic."""
+        try:
+            # Buscar artista
+            search_url = self._search_url(artist_name)
+            response = self.session.get(search_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Buscar primer resultado de artista
+            artist_link = soup.find('div', class_='artist')
+            if artist_link and artist_link.find('a'):
+                artist_url = artist_link.find('a')['href']
+                
+                # Obtener página del artista
+                response = self.session.get(artist_url)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Buscar biografía
+                bio = soup.find('div', class_='biography')
+                if bio:
+                    return bio.get_text().strip()
+            return None
+        except Exception as e:
+            print(f"Error getting AllMusic artist info: {e}")
+            return None
+    
+    def get_album_info(self, artist_name, album_name):
+        """Obtener información del álbum desde AllMusic."""
+        try:
+            # Buscar álbum
+            search_url = self._search_url(f"{artist_name} {album_name}")
+            response = self.session.get(search_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Buscar primer resultado de álbum
+            album_link = soup.find('div', class_='album')
+            if album_link and album_link.find('a'):
+                album_url = album_link.find('a')['href']
+                
+                # Obtener página del álbum
+                response = self.session.get(album_url)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Buscar reseña
+                review = soup.find('div', class_='review')
+                if review:
+                    return review.get_text().strip()
+            return None
+        except Exception as e:
+            print(f"Error getting AllMusic album info: {e}")
+            return None
 
 class MusicBrainzUpdater:
     def __init__(self):
-        self.db = MusicLibraryDB(db_path)
+        self.db = MusicLibraryDB(MUSIC_LIBRARY_DB)
         self.total_albums = 0
         self.current_album = 0
         self.skipped = 0
         self.processed = 0
         self.errors = 0
+
+    def _get_artist_description(self, artist_id: str) -> str:
+        """Get artist description from MusicBrainz."""
+        try:
+            artist_info = mb.get_artist_by_id(artist_id, includes=['url-rels'])
+            # MusicBrainz devuelve las relaciones en 'relations', no en 'relation-list'
+            for relation in artist_info.get('relations', []):
+                if relation.get('type') == 'wikipedia':
+                    return relation.get('url', {}).get('resource', '')
+            return ''
+        except Exception as e:
+            print(f"Error getting artist description: {e}")
+            return ''
+
+    def _get_release_info(self, release_id: str) -> dict:
+        """Get detailed release information."""
+        try:
+            release_info = mb.get_release_by_id(
+                release_id,
+                includes=['recordings', 'artists', 'artist-credits', 'work-rels', 
+                        'recording-rels', 'artist-rels']
+            )
+            return release_info
+        except Exception as e:
+            print(f"Error getting release info: {e}")
+            return {}
+
+    def _extract_collaborators(self, release_info: dict) -> list:
+        """Extract collaborators and their roles from a release."""
+        collaborators = []
+        try:
+            # Iterar sobre los mediums
+            for medium in release_info.get('medium-list', []):
+                for track in medium.get('track-list', []):
+                    if 'recording' not in track:
+                        continue
+                        
+                    # Las relaciones están en la grabación
+                    for relation in track['recording'].get('relation-list', []):
+                        if relation.get('type') in ['conductor', 'producer', 'mix', 'recording', 'performing orchestra']:
+                            artist = relation.get('artist', {})
+                            # Construir la información del colaborador
+                            collaborator = {
+                                'name': artist.get('name'),
+                                'role': relation.get('type'),
+                                'date_begin': relation.get('begin', ''),
+                                'date_end': relation.get('end', ''),
+                                'disambiguation': artist.get('disambiguation', '')
+                            }
+                            collaborators.append(collaborator)
+        except Exception as e:
+            print(f"Error extracting collaborators: {e}")
+        
+        return collaborators
+
+    def _extract_instruments(self, release_info: dict) -> list:
+        """Extract instruments used in the release."""
+        instruments = set()
+        try:
+            for medium in release_info.get('medium-list', []):
+                for track in medium.get('track-list', []):
+                    if 'recording' not in track:
+                        continue
+                        
+                    # Buscar relaciones de tipo instrumento en la grabación
+                    recording = track['recording']
+                    if 'relation-list' in recording:
+                        for relation in recording['relation-list']:
+                            if 'type' in relation and relation['type'] == 'instrument':
+                                if 'instrument' in relation:
+                                    instruments.add(relation['instrument'].get('name', ''))
+                                # También buscar en los atributos si existen
+                                if 'attributes' in relation:
+                                    instruments.update(relation['attributes'])
+                                    
+        except Exception as e:
+            print(f"Error extracting instruments: {e}")
+        
+        return list(instruments)
 
     def search_and_update(self, artist: str, album: str, album_path: str):
         self.current_album += 1
@@ -76,47 +331,64 @@ class MusicBrainzUpdater:
             result = mb.search_artists(artist=artist, limit=1)
             if result['artist-list']:
                 artist_data = result['artist-list'][0]
+                artist_id = artist_data['id']
                 print(f"  ✓ Artista encontrado: {artist_data.get('name')}")
                 
-                # Nueva consulta a MusicBrainz, aplicamos delay
+                # Obtener descripción del artista
+                artist_description = self._get_artist_description(artist_id)
                 time.sleep(RATE_LIMIT_DELAY)
                 
                 # Buscar álbum
                 album_result = mb.search_releases(artist=artist, release=album, limit=1)
-                album_mbid = None
-                album_data = None
+                release_info = None
                 if album_result['release-list']:
-                    album_data = album_result['release-list'][0]
-                    album_mbid = album_data['id']
-                    print(f"  ✓ Álbum encontrado: {album_data.get('title')}")
+                    release_data = album_result['release-list'][0]
+                    release_id = release_data['id']
+                    print(f"  ✓ Álbum encontrado: {release_data.get('title')}")
+                    
+                    # Obtener información detallada del release
+                    release_info = self._get_release_info(release_id)
+                    time.sleep(RATE_LIMIT_DELAY)
+                    
+                    # Extraer información adicional
+                    instruments = self._extract_instruments(release_info)
+                    collaborators = self._extract_collaborators(release_info)
+                    
+                    # Preparar metadata
+                    metadata = {
+                        'artist_mbid': artist_id,
+                        'album_mbid': release_id,
+                        'artist_type': artist_data.get('type', 'Unknown'),
+                        'artist_country': artist_data.get('country', 'Unknown'),
+                        'artist_begin': artist_data.get('life-span', {}).get('begin', 'Unknown'),
+                        'artist_end': artist_data.get('life-span', {}).get('ended', 'No'),
+                        'artist_tags': ','.join([t['name'] for t in artist_data.get('tag-list', [])]),
+                        'artist_description': artist_description,
+                        'album_info': release_info.get('annotation', ''),
+                        'instruments': ','.join(instruments),
+                        'collaborators': json.dumps(collaborators)
+                    }
+                    
+                    # Actualizar base de datos
+                    self.db.conn.execute("""
+                        INSERT OR REPLACE INTO musicbrainz_metadata 
+                        (album_path, artist_mbid, album_mbid, artist_type, artist_country, 
+                        artist_begin, artist_end, artist_tags, artist_description, 
+                        album_info, instruments, collaborators)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (album_path, metadata['artist_mbid'], metadata['album_mbid'],
+                        metadata['artist_type'], metadata['artist_country'],
+                        metadata['artist_begin'], metadata['artist_end'],
+                        metadata['artist_tags'], metadata['artist_description'],
+                        metadata['album_info'], metadata['instruments'],
+                        metadata['collaborators']))
+                    self.db.conn.commit()
+                    
+                    self.processed += 1
+                    return metadata
                 else:
                     print(f"  ✗ Álbum no encontrado")
-                
-                # Preparar datos
-                metadata = {
-                    'artist_mbid': artist_data.get('id'),
-                    'album_mbid': album_mbid,
-                    'artist_type': artist_data.get('type', 'Unknown'),
-                    'artist_country': artist_data.get('country', 'Unknown'),
-                    'artist_begin': artist_data.get('life-span', {}).get('begin', 'Unknown'),
-                    'artist_end': artist_data.get('life-span', {}).get('ended', 'No'),
-                    'artist_tags': ','.join([t['name'] for t in artist_data.get('tag-list', [])])
-                }
-                
-                # Actualizar base de datos
-                self.db.conn.execute("""
-                    INSERT OR REPLACE INTO musicbrainz_metadata 
-                    (album_path, artist_mbid, album_mbid, artist_type, artist_country, 
-                    artist_begin, artist_end, artist_tags)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (album_path, metadata['artist_mbid'], metadata['album_mbid'],
-                    metadata['artist_type'], metadata['artist_country'],
-                    metadata['artist_begin'], metadata['artist_end'],
-                    metadata['artist_tags']))
-                self.db.conn.commit()
-                
-                self.processed += 1
-                return metadata
+                    self.errors += 1
             else:
                 print(f"  ✗ Artista no encontrado")
                 self.errors += 1
@@ -126,10 +398,55 @@ class MusicBrainzUpdater:
             print(f"  ✗ Error en MusicBrainz para {artist} - {album}: {e}")
             return None
 
+class LastFMClient:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.session = requests.Session()
+        self.base_url = "http://ws.audioscrobbler.com/2.0/"
+    
+    def get_artist_info(self, artist_name):
+        params = {
+            'method': 'artist.getinfo',
+            'artist': artist_name,
+            'api_key': self.api_key,
+            'format': 'json',
+            'lang': 'es'  # Preferimos descripción en español
+        }
+        
+        try:
+            response = self.session.get(self.base_url, params=params)
+            data = response.json()
+            if 'artist' in data:
+                return data['artist'].get('bio', {}).get('content', '')
+            return None
+        except Exception as e:
+            print(f"Error getting Last.fm artist info: {e}")
+            return None
+    
+    def get_album_info(self, artist_name, album_name):
+        params = {
+            'method': 'album.getinfo',
+            'artist': artist_name,
+            'album': album_name,
+            'api_key': self.api_key,
+            'format': 'json',
+            'lang': 'es'  # Preferimos descripción en español
+        }
+        
+        try:
+            response = self.session.get(self.base_url, params=params)
+            data = response.json()
+            if 'album' in data:
+                return data['album'].get('wiki', {}).get('content', '')
+            return None
+        except Exception as e:
+            print(f"Error getting Last.fm album info: {e}")
+            return None
+
 
 class MusicLibraryDB:
-    def __init__(self, db_path: str):
-        self.conn = sqlite3.connect(db_path)
+    def __init__(self, MUSIC_LIBRARY_DB: str):
+        self.conn = sqlite3.connect(MUSIC_LIBRARY_DB)
         self.create_tables()
     
     def create_tables(self):
@@ -152,47 +469,6 @@ class MusicLibraryDB:
                 PRIMARY KEY(album_path, disc_number)
             );
             
-            -- Tablas de metadata de Discogs
-            CREATE TABLE IF NOT EXISTS discogs_metadata (
-                album_path TEXT PRIMARY KEY,
-                artist_id INTEGER,
-                album_id INTEGER,
-                country TEXT,
-                year TEXT,
-                format TEXT,
-                FOREIGN KEY(album_path) REFERENCES albums(path)
-            );
-            
-            CREATE TABLE IF NOT EXISTS genres (
-                album_path TEXT,
-                genre TEXT,
-                FOREIGN KEY(album_path) REFERENCES albums(path),
-                PRIMARY KEY(album_path, genre)
-            );
-            
-            CREATE TABLE IF NOT EXISTS styles (
-                album_path TEXT,
-                style TEXT,
-                FOREIGN KEY(album_path) REFERENCES albums(path),
-                PRIMARY KEY(album_path, style)
-            );
-            
-            CREATE TABLE IF NOT EXISTS personnel (
-                album_path TEXT,
-                name TEXT,
-                role TEXT,
-                FOREIGN KEY(album_path) REFERENCES albums(path),
-                PRIMARY KEY(album_path, name, role)
-            );
-            
-            CREATE TABLE IF NOT EXISTS credits (
-                album_path TEXT,
-                type TEXT,
-                name TEXT,
-                FOREIGN KEY(album_path) REFERENCES albums(path),
-                PRIMARY KEY(album_path, type, name)
-            );
-            
             -- Tabla de metadata de MusicBrainz
             CREATE TABLE IF NOT EXISTS musicbrainz_metadata (
                 album_path TEXT PRIMARY KEY,
@@ -203,11 +479,125 @@ class MusicLibraryDB:
                 artist_begin TEXT,
                 artist_end TEXT,
                 artist_tags TEXT,
+                artist_description TEXT,
+                album_info TEXT,
+                instruments TEXT,
+                collaborators TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path)
+            );
+
+            -- Tabla principal de metadata de Discogs
+            CREATE TABLE IF NOT EXISTS discogs_metadata (
+                album_path TEXT PRIMARY KEY,
+                artist_id INTEGER,
+                album_id INTEGER,
+                country TEXT,
+                year TEXT,
+                format TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path)
+            );
+
+            -- Tabla de géneros
+            CREATE TABLE IF NOT EXISTS genres (
+                album_path TEXT,
+                genre TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, genre)
+            );
+
+            -- Tabla de estilos
+            CREATE TABLE IF NOT EXISTS styles (
+                album_path TEXT,
+                style TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, style)
+            );
+
+            -- Tabla de personal
+            CREATE TABLE IF NOT EXISTS personnel (
+                album_path TEXT,
+                name TEXT,
+                role TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, name, role)
+            );
+
+            -- Tabla de créditos
+            CREATE TABLE IF NOT EXISTS credits (
+                album_path TEXT,
+                type TEXT,
+                name TEXT,
+                FOREIGN KEY(album_path) REFERENCES albums(path),
+                PRIMARY KEY(album_path, type, name)
+            );
+
+            -- Tabla para descripciones de artistas
+            CREATE TABLE IF NOT EXISTS artist_descriptions (
+                artist_name TEXT PRIMARY KEY,
+                wikipedia_desc TEXT,
+                lastfm_desc TEXT,
+                allmusic_desc TEXT,
+                last_updated TIMESTAMP
+            );
+            
+            -- Tabla para descripciones de álbumes
+            CREATE TABLE IF NOT EXISTS album_descriptions (
+                album_path TEXT PRIMARY KEY,
+                wikipedia_desc TEXT,
+                lastfm_desc TEXT,
+                allmusic_desc TEXT,
+                last_updated TIMESTAMP,
                 FOREIGN KEY(album_path) REFERENCES albums(path)
             );
         ''')
         self.conn.commit()
 
+
+    def update_artist_description(self, artist_name, source, description):
+        """Update artist description from a specific source."""
+        try:
+            self.conn.execute(f"""
+                INSERT INTO artist_descriptions (artist_name, {source}_desc, last_updated)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(artist_name) DO UPDATE SET
+                    {source}_desc = ?,
+                    last_updated = CURRENT_TIMESTAMP
+            """, (artist_name, description, description))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error updating {source} artist description: {e}")
+    
+    def update_album_description(self, album_path, source, description):
+        """Update album description from a specific source."""
+        try:
+            self.conn.execute(f"""
+                INSERT INTO album_descriptions (album_path, {source}_desc, last_updated)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(album_path) DO UPDATE SET
+                    {source}_desc = ?,
+                    last_updated = CURRENT_TIMESTAMP
+            """, (album_path, description, description))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error updating {source} album description: {e}")
+    
+    def get_artist_descriptions(self, artist_name):
+        """Get all available descriptions for an artist."""
+        cursor = self.conn.execute("""
+            SELECT wikipedia_desc, lastfm_desc, allmusic_desc, last_updated
+            FROM artist_descriptions
+            WHERE artist_name = ?
+        """, (artist_name,))
+        return cursor.fetchone()
+    
+    def get_album_descriptions(self, album_path):
+        """Get all available descriptions for an album."""
+        cursor = self.conn.execute("""
+            SELECT wikipedia_desc, lastfm_desc, allmusic_desc, last_updated
+            FROM album_descriptions
+            WHERE album_path = ?
+        """, (album_path,))
+        return cursor.fetchone()
 
     def get_all_albums(self) -> List[Dict]:
         cursor = self.conn.execute('''
@@ -352,9 +742,10 @@ class MusicLibraryDB:
     def get_musicbrainz_metadata(self, album_path: str) -> Optional[Dict]:
         """Get MusicBrainz metadata for an album."""
         try:
-            cursor = self.db.conn.execute("""
+            cursor = self.conn.execute("""
                 SELECT artist_mbid, album_mbid, artist_type, artist_country,
-                    artist_begin, artist_end, artist_tags
+                    artist_begin, artist_end, artist_tags, artist_description,
+                    album_info, instruments, collaborators
                 FROM musicbrainz_metadata 
                 WHERE album_path = ?
             """, (album_path,))
@@ -367,7 +758,11 @@ class MusicLibraryDB:
                     'artist_country': row[3] if row[3] else 'Unknown',
                     'artist_begin': row[4] if row[4] else 'Unknown',
                     'artist_end': row[5] if row[5] else 'N/A',
-                    'artist_tags': row[6].split(',') if row[6] else []
+                    'artist_tags': row[6].split(',') if row[6] else [],
+                    'artist_description': row[7] if row[7] else '',
+                    'album_info': row[8] if row[8] else '',
+                    'instruments': row[9].split(',') if row[9] else [],
+                    'collaborators': json.loads(row[10]) if row[10] else []
                 }
             return None
         except Exception as e:
@@ -378,7 +773,7 @@ class MusicLibraryDB:
 class DiscogsUpdater:
     def __init__(self, token: str):
         self.client = discogs_client.Client('MusicLibrary/1.0', user_token=token)
-        self.db = MusicLibraryDB(db_path)
+        self.db = MusicLibraryDB(MUSIC_LIBRARY_DB)
 
     def _extract_personnel(self, release) -> List[Dict[str, str]]:
         """Extract personnel information safely handling missing attributes."""
@@ -712,39 +1107,7 @@ class MusicLibrarySearchApp:
         self.search_entry.bind("<KeyRelease>", self.update_results)
         self.search_entry.bind("<Return>", self.update_results)
         
-    # def create_search_frame(self):
-    #     """Create search input frame."""
-    #     search_frame = tk.Frame(self.root, bg='#14141e')
-    #     search_frame.pack(pady=(10, 10), padx=5, fill=tk.X)
 
-    #     # Play button
-    #     play_button = tk.Button(search_frame, 
-    #                             text="▶ Reproducir", 
-    #                             command=self.play_selected_album, 
-    #                             bg='#1974D2', 
-    #                             fg='white')
-    #     play_button.pack(side=tk.LEFT, padx=(0, 10))
-
-    #     # Open Folder button
-    #     open_folder_button = tk.Button(search_frame, 
-    #                                    text="📁 Abrir Carpeta", 
-    #                                    command=self.open_selected_folder, 
-    #                                    bg='#f8bd9a', 
-    #                                    fg='black')
-    #     open_folder_button.pack(side=tk.LEFT, padx=(0, 10))
-
-    #     # Search entry
-    #     self.search_entry = tk.Entry(search_frame, 
-    #                                  bg='#cba6f7', 
-    #                                  fg='black', 
-    #                                  font=('Arial', 12), 
-    #                                  insertbackground='black', 
-    #                                  width=50)
-    #     self.search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        
-    #     # Bind events
-    #     self.search_entry.bind("<KeyRelease>", self.update_results)
-    #     self.search_entry.bind("<Return>", self.update_results)
 
     def create_results_list(self):
         """Create results listbox."""
@@ -775,16 +1138,7 @@ class MusicLibrarySearchApp:
         self.result_list.bind("<<ListboxSelect>>", self.on_select)
 
 
-    # def create_results_list(self):
-    #     """Create results listbox."""
-    #     self.result_list = tk.Listbox(self.root, 
-    #                                   width=50, 
-    #                                   height=20, 
-    #                                   font=('Arial', 12), 
-    #                                   bg='#14141e', 
-    #                                   fg='white')
-    #     self.result_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    #     self.result_list.bind("<<ListboxSelect>>", self.on_select)
+
 
     def create_details_frame(self):
         """Create frame for details and cover art."""
@@ -816,26 +1170,6 @@ class MusicLibrarySearchApp:
 
         # Make details text read-only
         self.details_text.config(state=tk.DISABLED)
-
-    # def create_details_frame(self):
-    #     """Create frame for details and cover art."""
-    #     # Frame principal para detalles
-    #     self.details_frame = tk.Frame(self.root, bg='#14141e')
-    #     self.details_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-    #     # Frame para la imagen
-    #     self.cover_frame = tk.Label(self.details_frame, bg='#14141e')
-    #     self.cover_frame.pack(side=tk.TOP, pady=10)
-
-    #     # Text area para los detalles
-    #     self.details_text = tk.Text(self.details_frame,
-    #                               width=80,
-    #                               height=10,
-    #                               wrap=tk.WORD,
-    #                               bg='#14141e',
-    #                               fg='white',
-    #                               font=('Arial', 12))
-    #     self.details_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
     def find_cover_image(self, album_path):
         """Find cover image in album directory."""
@@ -955,50 +1289,109 @@ class MusicLibrarySearchApp:
             # Clear previous details
             self.details_text.delete(1.0, tk.END)
             
-            # Format basic album details with better spacing and formatting
+            # Format basic album details
             details = f"""{"="*50}
-ALBUM DETAILS
-{"="*50}
+    ALBUM DETAILS
+    {"="*50}
 
-Artist: {album['artist']}
-Album:  {album['album']}
-Date:   {album.get('date', 'Unknown')}
-Label:  {album.get('label', 'Unknown')}
+    Artist: {album['artist']}
+    Album:  {album['album']}
+    Date:   {album.get('date', 'Unknown')}
+    Label:  {album.get('label', 'Unknown')}
 
-Location: {album.get('path', 'Unknown')}
+    Location: {album.get('path', 'Unknown')}
 
-"""
-            
-            # Add Discogs metadata if available
-            discogs_data = self.db.get_discogs_metadata(album['path'])
-            if discogs_data:
-                details += f"""{"="*50}
-DISCOGS INFORMATION
-{"="*50}
-
-Country: {discogs_data.get('country', 'Unknown')}
-Year:    {discogs_data.get('year', 'Unknown')}
-Format:  {discogs_data.get('format', 'Unknown')}
-
-Genres:  {', '.join(discogs_data.get('genres', ['None']))}
-Styles:  {', '.join(discogs_data.get('styles', ['None']))}
-
-"""
+    """
             
             # Add MusicBrainz metadata if available
             mb_data = self.db.get_musicbrainz_metadata(album['path'])
             if mb_data:
                 details += f"""{"="*50}
-MUSICBRAINZ INFORMATION
-{"="*50}
+    MUSICBRAINZ INFORMATION
+    {"="*50}
 
-Artist Type:    {mb_data.get('artist_type', 'Unknown')}
-Artist Country: {mb_data.get('artist_country', 'Unknown')}
-Career Start:   {mb_data.get('artist_begin', 'Unknown')}
-Career End:     {mb_data.get('artist_end', 'N/A')}
+    Artist Type:    {mb_data.get('artist_type', 'Unknown')}
+    Artist Country: {mb_data.get('artist_country', 'Unknown')}
+    Career Start:   {mb_data.get('artist_begin', 'Unknown')}
+    Career End:     {mb_data.get('artist_end', 'N/A')}
 
-Tags: {', '.join(mb_data.get('artist_tags', ['None']))}
-"""
+    Tags: {', '.join(mb_data.get('artist_tags', ['None']))}\n"""
+
+            # Add Discogs metadata if available
+            discogs_data = self.db.get_discogs_metadata(album['path'])
+            if discogs_data:
+                details += f"""\n{"="*50}
+    DISCOGS INFORMATION
+    {"="*50}
+
+    Country:  {discogs_data.get('country', 'Unknown')}
+    Year:     {discogs_data.get('year', 'Unknown')}
+    Format:   {discogs_data.get('format', 'Unknown')}
+
+    Genres:   {', '.join(discogs_data.get('genres', ['None']))}
+    Styles:   {', '.join(discogs_data.get('styles', ['None']))}\n"""
+
+                # Get personnel information
+                cursor = self.db.conn.execute("""
+                    SELECT name, role FROM personnel 
+                    WHERE album_path = ? 
+                    ORDER BY role, name
+                """, (album['path'],))
+                personnel = cursor.fetchall()
+                
+                if personnel:
+                    details += "\nPERSONNEL:\n"
+                    current_role = None
+                    for name, role in personnel:
+                        if role != current_role:
+                            details += f"\n{role}:\n"
+                            current_role = role
+                        details += f"- {name}\n"
+
+                # Get credits information
+                cursor = self.db.conn.execute("""
+                    SELECT type, name FROM credits 
+                    WHERE album_path = ? 
+                    ORDER BY type, name
+                """, (album['path'],))
+                credits = cursor.fetchall()
+                
+                if credits:
+                    details += "\nCREDITS:\n"
+                    current_type = None
+                    for credit_type, name in credits:
+                        if credit_type != current_type:
+                            details += f"\n{credit_type}:\n"
+                            current_type = credit_type
+                        details += f"- {name}\n"
+            
+            # Formato básico del álbum...
+            
+            # Obtener descripciones del artista
+            artist_desc = self.db.get_artist_descriptions(album['artist'])
+            if artist_desc:
+                details += f"""\n{"="*50}
+    ARTIST INFORMATION
+    {"="*50}\n"""
+                if artist_desc[0]:  # Wikipedia
+                    details += f"\nWIKIPEDIA:\n{artist_desc[0]}\n"
+                if artist_desc[1]:  # Last.fm
+                    details += f"\nLAST.FM:\n{artist_desc[1]}\n"
+                if artist_desc[2]:  # AllMusic
+                    details += f"\nALLMUSIC:\n{artist_desc[2]}\n"
+            
+            # Obtener descripciones del álbum
+            album_desc = self.db.get_album_descriptions(album['path'])
+            if album_desc:
+                details += f"""\n{"="*50}
+    ALBUM INFORMATION
+    {"="*50}\n"""
+                if album_desc[0]:  # Wikipedia
+                    details += f"\nWIKIPEDIA:\n{album_desc[0]}\n"
+                if album_desc[1]:  # Last.fm
+                    details += f"\nLAST.FM:\n{album_desc[1]}\n"
+                if album_desc[2]:  # AllMusic
+                    details += f"\nALLMUSIC:\n{album_desc[2]}\n"
             
             # Insert formatted text
             self.details_text.insert(tk.END, details)
@@ -1010,47 +1403,6 @@ Tags: {', '.join(mb_data.get('artist_tags', ['None']))}
             if 'path' in album:
                 cover_path = self.find_cover_image(album['path'])
                 self.display_cover_image(cover_path)
-
-    # def on_select(self, event):
-    #     """Display details of selected album."""
-    #     album = self.get_selected_album()
-    #     if album:
-    #         # Clear previous details
-    #         self.details_text.delete(1.0, tk.END)
-            
-    #         # Basic album details
-    #         details = (f"Artist: {album['artist']}\n"
-    #                   f"Album: {album['album']}\n"
-    #                   f"Date: {album.get('date', 'Unknown')}\n"
-    #                   f"Label: {album.get('label', 'Unknown')}\n"
-    #                   f"Path: {album.get('path', 'Unknown')}\n\n")
-            
-    #         # Obtener y mostrar metadata de Discogs
-    #         discogs_data = self.db.get_discogs_metadata(album['path'])
-    #         if discogs_data:
-    #             details += "Discogs Info:\n"
-    #             details += f"Country: {discogs_data.get('country', 'Unknown')}\n"
-    #             details += f"Year: {discogs_data.get('year', 'Unknown')}\n"
-    #             details += f"Format: {discogs_data.get('format', 'Unknown')}\n"
-    #             details += f"Genres: {', '.join(discogs_data.get('genres', []))}\n"
-    #             details += f"Styles: {', '.join(discogs_data.get('styles', []))}\n\n"
-            
-    #         # Obtener y mostrar metadata de MusicBrainz
-    #         mb_data = self.db.get_musicbrainz_metadata(album['path'])
-    #         if mb_data:
-    #             details += "MusicBrainz Info:\n"
-    #             details += f"Artist Type: {mb_data.get('artist_type', 'Unknown')}\n"
-    #             details += f"Artist Country: {mb_data.get('artist_country', 'Unknown')}\n"
-    #             details += f"Career Start: {mb_data.get('artist_begin', 'Unknown')}\n"
-    #             details += f"Career End: {mb_data.get('artist_end', 'N/A')}\n"
-    #             details += f"Tags: {mb_data.get('artist_tags', [])}\n"
-            
-    #         self.details_text.insert(tk.END, details)
-            
-    #         # Mostrar imagen de portada
-    #         if 'path' in album:
-    #             cover_path = self.find_cover_image(album['path'])
-    #             self.display_cover_image(cover_path)
 
 
     def add_keyboard_shortcuts(self):
@@ -1138,6 +1490,15 @@ def main():
             print("Buscando en MusicBrainz...")
             mb_updater.search_and_update(album['artist'], album['album'], album['path'])
             time.sleep(RATE_LIMIT_DELAY)
+            
+        # Verificar si ya existe descripción para este álbum
+        cursor = db.conn.execute(
+            "SELECT 1 FROM album_descriptions WHERE album_path = ?",
+            (album['path'],)
+        )
+        if not cursor.fetchone():
+            print("Actualizando descripción...")
+            update_descriptions(db, album['artist'], album['path'])
     
     print("\nActualización de metadata completada")
     print(f"Total de álbumes procesados: {total_albums}")
