@@ -27,12 +27,15 @@ import requests
 load_dotenv()
 
 # Configuración
-MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica.db"
+#MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_moode.db"
+MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_lidarr.db"
 #MUSIC_LIBRARY_DB = "/home/huan/Música/flac/musica.db"
+
 RATE_LIMIT_DELAY = 0.2
 LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')
-RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
+#RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
 #RUTA_LIBRERIA = "/mnt/NFS/moode/moode/I/"
+RUTA_LIBRERIA = "/mnt/NFS/lidarr"
 
 @dataclass
 class Album:
@@ -646,38 +649,38 @@ class MusicLibraryDB:
 
     def scan_library(self, force_update=True):
         for root, dirs, files in os.walk(RUTA_LIBRERIA):
-            if os.path.basename(root).startswith("Disc "):
-                try:
-                    flac_files = [f for f in files if f.lower().endswith('.flac')]
-                    if not flac_files:
+    # if os.path.basename(root).startswith("Disc "):
+            try:
+                flac_files = [f for f in files if f.lower().endswith('.flac')]
+                if not flac_files:
+                    continue
+                
+                album_dir = os.path.dirname(root)
+                last_modified = os.path.getmtime(root)
+                
+                # Skip if not forced and already up to date
+                if not force_update:
+                    cursor = self.conn.execute(
+                        "SELECT last_modified FROM albums WHERE path = ?", 
+                        (album_dir,))
+                    result = cursor.fetchone()
+                    if result and result[0] >= last_modified:
                         continue
-                    
-                    album_dir = os.path.dirname(root)
-                    last_modified = os.path.getmtime(root)
-                    
-                    # Skip if not forced and already up to date
-                    if not force_update:
-                        cursor = self.conn.execute(
-                            "SELECT last_modified FROM albums WHERE path = ?", 
-                            (album_dir,))
-                        result = cursor.fetchone()
-                        if result and result[0] >= last_modified:
-                            continue
-                    
-                    audio = FLAC(os.path.join(root, flac_files[0]))
-                    album = Album(
-                        artist=audio.get('artist', ['Unknown'])[0],
-                        album=audio.get('album', ['Unknown'])[0],
-                        date=audio.get('date', ['Unknown'])[0],
-                        label=audio.get('label', ['Unknown'])[0],
-                        path=album_dir,
-                        discs=[os.path.basename(root).split()[1]],
-                        last_modified=last_modified
-                    )
-                    self.update_album(album)
-                    
-                except Exception as e:
-                    print(f"Error processing {root}: {e}")
+                
+                audio = FLAC(os.path.join(root, flac_files[0]))
+                album = Album(
+                    artist=audio.get('artist', ['Unknown'])[0],
+                    album=audio.get('album', ['Unknown'])[0],
+                    date=audio.get('date', ['Unknown'])[0],
+                    label=audio.get('label', ['Unknown'])[0],
+                    path=album_dir,
+                    discs=[os.path.basename(root).split()[1]],
+                    last_modified=last_modified
+                )
+                self.update_album(album)
+                
+            except Exception as e:
+                print(f"Error processing {root}: {e}")
 
     def update_discogs_metadata(self, album_path: str, metadata: DiscogsMetadata):
         try:
@@ -1116,8 +1119,8 @@ class MusicLibrarySearchApp:
         list_frame.pack(fill=tk.BOTH, expand=True)
 
         # Scrollbar
-        scrollbar = tk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        #scrollbar = tk.Scrollbar(list_frame)
+        #scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Listbox
         self.result_list = tk.Listbox(list_frame, 
@@ -1131,8 +1134,8 @@ class MusicLibrarySearchApp:
         self.result_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Configure scrollbar
-        scrollbar.config(command=self.result_list.yview)
-        self.result_list.config(yscrollcommand=scrollbar.set)
+        #scrollbar.config(command=self.result_list.yview)
+        #self.result_list.config(yscrollcommand=scrollbar.set)
         
         # Bind selection event
         self.result_list.bind("<<ListboxSelect>>", self.on_select)
@@ -1151,8 +1154,8 @@ class MusicLibrarySearchApp:
         details_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
         # Scrollbar for details
-        details_scrollbar = tk.Scrollbar(details_container)
-        details_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # details_scrollbar = tk.Scrollbar(details_container)
+        # details_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Details text widget
         self.details_text = tk.Text(details_container,
@@ -1165,8 +1168,8 @@ class MusicLibrarySearchApp:
         self.details_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Configure scrollbar
-        details_scrollbar.config(command=self.details_text.yview)
-        self.details_text.config(yscrollcommand=details_scrollbar.set)
+        # details_scrollbar.config(command=self.details_text.yview)
+        # self.details_text.config(yscrollcommand=details_scrollbar.set)
 
         # Make details text read-only
         self.details_text.config(state=tk.DISABLED)
@@ -1221,7 +1224,7 @@ class MusicLibrarySearchApp:
                 print(f"Original dimensions: {width}x{height}")  # Debug
                 
                 # Calcular nueva dimensión manteniendo proporción
-                max_size = (500, 500)
+                max_size = (400, 400)
                 ratio = min(max_size[0]/width, max_size[1]/height)
                 new_size = (int(width * ratio), int(height * ratio))
                 print(f"New dimensions: {new_size}")  # Debug
@@ -1373,8 +1376,8 @@ class MusicLibrarySearchApp:
                 details += f"""\n{"="*50}
     ARTIST INFORMATION
     {"="*50}\n"""
-                if artist_desc[0]:  # Wikipedia
-                    details += f"\nWIKIPEDIA:\n{artist_desc[0]}\n"
+                # if artist_desc[0]:  # Wikipedia
+                #     details += f"\nWIKIPEDIA:\n{artist_desc[0]}\n"
                 if artist_desc[1]:  # Last.fm
                     details += f"\nLAST.FM:\n{artist_desc[1]}\n"
                 if artist_desc[2]:  # AllMusic
@@ -1386,12 +1389,12 @@ class MusicLibrarySearchApp:
                 details += f"""\n{"="*50}
     ALBUM INFORMATION
     {"="*50}\n"""
-                if album_desc[0]:  # Wikipedia
-                    details += f"\nWIKIPEDIA:\n{album_desc[0]}\n"
+                # if album_desc[0]:  # Wikipedia
+                #     details += f"\nWIKIPEDIA:\n{album_desc[0]}\n"
                 if album_desc[1]:  # Last.fm
                     details += f"\nLAST.FM:\n{album_desc[1]}\n"
-                if album_desc[2]:  # AllMusic
-                    details += f"\nALLMUSIC:\n{album_desc[2]}\n"
+                # if album_desc[2]:  # AllMusic
+                #     details += f"\nALLMUSIC:\n{album_desc[2]}\n"
             
             # Insert formatted text
             self.details_text.insert(tk.END, details)
@@ -1464,7 +1467,7 @@ def main():
     albums = db.get_all_albums()
     total_albums = len(albums)
     
-    # Inicializar actualizadores
+    #Inicializar actualizadores
     discogs_updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
     mb_updater = MusicBrainzUpdater()
     mb_updater.total_albums = total_albums
@@ -1504,7 +1507,7 @@ def main():
     print(f"Total de álbumes procesados: {total_albums}")
     print(f"Errores en MusicBrainz: {mb_updater.errors}")
     
-    # Iniciar interfaz gráfica
+    # Iniciar interfaz gráfica#
     root = tk.Tk()
     app = MusicLibrarySearchApp(root)
     root.mainloop()
