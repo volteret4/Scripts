@@ -649,13 +649,21 @@ class MusicLibraryDB:
 
     def scan_library(self, force_update=True):
         for root, dirs, files in os.walk(RUTA_LIBRERIA):
-    # if os.path.basename(root).startswith("Disc "):
             try:
+                # Buscar archivos FLAC en la carpeta actual
                 flac_files = [f for f in files if f.lower().endswith('.flac')]
                 if not flac_files:
                     continue
                 
-                album_dir = os.path.dirname(root)
+                # Determinar si estamos en una carpeta de disco o en la carpeta principal del álbum
+                current_dir = os.path.basename(root)
+                if current_dir.lower().startswith("disc"):
+                    album_dir = os.path.dirname(root)
+                    disc_number = current_dir.split()[1]
+                else:
+                    album_dir = root
+                    disc_number = "1"  # Asumimos disco 1 si no hay subcarpeta de disco
+                
                 last_modified = os.path.getmtime(root)
                 
                 # Skip if not forced and already up to date
@@ -667,14 +675,16 @@ class MusicLibraryDB:
                     if result and result[0] >= last_modified:
                         continue
                 
+                # Obtener metadatos del primer archivo FLAC
                 audio = FLAC(os.path.join(root, flac_files[0]))
+                
                 album = Album(
                     artist=audio.get('artist', ['Unknown'])[0],
                     album=audio.get('album', ['Unknown'])[0],
                     date=audio.get('date', ['Unknown'])[0],
                     label=audio.get('label', ['Unknown'])[0],
                     path=album_dir,
-                    discs=[os.path.basename(root).split()[1]],
+                    discs=[disc_number],  # Mantenemos el formato original de lista
                     last_modified=last_modified
                 )
                 self.update_album(album)
