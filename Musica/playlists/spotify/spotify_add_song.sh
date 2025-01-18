@@ -12,11 +12,11 @@
 
 # Directorios y variables:
 scr_dir="$HOME/Scripts/Musica/playlists/spotify"
-hugo_dir="$HOME/hugo/scripts/playlists/spotify"
+hugo_dir="/home/pi/hugo/hugo_scripts/playlists/spotify"
 
-
+#python_env="$(source /home/pi/scripts/python_venv/bin/activate)"
 # Actualiza listas de reproducción de spotify.
-ssh moode "python3 ${hugo_dir}/sp_playlist.py"
+ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_playlist.py"
 
 # Descarga el listado.
 rsync -avzh moode:"${hugo_dir}"/playlists.txt $HOME/Scripts/Musica/playlists/spotify/playlists.txt
@@ -41,7 +41,7 @@ album="$(bash $HOME/Scripts/utilities/aliases/limpia_var.sh ${album})"
 echo "$artista $titulo $album"
 
 # Busca cancion en spotify.
-song_id="$(ssh moode "python3 ${hugo_dir}/sp_busca_cancion.py ${artista} ${titulo}")"
+song_id="$(ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artista} ${titulo}")"
 
 if [[ -z $song_id ]]; then
     notify-send -u critical -t 5000 " error en el script "
@@ -52,7 +52,7 @@ if [[ -z $song_id ]]; then
     elif [[ $song_id =~ 'nocancion' ]] ; then
         notify-send -u critical -t 5000 "fallo con la id de la canción... reintentando"
         artist_song="$(yad --entry --entry-text="$artista - $titulo" --entry-label="artista - cancion")"
-        song_id="$(ssh moode "python3 ${hugo_dir}/sp_busca_cancion.py ${artist_song}")"
+        song_id="$(ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artist_song}")"
         if [[ $song_id =~ 'nocancion' ]] ; then
             notify-send -u critical -t 5000 " fallo DEFINITIVO con la id de la canción"
         fi
@@ -80,7 +80,7 @@ ssh moode "python3 ${hugo_dir}/sp_add_song_to_playlist.py ${id} ${playlist}"
 # fi
 
 # Descargar caratula
-sp_portada="/home/pi/hugo/scripts/blog/vvmm/post/portadas/caratula-spotify.py"
+sp_portada="${hugo_dir}/blog/vvmm/post/portadas/caratula-spotify.py"
 
 ssh moode "python3 $sp_portada $artista $album"
 rsync moode:hugo/image.jpeg .

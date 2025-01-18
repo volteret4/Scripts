@@ -1,6 +1,7 @@
 import requests
 import sys
 import subprocess
+import os
 
 # Verifica que se haya proporcionado un argumento
 if len(sys.argv) != 4:
@@ -30,7 +31,8 @@ if response.status_code == 200:
     subprocess.run(["copyq", "add", contenido])
     
     # Enviar notificación
-    subprocess.run(["notify-send", "-t", "5000", "Odesli Link", f"Copiado al portapapeles:\n{contenido}"])
+    # os.environ["DISPLAY"] = ":0"
+    # subprocess.run(["notify-send", "-t", "5000", "Odesli Link", f"Copiado al portapapeles:\n{contenido}"])
     
     # Imprime el enlace en la terminal (opcional)
     print(f"{page_url}")

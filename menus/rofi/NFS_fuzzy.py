@@ -27,15 +27,15 @@ import requests
 load_dotenv()
 
 # Configuración
-#MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_moode.db"
-MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_lidarr.db"
+MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_moode.db"
+#MUSIC_LIBRARY_DB = "/home/huan/Scripts/.content/musica_lidarr.db"
 #MUSIC_LIBRARY_DB = "/home/huan/Música/flac/musica.db"
 
 RATE_LIMIT_DELAY = 0.2
 LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')
-#RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
+RUTA_LIBRERIA = "/mnt/NFS/moode/moode"
 #RUTA_LIBRERIA = "/mnt/NFS/moode/moode/I/"
-RUTA_LIBRERIA = "/mnt/NFS/lidarr"
+#RUTA_LIBRERIA = "/mnt/NFS/lidarr"
 
 @dataclass
 class Album:
@@ -1466,52 +1466,52 @@ def main():
     # Inicializar base de datos
     db = MusicLibraryDB(MUSIC_LIBRARY_DB)
     
-    # Realizar escaneo inicial si es necesario
-    cursor = db.conn.execute("SELECT COUNT(*) FROM albums")
-    if cursor.fetchone()[0] == 0:
-        print("Base de datos vacía, realizando escaneo inicial...")
-        db.scan_library(force_update=True)
+    # # Realizar escaneo inicial si es necesario
+    # cursor = db.conn.execute("SELECT COUNT(*) FROM albums")
+    # if cursor.fetchone()[0] == 0:
+    #     print("Base de datos vacía, realizando escaneo inicial...")
+    #     db.scan_library(force_update=True)
     
-    # Verificar y actualizar metadata faltante
+    # # Verificar y actualizar metadata faltante
     print("\nVerificando metadata...")
     albums = db.get_all_albums()
     total_albums = len(albums)
     
-    #Inicializar actualizadores
-    discogs_updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
+    # #Inicializar actualizadores
+    # discogs_updater = DiscogsUpdater('cVyFrzzUgWFORRCZfXErXrHygsUDIaqJNFJBfGgL')
     mb_updater = MusicBrainzUpdater()
     mb_updater.total_albums = total_albums
     
-    for i, album in enumerate(albums, 1):
-        print(f"\nProcesando álbum {i}/{total_albums}: {album['artist']} - {album['album']}")
+    # for i, album in enumerate(albums, 1):
+    #     print(f"\nProcesando álbum {i}/{total_albums}: {album['artist']} - {album['album']}")
         
-        # Verificar y actualizar Discogs
-        if not discogs_updater.has_discogs_data(album['path']):
-            print("Buscando en Discogs...")
-            metadata = discogs_updater.search_release(album['artist'], album['album'])
-            if metadata:
-                db.update_discogs_metadata(album['path'], metadata)
-                print("✓ Metadata de Discogs actualizada")
-            time.sleep(RATE_LIMIT_DELAY)
+    #     # Verificar y actualizar Discogs
+    #     if not discogs_updater.has_discogs_data(album['path']):
+    #         print("Buscando en Discogs...")
+    #         metadata = discogs_updater.search_release(album['artist'], album['album'])
+    #         if metadata:
+    #             db.update_discogs_metadata(album['path'], metadata)
+    #             print("✓ Metadata de Discogs actualizada")
+    #         time.sleep(RATE_LIMIT_DELAY)
         
-        # Verificar y actualizar MusicBrainz
-        cursor = db.conn.execute(
-            "SELECT 1 FROM musicbrainz_metadata WHERE album_path = ?", 
-            (album['path'],)
-        )
-        if not cursor.fetchone():
-            print("Buscando en MusicBrainz...")
-            mb_updater.search_and_update(album['artist'], album['album'], album['path'])
-            time.sleep(RATE_LIMIT_DELAY)
+    #     # Verificar y actualizar MusicBrainz
+    #     cursor = db.conn.execute(
+    #         "SELECT 1 FROM musicbrainz_metadata WHERE album_path = ?", 
+    #         (album['path'],)
+    #     )
+    #     if not cursor.fetchone():
+    #         print("Buscando en MusicBrainz...")
+    #         mb_updater.search_and_update(album['artist'], album['album'], album['path'])
+    #         time.sleep(RATE_LIMIT_DELAY)
             
-        # Verificar si ya existe descripción para este álbum
-        cursor = db.conn.execute(
-            "SELECT 1 FROM album_descriptions WHERE album_path = ?",
-            (album['path'],)
-        )
-        if not cursor.fetchone():
-            print("Actualizando descripción...")
-            update_descriptions(db, album['artist'], album['path'])
+    #     # Verificar si ya existe descripción para este álbum
+    #     cursor = db.conn.execute(
+    #         "SELECT 1 FROM album_descriptions WHERE album_path = ?",
+    #         (album['path'],)
+    #     )
+    #     if not cursor.fetchone():
+    #         print("Actualizando descripción...")
+    #         update_descriptions(db, album['artist'], album['path'])
     
     print("\nActualización de metadata completada")
     print(f"Total de álbumes procesados: {total_albums}")
