@@ -31,4 +31,6 @@ fi
 echo "$url_spotify"
 
 # Obtener url odesli
-python3 $HOME/Scripts/utilities/open_search_links/music_player/odesli_metadata.py "${url_spotify}" "${artista}" "${albuma}"
+url="$(python3 $HOME/Scripts/utilities/open_search_links/music_player/odesli_metadata.py "${url_spotify}" "${artista}" "${albuma}")"
+
+#export DISPLAY=":0" && notify-send -t 5000 "${artist} - ${album} ${url}"
