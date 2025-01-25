@@ -62,12 +62,15 @@ else
     genre="$(deadbeef --nowplaying-tf "%genre%")"
 fi
 
-artista="$(echo $artist | sed 's/ /-/g' | sed 's/á/a/g' | sed 's/é/e/g' | sed 's/í/i/g' | sed 's/ó/o/g' | sed 's/ú/u/g' | sed "s/'/-/g" | sed 's/"/-/g'| sed 's/`/-/g')"
-albuma="$(echo $album | sed 's/ /-/g' | sed 's/á/a/g' | sed 's/é/e/g' | sed 's/í/i/g' | sed 's/ó/o/g' | sed 's/ú/u/g' | sed "s/'/-/g" | sed 's/"/-/g')"
+artista="$(echo "$artist" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g; s/---/-/g; s/--/-/g; s/\ //g; s/^-//g; s/-$//g")"
+echo "A $artista"
+albuma="$(echo "$album" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g;  s/---/-/g; s/--/-/g; s/\ //g; s/^-//g; s/-$//g")"
+echo "B $album"
 genre="$(echo $genre | sed 's/\// /g' | tr '[:upper:]' '[:lower:]' | sed 's/electronic//I' | sed 's/electronica//I' | sed 's/electrónica//I' | sed 's/indie//I' | sed 's/`/-/g')"
+echo "C $genre"
 
-artista_utf8="$(echo "$artista" | iconv -f UTF-8)"
-album_utf8="$(echo "$albuma" | iconv -f UTF-8)"
+artista_utf8="$(echo "$artista" | iconv -f UTF-8 -t UTF-8)"
+albuma_utf8="$(echo "$albuma" | iconv -f UTF-8 -t UTF-8)"
 
 # artista="$(echo "$artista_utf8" | tr 'àèìòùáéíóúÁÉÍÓÚüÜñÑäëïöüÄËÏÖÜÀÈÌÒÙ' 'aeiouaeiouAEIOUuUnNaeiouAEIOUAEIOU')"
 # albuma="$(echo "$album_utf8" | tr 'àèìòùáéíóúÁÉÍÓÚüÜñÑäëïöüÄËÏÖÜÀÈÌÒÙ' 'aeiouaeiouAEIOUuUnNaeiouAEIOUAEIOU')"
@@ -96,7 +99,7 @@ if [[ $tags =~ 'pollo' ]]; then
     rsync /tmp/pollo.txt hugo:
 fi
 
-
+echo "ssh moode"
 ssh moode "bash /home/pi/hugo/hugo_scripts//blog/vvmm/post/get-links.sh ${artista} ${albuma} $tags"
 check_status $? "Links obtenidos." "Error al obtener links."
 
@@ -105,9 +108,9 @@ check_status $? "Links obtenidos." "Error al obtener links."
 
 # Añadir canción a playlist de spotify también.
 bash "${HOME}/Scripts/Musica/playlists/spotify/spotify_add_song.sh"
+echo "add song"
 
-
-hugo server --bind 0.0.0.0 --baseURL 192.168.1.33 &
+ssh moode "cd /home/pi/hugo/web/vvmm/ && hugo server --bind 0.0.0.0 --baseURL 192.168.1.33 &"
 HUGO_PID=$!
 
 sleep 1
