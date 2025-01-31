@@ -42,7 +42,8 @@ create_playlist() {
 # Reproducir la playlist con MPC
 play_with_mpd() {
     echo "Reproduciendo la playlist con MPC..."  # Depuración
-    mpd --kill && mpd play
+    celluloid --input-ipc-server="/tmp/mpvsocket" --ytdl-format="best" --replaygain="track" --force-window --osd-level=3 --osd-msg3="${media-title}" --term-playing-msg="Title: ""${media-title}""" --playlist="${1}"
+#    mpd --kill && mpd play
 }
 
 # Obtener las URLs de los posts desde el feed

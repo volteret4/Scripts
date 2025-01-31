@@ -12,8 +12,9 @@
 
 #yt="^https://www.youtube*|^http://youtube*|^http://www.youtube*|^https://youtu.be*"
 #yt="^https?:\/\/(www\.)?(.+)?(bandcamp|youtube|youtu.be)(.com)?"
-
-mpv --input-ipc-server="/tmp/mpvsocket" --ytdl-format="best" --replaygain="track" --force-window --osd-level=3 --osd-msg3="${media-title}" --term-playing-msg="Title: ""${media-title}""" --playlist="${1}"
+playlist="$1"
+url="$2"
+mpv --input-ipc-server="/tmp/mpvsocket" --ytdl-format="best" --replaygain="track" --force-window --osd-level=3 --osd-msg3="${url}" --term-playing-msg="Title: ""${media-title} - ${media-artist} - ${media-album}""" --playlist="${playlist}" &
 
 # while IFS= read -r line; do
 #     if [[ $line =~ $yt ]]
