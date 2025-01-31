@@ -62,9 +62,9 @@ else
     genre="$(deadbeef --nowplaying-tf "%genre%")"
 fi
 
-artista="$(echo "$artist" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g; s/---/-/g; s/--/-/g; s/\ //g; s/^-//g; s/-$//g")"
+artista="$(echo "$artist" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g; s/---/-/g; s/--/-/g; s/\ /-/g; s/^-//g; s/-$//g")"
 echo "A $artista"
-albuma="$(echo "$album" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g;  s/---/-/g; s/--/-/g; s/\ //g; s/^-//g; s/-$//g")"
+albuma="$(echo "$album" | sed -E "s/[áÁ]/-/g; s/\(.*\)//g; s/&/and/g; s/[éÉ]/e/g; s/[íÍ]/i/g; s/[óÓ]/o/g; s/[úÚ]/u/g; s/['\`]/-/g;  s/---/-/g; s/--/-/g; s/\ /-/g; s/^-//g; s/-$//g")"
 echo "B $album"
 genre="$(echo $genre | sed 's/\// /g' | tr '[:upper:]' '[:lower:]' | sed 's/electronic//I' | sed 's/electronica//I' | sed 's/electrónica//I' | sed 's/indie//I' | sed 's/`/-/g')"
 echo "C $genre"
@@ -110,8 +110,9 @@ check_status $? "Links obtenidos." "Error al obtener links."
 bash "${HOME}/Scripts/Musica/playlists/spotify/spotify_add_song.sh"
 echo "add song"
 
-ssh moode "cd /home/pi/hugo/web/vvmm/ && hugo server --bind 0.0.0.0 --baseURL 192.168.1.33 &"
-HUGO_PID=$!
+ssh moode "cd /home/pi/hugo/web/vvmm/ && nohup hugo server --bind 0.0.0.0 --baseURL 192.168.1.33 > /dev/null 2>&1 & echo \$!" > hugo_pid.txt
+
+HUGO_PID=$(cat hugo_pid.txt)
 
 sleep 1
 
@@ -128,7 +129,7 @@ while [ $count -lt $timeout ] && kill -0 $QUTE_PID 2>/dev/null; do
 done
 
 # Matar el proceso de Hugo
-kill $HUGO_PID 2>/dev/null
+ssh hugo "kill $HUGO_PID 2>/dev/null"
 
 # Asegurarse de que qutebrowser también se cierre si alcanzó el timeout
 kill $QUTE_PID 2>/dev/null
