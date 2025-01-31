@@ -167,10 +167,10 @@ def edit_file():
                     filename = journal_results[adjusted_index][0]
 
         if filename and os.path.isfile(filename):
-            subprocess.run(["vscodium", filename])  # Abre el archivo con VSCodium
+            subprocess.run(["xdg-open 'obsidian://open?path='", filename])  # Abre el archivo con VSCodium
 
 def open_folder():
-    """Abre el archivo seleccionado con VSCodium."""
+    """Abre el archivo seleccionado con VSCodium."""gg
     selection = result_list.curselection()
     if selection:
         index = selection[0]
@@ -339,4 +339,4 @@ def create_gui():
     root.mainloop()
 
 if __name__ == "__main__":
-    create_gui()#!/usr/bin/env python
+    create_gui()

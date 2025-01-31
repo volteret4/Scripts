@@ -112,3 +112,5 @@ utilities/wordpress/.cache-pollolpc
 python_venv
 results.txt
 .content/*
+.stfolder
+.stignore
