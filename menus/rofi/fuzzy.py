@@ -1,341 +1,308 @@
 #!/usr/bin/env python
-# Script Name: fuzzy.py
-# Description: Consulta en el contenido de los archivos de la wiki
-# Author: volteret4
-# Repository: https://github.com/volteret4/
-# License:
-# TODO: 
-# 
-# Notes:
-# Dependencies: - python3, tk
-
 import os
 import tkinter as tk
 import re
 import glob
 import subprocess
 import tkinter.messagebox as messagebox
+from markdown import markdown
+from tkinterweb import HtmlFrame
 
 # Define el directorio donde están tus archivos Markdown
 SEARCH_DIR = "/mnt/windows/FTP/wiki/Obsidian/"
 
+# Define los paths que quieres mostrar al final con iconos
+SECONDARY_PATHS = [
+    "/mnt/windows/FTP/wiki/Obsidian/.space/",
+    #"/mnt/windows/FTP/wiki/Obsidian/Templates/",
+    # Añade más paths aquí
+]
+
+def display_file_content(filename, query):
+    """Muestra el contenido del archivo con formato Markdown."""
+    global html_viewer  # Añadimos esta línea
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            content = file.read()
+            # Eliminar secciones delimitadas por '---'
+            content = re.sub(r'---.*?---', '', content, flags=re.DOTALL).strip()
+            
+            # Convertir Markdown a HTML con extensiones
+            html_content = markdown(content, extensions=[
+                'markdown.extensions.extra',
+                'markdown.extensions.codehilite',
+                'markdown.extensions.tables',
+                'markdown.extensions.toc'
+            ])
+            
+            # Añadir estilos CSS para el tema oscuro y formato Markdown
+            html_content = f"""
+            <html>
+            <head>
+                <style>
+                    body {{
+                        background-color: #14141e !important;
+                        color: white !important;
+                        font-family: Arial, sans-serif;
+                        padding: 20px;
+                        line-height: 1.6;
+                    }}
+                    h1, h2, h3, h4, h5, h6 {{
+                        color: #cba6f7;
+                        margin-top: 24px;
+                        margin-bottom: 16px;
+                        font-weight: 600;
+                        line-height: 1.25;
+                    }}
+                    h1 {{ font-size: 2em; border-bottom: 1px solid #444; padding-bottom: .3em; }}
+                    h2 {{ font-size: 1.5em; border-bottom: 1px solid #444; padding-bottom: .3em; }}
+                    h3 {{ font-size: 1.25em; }}
+                    h4 {{ font-size: 1em; }}
+                    p {{
+                        margin-bottom: 16px;
+                    }}
+                    a {{
+                        color: #1974D2;
+                        text-decoration: none;
+                    }}
+                    a:hover {{
+                        text-decoration: underline;
+                    }}
+                    code {{
+                        background-color: #282a36;
+                        padding: 0.2em 0.4em;
+                        border-radius: 3px;
+                        font-family: monospace;
+                        font-size: 85%;
+                    }}
+                    pre {{
+                        background-color: #282a36;
+                        padding: 16px;
+                        border-radius: 6px;
+                        overflow: auto;
+                        line-height: 1.45;
+                    }}
+                    pre code {{
+                        background-color: transparent;
+                        padding: 0;
+                    }}
+                    blockquote {{
+                        padding: 0 1em;
+                        color: #8b949e;
+                        border-left: .25em solid #444;
+                        margin: 0 0 16px 0;
+                    }}
+                    ul, ol {{
+                        padding-left: 2em;
+                        margin-bottom: 16px;
+                    }}
+                    li {{
+                        margin: 0.25em 0;
+                    }}
+                    table {{
+                        border-collapse: collapse;
+                        margin-bottom: 16px;
+                        width: 100%;
+                    }}
+                    table th, table td {{
+                        padding: 6px 13px;
+                        border: 1px solid #444;
+                    }}
+                    table th {{
+                        background-color: #282a36;
+                    }}
+                    img {{
+                        max-width: 100%;
+                        height: auto;
+                    }}
+                    hr {{
+                        height: .25em;
+                        padding: 0;
+                        margin: 24px 0;
+                        background-color: #444;
+                        border: 0;
+                    }}
+                </style>
+            </head>
+            <body>
+                {html_content}
+            </body>
+            </html>
+            """
+            
+            # Actualizar el contenido HTML
+            html_viewer.load_html(html_content)
+            
+    except Exception as e:
+        print(f"Error al renderizar el archivo {filename}: {e}")
+
+def get_selected_file():
+    """Obtiene el archivo seleccionado actualmente."""
+    selection = result_list.curselection()
+    if selection:
+        index = selection[0]
+        all_results = primary_results + secondary_results
+        if index < len(all_results):
+            _, filename, _ = all_results[index]
+            return filename
+    return None
+
 def search_files(query):
     """Realiza la búsqueda de archivos Markdown que coincidan con la consulta."""
-    title_matches = []
-    content_matches = {}
-    important_matches = []
-    wallabag_matches = []
-    journal_matches = []
-
+    primary_matches = []
+    secondary_matches = []
+    
     for filename in glob.iglob(os.path.join(SEARCH_DIR, '**', '*.md'), recursive=True):
-        title = os.path.basename(filename).replace('.md', '')  # Eliminar la extensión .md
-
-        # Buscar coincidencias en el título
+        title = os.path.basename(filename).replace('.md', '')
+        
+        is_secondary = any(path in filename for path in SECONDARY_PATHS)
+        
         if re.search(query, title, re.IGNORECASE):
-            title_matches.append((filename, title))  # Agregar a coincidencias de título
-
-            # Verificar si "wallabag" está en el nombre del archivo
-            if "wallabag" in filename.lower():  
-                wallabag_matches.append((filename, title))  # Solo si "wallabag" está en el título
-
-        # Leer el contenido del archivo
+            if is_secondary:
+                secondary_matches.append(('📁', filename, title))
+            else:
+                primary_matches.append(('📄', filename, title))
+                
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 content = file.read()
-                # Eliminar secciones delimitadas por '---'
                 content = re.sub(r'---.*?---', '', content, flags=re.DOTALL).strip()
-
-                # Verificar si hay coincidencias en el contenido
+                
                 if re.search(query, content, re.IGNORECASE):
-                    content_matches[filename] = title  # Almacenar el título solo una vez
-
-                    # Verificar si "wallabag" está en el contenido
-                    if "wallabag" in content.lower():  
-                        wallabag_matches.append((filename, title))  # Agregar si hay coincidencia
-
+                    if is_secondary and ('📁', filename, title) not in secondary_matches:
+                        secondary_matches.append(('📁', filename, title))
+                    elif not is_secondary and ('📄', filename, title) not in primary_matches:
+                        primary_matches.append(('📄', filename, title))
+                        
         except Exception as e:
             print(f"Error al leer el archivo {filename}: {e}")
+    
+    return primary_matches, secondary_matches
 
-    return title_matches, list(content_matches.items()), important_matches, wallabag_matches, journal_matches
 def update_results(event):
     """Actualiza la lista de resultados según el texto de búsqueda."""
     query = search_entry.get()
-    global title_results, content_results, important_results, wallabag_results, journal_results  # Asegúrate de que son variables globales
-    title_results, content_results, important_results, wallabag_results, journal_results = search_files(query)
+    global primary_results, secondary_results
+    primary_results, secondary_results = search_files(query)
 
-    # Limpiar la lista de resultados
     result_list.delete(0, tk.END)
 
-    # Agregar coincidencias en títulos
-    for filename, title in title_results:
-        result_list.insert(tk.END, title)  # Títulos en mayúsculas
+    for icon, _, title in primary_results:
+        result_list.insert(tk.END, f"{icon} {title}")
 
-    # Agregar coincidencias en contenido
-    for filename, title in content_results:
-        if "wallabag" in filename.lower():
-            result_list.insert(tk.END, f"W {title}")
-        elif "journal" in filename.lower():
-            result_list.insert(tk.END, f"D {title}")
-        elif "important" in filename.lower():
-            result_list.insert(tk.END, f"T {title}")
-        else:
-            result_list.insert(tk.END, title)  # Mostrar contenido como un solo título
-
-    # Limpiar el contenido mostrado
-    content_text.delete(1.0, tk.END)
-
-def display_file_content(filename, query):
-    """Muestra el contenido del archivo en el área de texto, resaltando la búsqueda."""
-    with open(filename, 'r', encoding='utf-8') as file:
-        content = file.read()
-        # Eliminar secciones delimitadas por '---'
-        content = re.sub(r'---.*?---', '', content, flags=re.DOTALL).strip()
-        content_text.delete(1.0, tk.END)  # Limpiar el área de texto antes de mostrar nuevo contenido
-        content_text.insert(tk.END, content)  # Mostrar el contenido del archivo
-
-        # Resaltar el texto buscado
-        if query:
-            start_index = '1.0'
-            first_match = None  # Variable para almacenar la primera coincidencia
-            while True:
-                start_index = content_text.search(query, start_index, stopindex=tk.END, nocase=True)
-                if not start_index:
-                    break
-                end_index = f"{start_index}+{len(query)}c"
-                content_text.tag_add("highlight", start_index, end_index)
-                if first_match is None:  # Guardar la primera coincidencia
-                    first_match = start_index
-                start_index = end_index
-
-            # Desplazarse a la primera coincidencia si existe
-            if first_match:
-                content_text.see(first_match)  # Desplaza el texto para que la coincidencia sea visible
-                content_text.mark_set("insert", first_match)  # Coloca el cursor en la primera coincidencia
+    for icon, _, title in secondary_results:
+        result_list.insert(tk.END, f"{icon} {title}")
 
 def on_select(event):
-    """Muestra el contenido del archivo seleccionado en la lista de resultados."""
+    """Muestra el contenido del archivo seleccionado."""
     selection = result_list.curselection()
     if selection:
-        index = selection[0]  # Inicializa el nombre de archivo a None
-        filename = None  # Verificar si el índice está dentro de los títulos
-        if index < len(title_results):
-            # Es un título
-            filename, title = title_results[index]
-        else:
-            adjusted_index = index - len(title_results)  # Ajustar índice por los títulos
-            # Determinar el grupo correcto
-            if adjusted_index < len(content_results):
-                # Es un resultado en CONTENT
-                filename, title = content_results[adjusted_index]
-            else:
-                adjusted_index -= len(content_results)
-                if adjusted_index < len(important_results):
-                    # Es un resultado en Important
-                    filename, title = important_results[adjusted_index]
-                adjusted_index -= len(important_results)
-                if adjusted_index < len(wallabag_results):
-                    # Es un resultado en Wallabag
-                    filename, title = wallabag_results[adjusted_index]
-                else:
-                    # Es un resultado en Journals
-                    adjusted_index -= len(wallabag_results)
-                    filename, title = journal_results[adjusted_index]
-
-        if filename:  # Asegurarse de que se tiene un nombre de archivo válido
+        index = selection[0]
+        all_results = primary_results + secondary_results
+        if index < len(all_results):
+            _, filename, _ = all_results[index]
             display_file_content(filename, search_entry.get())
 
-def edit_file():
-    """Abre el archivo seleccionado con VSCodium."""
-    selection = result_list.curselection()
-    if selection:
-        index = selection[0]
-        if index < len(title_results):
-            filename = title_results[index][0]
-        else:
-            adjusted_index = index - len(title_results)
-            if adjusted_index < len(content_results):
-                filename = content_results[adjusted_index][0]
-            else:
-                adjusted_index -= len(content_results)
-                if adjusted_index < len(important_results):
-                    filename = important_results[adjusted_index][0]
-                adjusted_index -= len(important_results)
-                if adjusted_index < len(wallabag_results):
-                    filename = wallabag_results[adjusted_index][0]
-                else:
-                    adjusted_index -= len(wallabag_results)
-                    filename = journal_results[adjusted_index][0]
+def edit_file(event=None):
+    """Abre el archivo seleccionado con Obsidian."""
+    filename = get_selected_file()
+    if filename and os.path.isfile(filename):
+        file_path = os.path.abspath(filename)
+        obsidian_uri = f"obsidian://open?path={file_path}"
+        subprocess.run(["xdg-open", obsidian_uri])
 
-        if filename and os.path.isfile(filename):
-            subprocess.run(["xdg-open 'obsidian://open?path='", filename])  # Abre el archivo con VSCodium
+def open_folder(event=None):
+    """Abre la carpeta que contiene el archivo seleccionado."""
+    filename = get_selected_file()
+    if filename and os.path.isfile(filename):
+        folder_path = os.path.dirname(filename)
+        subprocess.run(["thunar", folder_path])
 
-def open_folder():
-    """Abre el archivo seleccionado con VSCodium."""gg
-    selection = result_list.curselection()
-    if selection:
-        index = selection[0]
-        if index < len(title_results):
-            filename = title_results[index][0]
-        else:
-            adjusted_index = index - len(title_results)
-            if adjusted_index < len(content_results):
-                filename = content_results[adjusted_index][0]
-            else:
-                adjusted_index -= len(content_results)
-                if adjusted_index < len(important_results):
-                    filename = important_results[adjusted_index][0]
-                adjusted_index -= len(important_results)
-                if adjusted_index < len(wallabag_results):
-                    filename = wallabag_results[adjusted_index][0]
-                else:
-                    adjusted_index -= len(wallabag_results)
-                    filename = journal_results[adjusted_index][0]
-
-        if filename and os.path.isfile(filename):
-            subprocess.run(["thunar", filename]) 
-
-def delete_file():
+def delete_file(event=None):
     """Elimina el archivo seleccionado."""
-    selection = result_list.curselection()
-    if selection:
-        index = selection[0]
-        if index < len(title_results):
-            filename = title_results[index][0]
-        else:
-            adjusted_index = index - len(title_results)
-            if adjusted_index < len(content_results):
-                filename = content_results[adjusted_index][0]
-            else:
-                adjusted_index -= len(content_results)
-                if adjusted_index < len(important_results):
-                    filename = important_results[adjusted_index][0]
-                adjusted_index -= len(important_results)
-                if adjusted_index < len(wallabag_results):
-                    filename = wallabag_results[adjusted_index][0]
-                else:
-                    adjusted_index -= len(wallabag_results)
-                    filename = journal_results[adjusted_index][0]
-
-        if filename and os.path.isfile(filename):
-            # Confirmación antes de eliminar
-            confirm = messagebox.askyesno("Confirmar eliminación", f"¿Estás seguro de que deseas eliminar '{os.path.basename(filename)}'?")
-            if confirm:
-                os.remove(filename)  # Eliminar el archivo
-                update_results(None)  # Actualiza la lista de resultados
+    filename = get_selected_file()
+    if filename and os.path.isfile(filename):
+        confirm = messagebox.askyesno(
+            "Confirmar eliminación", 
+            f"¿Estás seguro de que deseas eliminar '{os.path.basename(filename)}'?"
+        )
+        if confirm:
+            try:
+                os.remove(filename)
+                update_results(None)
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo eliminar el archivo: {str(e)}")
 
 def focus_search(event=None):
     """Focaliza el campo de búsqueda."""
     search_entry.focus_set()
 
-def ctrl_f(event):
-    """Focaliza el campo de búsqueda al pulsar Ctrl+F."""
-    if event.state & 0x0004:  # Verifica si Ctrl está presionado
-        focus_search()
 def select_all(event=None):
-    """Selecciona todo el texto en el Text widget."""
-    search_entry.tag_add("sel", 1.0, "end")  # Selecciona desde el inicio hasta el final
-    return "break"  # Evita el manejo predeterminado del evento
-
-
-
-def edit_file_with_shortcut(event=None):
-    """Abre el archivo seleccionado con VSCodium al presionar Ctrl+O."""
-    edit_file()  # Llama a la función que ya tienes para abrir el archivo
-
-def open_folder_with_shortcut(event=None):
-    """Abre el archivo seleccionado con VSCodium al presionar Ctrl+O."""
-    open_folder()  # Llama a la función que ya tienes para abrir el archivo
-
-def delete_file_with_shortcut(event=None):
-    """Elimina el archivo seleccionado al presionar Suprimir."""
-    delete_file()  # Llama a la función que ya tienes para eliminar el archivo
-
-def save_file():
-    """Guarda el contenido del archivo editado."""
-    selection = result_list.curselection()
-    if selection:
-        index = selection[0]
-        if index < len(title_results):
-            filename = title_results[index][0]
-        else:
-            adjusted_index = index - len(title_results)
-            if adjusted_index < len(content_results):
-                filename = content_results[adjusted_index][0]
-            else:
-                adjusted_index -= len(content_results)
-                if adjusted_index < len(important_results):
-                    filename = important_results[adjusted_index][0]
-                adjusted_index -= len(important_results)
-                if adjusted_index < len(wallabag_results):
-                    filename = wallabag_results[adjusted_index][0]
-                else:
-                    adjusted_index -= len(wallabag_results)
-                    filename = journal_results[adjusted_index][0]
-
-        if filename and os.path.isfile(filename):
-            # Guardar el contenido del área de texto en el archivo
-            with open(filename, 'w', encoding='utf-8') as file:
-                file.write(content_text.get(1.0, tk.END))  # Guarda el contenido
-            messagebox.showinfo("Guardar archivo", f"Archivo '{os.path.basename(filename)}' guardado con éxito.")
+    """Selecciona todo el texto en el campo de búsqueda."""
+    search_entry.select_range(0, tk.END)
+    return "break"
 
 def create_gui():
     """Crea la interfaz gráfica."""
-    global root, search_entry, result_list, content_text, title_results, content_results, important_results, wallabag_results, journal_results
+    global root, search_entry, result_list, html_viewer, primary_results, secondary_results
     root = tk.Tk()
     root.title("Buscador de archivos Markdown")
-    
-    # Cambiar colores y tamaño de la ventana
-    root.configure(bg='#14141e')  # Color de fondo oscuro para el menú principal
-    root.geometry("1800x800")  # Aumentar tamaño de la ventana
+    root.configure(bg='#14141e')
+    root.geometry("1800x800")
 
-    # Campo de búsqueda
-    search_frame = tk.Frame(root, bg='#14141e')  # Color de fondo oscuro para el marco
+    search_frame = tk.Frame(root, bg='#14141e')
     search_frame.pack(pady=(10, 10), padx=5)
 
-    # Botones de abrir y borrar
-    open_button = tk.Button(search_frame, text="Carpeta", command=edit_file, bg='#f8bd9a')
-    open_button.pack(side=tk.LEFT, padx=(0, 15))  # Mover a la izquierda
+    open_button = tk.Button(search_frame, text="Carpeta", command=open_folder, bg='#f8bd9a')
+    open_button.pack(side=tk.LEFT, padx=(0, 15))
 
-    edit_button = tk.Button(search_frame, text="Editar", command=open_folder, bg='#1974D2')
-    edit_button.pack(side=tk.LEFT, padx=(0, 15))  # Mover a la izquierda
+    edit_button = tk.Button(search_frame, text="Editar", command=edit_file, bg='#1974D2')
+    edit_button.pack(side=tk.LEFT, padx=(0, 15))
 
     delete_button = tk.Button(search_frame, text="Eliminar", command=delete_file, bg='#ff8b8b')
-    delete_button.pack(side=tk.LEFT, padx=(0, 15))  # Mover a la izquierda
+    delete_button.pack(side=tk.LEFT, padx=(0, 15))
 
-    # Campo de búsqueda
-    search_entry = tk.Entry(search_frame, bg='#cba6f7', fg='black', font=('Arial', 12), insertbackground='black', width=50)
+    search_entry = tk.Entry(search_frame, bg='#cba6f7', fg='black', font=('Arial', 12), 
+                          insertbackground='black', width=50)
     search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-    search_entry.bind("<KeyRelease>", update_results)
-    search_entry.bind("<Return>", update_results)  # Actualiza al presionar Enter
-    search_entry.bind("<FocusIn>", focus_search)  # Focaliza al hacer clic en el campo
 
-    # Lista de resultados
-    result_list = tk.Listbox(root, width=50, height=20, font=('Arial', 12), bg='#14141e', fg='white')
+    result_list = tk.Listbox(root, width=50, height=20, font=('Arial', 12), 
+                            bg='#14141e', fg='white')
     result_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    html_viewer = HtmlFrame(root, horizontal_scrollbar="auto")
+    html_viewer.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+    html_viewer.load_html("""
+    <html>
+    <head>
+        <style>
+            body {
+                background-color: #14141e;
+                color: white;
+                font-family: Arial, sans-serif;
+            }
+        </style>
+    </head>
+    <body></body>
+    </html>
+    """)
+
+    # Bindings
+    search_entry.bind("<KeyRelease>", update_results)
+    search_entry.bind("<Return>", update_results)
+    search_entry.bind("<FocusIn>", focus_search)
     result_list.bind("<<ListboxSelect>>", on_select)
-
-    # Área de texto para mostrar el contenido
-    content_text = tk.Text(root, width=80, height=20, wrap=tk.WORD, bg='#14141e', fg='white', font=('Arial', 12))
-    content_text.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-    # Resaltar el texto buscado
-    content_text.tag_configure("highlight", background="#cba6f7", foreground="black")
-
-    # Focalizar el campo de búsqueda al inicio
-    focus_search()
-
-    # Atajos de teclado
-    root.bind("<Control-f>", ctrl_f)        # Para focalizar búsqueda
-    root.bind("<Control-e>", edit_file_with_shortcut)  # Para abrir archivo con Ctrl+E
-    root.bind("<Delete>", delete_file_with_shortcut)    # Para eliminar archivo con Suprimir
-    root.bind("<Control-o>", open_folder_with_shortcut)  # Para abrir archivo con Ctrl+O
+    root.bind("<Control-f>", lambda e: focus_search())
+    root.bind("<Control-o>", lambda e: open_folder())
+    root.bind("<Control-e>", lambda e: edit_file())
+    root.bind("<Delete>", lambda e: delete_file())
     root.bind("<Control-a>", select_all)
-    root.bind("<Control-s>", lambda event: save_file())  # Para guardar archivo con Ctrl+S
 
-    
-    # Focalizar el campo de búsqueda al abrir la ventana
-    focus_search()
+    primary_results = []
+    secondary_results = []
 
+    search_entry.focus_set()
     root.mainloop()
 
 if __name__ == "__main__":
