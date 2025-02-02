@@ -11,6 +11,8 @@ from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence
 from PyQt6.QtCore import Qt, QSize
 import subprocess
 
+
+reproductor = 'deadbeef'
 # Tema Tokyo Night
 THEME = {
     'bg': '#1a1b26',
@@ -122,7 +124,8 @@ class SearchParser:
         return conditions, params
 
 class MusicBrowser(QMainWindow):
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, font_family="Inter"):
+        self.font_family = font_family
         super().__init__()
         self.db_path = db_path
         self.search_parser = SearchParser()
@@ -138,20 +141,24 @@ class MusicBrowser(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
+        layout.setSpacing(5)
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        # Barra superior
-        top_bar = QWidget()
-        top_layout = QHBoxLayout(top_bar)
+        # Contenedor superior con altura máxima
+        top_container = QWidget()
+        top_container.setMaximumHeight(100)
+        top_layout = QVBoxLayout(top_container)
+        top_layout.setSpacing(5)
+        
+        # Barra de búsqueda
+        search_layout = QHBoxLayout()
         
         # Búsqueda
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('Buscar (usa a: artista, b: album, g: género...)')
+        self.search_box.setPlaceholderText('Buscar...')
         self.search_box.textChanged.connect(self.search)
-        top_layout.addWidget(self.search_box)
+        search_layout.addWidget(self.search_box)
 
-        # Establecer una altura fija para la barra superior
-        top_bar.setFixedHeight(50)  # Ajusta esta altura según sea necesario
-        
         # Botones
         self.play_button = QPushButton('Reproducir')
         self.folder_button = QPushButton('Abrir Carpeta')
@@ -162,21 +169,35 @@ class MusicBrowser(QMainWindow):
         for button in [self.play_button, self.folder_button, 
                       self.custom_button1, self.custom_button2, self.custom_button3]:
             button.setFixedWidth(100)
-            top_layout.addWidget(button)
+            search_layout.addWidget(button)
 
-        layout.addWidget(top_bar)
+        top_layout.addLayout(search_layout)
+
+        # Leyenda de argumentos
+        legend_label = QLabel(
+            '<span style="color: #7aa2f7;">'
+            'Filtros: a:artista -   b:álbum -    g:género -   l:sello -    t:título -   aa:album-artist  -   br:bitrate  -    d:fecha'
+            '</span>'
+        )
+        legend_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        top_layout.addWidget(legend_label)
+
+        layout.addWidget(top_container)
 
         # Splitter principal
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Panel izquierdo (resultados)
         self.results_list = QListWidget()
+        self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.results_list.currentItemChanged.connect(self.show_details)
         splitter.addWidget(self.results_list)
 
         # Panel derecho (detalles)
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
+        details_layout.setContentsMargins(0, 0, 0, 0)
         
         # Imagen
         self.cover_label = QLabel()
@@ -187,6 +208,9 @@ class MusicBrowser(QMainWindow):
         # Información
         self.info_scroll = QScrollArea()
         self.info_scroll.setWidgetResizable(True)
+        self.info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
         
@@ -204,16 +228,24 @@ class MusicBrowser(QMainWindow):
         splitter.addWidget(details_widget)
         layout.addWidget(splitter)
 
-        # Conectar señales
-        self.play_button.clicked.connect(self.play_item)
-        self.folder_button.clicked.connect(self.open_folder)
-        self.custom_button1.clicked.connect(lambda: self.run_custom_script(1))
-        self.custom_button2.clicked.connect(lambda: self.run_custom_script(2))
-        self.custom_button3.clicked.connect(lambda: self.run_custom_script(3))
-
-        # Dar focus inicial al búscador
-        self.search_box.setFocus()
-
+        # Aplicar la fuente a toda la aplicación
+        self.setStyleSheet(f"""
+            * {{
+                font-family: {self.font_family};
+            }}
+            QLabel {{
+                font-size: 12px;
+            }}
+            QLineEdit {{
+                font-size: 13px;
+            }}
+            QPushButton {{
+                font-size: 12px;
+            }}
+            QListWidget {{
+                font-size: 12px;
+            }}
+        """)
     def setup_shortcuts(self):
         # Enter para reproducir
         QShortcut(QKeySequence(Qt.Key.Key_Return), self, self.play_item)
@@ -223,7 +255,7 @@ class MusicBrowser(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, self.search_box.setFocus)
 
     def apply_theme(self):
-        self.setStyleSheet(f"""
+        self.setStyleSheet(self.styleSheet() + f"""
             QMainWindow, QWidget {{
                 background-color: {THEME['bg']};
                 color: {THEME['fg']};
@@ -251,6 +283,7 @@ class MusicBrowser(QMainWindow):
                 background-color: {THEME['secondary_bg']};
                 border: 1px solid {THEME['border']};
                 border-radius: 3px;
+                padding: 5px;
             }}
             
             QListWidget::item:selected {{
@@ -260,6 +293,31 @@ class MusicBrowser(QMainWindow):
             QScrollArea {{
                 border: 1px solid {THEME['border']};
                 border-radius: 3px;
+            }}
+
+            QScrollBar:vertical {{
+                border: none;
+                background: {THEME['secondary_bg']};
+                width: 10px;
+                margin: 0px;
+            }}
+
+            QScrollBar::handle:vertical {{
+                background-color: {THEME['border']};
+                border-radius: 5px;
+                min-height: 20px;
+            }}
+
+            QScrollBar::handle:vertical:hover {{
+                background-color: {THEME['accent']};
+            }}
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {{
+                height: 0px;
+                background: none;
             }}
         """)
 
@@ -292,12 +350,46 @@ class MusicBrowser(QMainWindow):
             LEFT JOIN artist_info ai ON s.artist = ai.artist
         """
         
-        # Obtener condiciones y parámetros
-        conditions, params = self.search_parser.build_sql_conditions(parsed)
-        
+        conditions = []
+        params = []
+
+        # Procesar filtros específicos
+        for field, value in parsed['filters'].items():
+            if field == 'bitrate':
+                # Manejar rangos de bitrate (>192, <192, =192)
+                if value.startswith('>'):
+                    conditions.append(f"s.{field} > ?")
+                    params.append(int(value[1:]))
+                elif value.startswith('<'):
+                    conditions.append(f"s.{field} < ?")
+                    params.append(int(value[1:]))
+                else:
+                    conditions.append(f"s.{field} = ?")
+                    try:
+                        params.append(int(value))
+                    except ValueError:
+                        print(f"Error: valor de bitrate inválido: {value}")
+                        continue
+            else:
+                conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{value}%")
+
+        # Procesar términos generales
+        if parsed['general']:
+            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
+            general_conditions = []
+            for field in general_fields:
+                general_conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{parsed['general']}%")
+            if general_conditions:
+                conditions.append(f"({' OR '.join(general_conditions)})")
+
         # Añadir WHERE si hay condiciones
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
+
+        # Añadir ORDER BY para una presentación consistente
+        sql += " ORDER BY s.artist, s.album, s.title"
         
         try:
             c.execute(sql, params)
@@ -305,12 +397,15 @@ class MusicBrowser(QMainWindow):
             
             self.results_list.clear()
             for row in results:
-                title = row[2] or "Sin título"
-                artist = row[3] or "Sin artista"
-                album = row[5] or "Sin álbum"
-                display_text = f"{title} - {artist} - {album}"
+                # Asegurarse de que los campos no sean None
+                artist = row[3] if row[3] else "Sin artista"
+                album = row[5] if row[5] else "Sin álbum"
+                title = row[2] if row[2] else "Sin título"
                 
-                item = self.results_list.addItem(display_text)
+                # Nuevo formato: artista - álbum - canción
+                display_text = f"{artist} - {album} - {title}"
+                
+                self.results_list.addItem(display_text)
                 self.results_list.item(self.results_list.count() - 1).setData(
                     Qt.ItemDataRole.UserRole, row)
                 
@@ -381,14 +476,14 @@ class MusicBrowser(QMainWindow):
         current = self.results_list.currentItem()
         if current:
             file_path = current.data(Qt.ItemDataRole.UserRole)[1]
-            subprocess.Popen(['xdg-open', file_path])
+            subprocess.Popen([reproductor, file_path])
 
     def open_folder(self):
         current = self.results_list.currentItem()
         if current:
             file_path = current.data(Qt.ItemDataRole.UserRole)[1]
             folder_path = str(Path(file_path).parent)
-            subprocess.Popen(['xdg-open', folder_path])
+            subprocess.Popen(['thunar', folder_path])
 
     def run_custom_script(self, script_num):
         current = self.results_list.currentItem()
@@ -411,10 +506,11 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Navegador de música')
     parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
+    parser.add_argument('--font', default='Inter', help='Fuente a usar en la interfaz')
     
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    browser = MusicBrowser(args.db_path)
+    browser = MusicBrowser(args.db_path, font_family=args.font)
     browser.show()
     sys.exit(app.exec())
