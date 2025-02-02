@@ -29,40 +29,97 @@ class SearchParser:
             'b:': 'album',
             'g:': 'genre',
             'l:': 'label',
+            't:': 'title',
             'aa:': 'album_artist',
-            'br:': 'bitrate'
+            'br:': 'bitrate',
+            'd:': 'date'
         }
     
     def parse_query(self, query: str) -> Dict:
         """Parsea la query y devuelve diccionario con filtros y término general."""
-        parts = query.split()
         filters = {}
         general_terms = []
-
+        current_term = ''
         i = 0
-        while i < len(parts):
-            part = parts[i]
-            matched = False
-            
+        
+        while i < len(query):
+            # Buscar si hay un filtro al inicio de esta parte
+            found_filter = False
             for prefix, field in self.filters.items():
-                if part.startswith(prefix):
-                    value = part[len(prefix):]
-                    # Si el valor está vacío, tomar la siguiente palabra
-                    if not value and i + 1 < len(parts):
-                        value = parts[i + 1]
+                if query[i:].startswith(prefix):
+                    # Si hay un término acumulado, añadirlo a términos generales
+                    if current_term.strip():
+                        general_terms.append(current_term.strip())
+                        current_term = ''
+                    
+                    # Avanzar más allá del prefijo
+                    i += len(prefix)
+                    # Recoger el valor hasta el siguiente filtro o fin de cadena
+                    value = ''
+                    while i < len(query):
+                        # Comprobar si empieza otro filtro
+                        next_filter = False
+                        for next_prefix in self.filters:
+                            if query[i:].startswith(next_prefix):
+                                next_filter = True
+                                break
+                        if next_filter:
+                            break
+                        value += query[i]
                         i += 1
-                    filters[field] = value
-                    matched = True
+                    
+                    value = value.strip()
+                    if value:
+                        filters[field] = value
+                    found_filter = True
                     break
             
-            if not matched:
-                general_terms.append(part)
-            i += 1
-
+            if not found_filter and i < len(query):
+                current_term += query[i]
+                i += 1
+        
+        # Añadir el último término si existe
+        if current_term.strip():
+            general_terms.append(current_term.strip())
+        
         return {
             'filters': filters,
             'general': ' '.join(general_terms)
         }
+
+    def build_sql_conditions(self, parsed_query: Dict) -> tuple:
+        """Construye las condiciones SQL y parámetros basados en la query parseada."""
+        conditions = []
+        params = []
+        
+        # Procesar filtros específicos
+        for field, value in parsed_query['filters'].items():
+            if field == 'bitrate':
+                # Manejar rangos de bitrate (>192, <192, =192)
+                if value.startswith('>'):
+                    conditions.append(f"s.{field} > ?")
+                    params.append(int(value[1:]))
+                elif value.startswith('<'):
+                    conditions.append(f"s.{field} < ?")
+                    params.append(int(value[1:]))
+                else:
+                    conditions.append(f"s.{field} = ?")
+                    params.append(int(value))
+            else:
+                conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{value}%")
+        
+        # Procesar términos generales
+        if parsed_query['general']:
+            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
+            general_conditions = []
+            for field in general_fields:
+                general_conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{parsed_query['general']}%")
+            if general_conditions:
+                conditions.append(f"({' OR '.join(general_conditions)})")
+        
+        return conditions, params
 
 class MusicBrowser(QMainWindow):
     def __init__(self, db_path: str):
@@ -213,7 +270,7 @@ class MusicBrowser(QMainWindow):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Construir la query SQL con referencias explícitas a las tablas
+        # Consulta base
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -233,56 +290,34 @@ class MusicBrowser(QMainWindow):
                 ai.bio
             FROM songs s
             LEFT JOIN artist_info ai ON s.artist = ai.artist
-            WHERE 1=1
         """
-        params = []
-
-        # Aplicar filtros específicos
-        for field, value in parsed['filters'].items():
-            if field == 'bitrate':
-                # Manejar rangos de bitrate (ej: br:>192)
-                if value.startswith('>'):
-                    sql += f" AND s.{field} > ?"
-                    params.append(int(value[1:]))
-                elif value.startswith('<'):
-                    sql += f" AND s.{field} < ?"
-                    params.append(int(value[1:]))
-                else:
-                    sql += f" AND s.{field} = ?"
-                    params.append(int(value))
-            else:
-                sql += f" AND s.{field} LIKE ?"
-                params.append(f"%{value}%")
-
-        # Búsqueda general
-        if parsed['general']:
-            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
-            general_conditions = [f"s.{field} LIKE ?" for field in general_fields]
-            sql += f" AND ({' OR '.join(general_conditions)})"
-            params.extend([f"%{parsed['general']}%"] * len(general_fields))
-
+        
+        # Obtener condiciones y parámetros
+        conditions, params = self.search_parser.build_sql_conditions(parsed)
+        
+        # Añadir WHERE si hay condiciones
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        
         try:
             c.execute(sql, params)
             results = c.fetchall()
             
             self.results_list.clear()
             for row in results:
-                # Crear un texto representativo para mostrar
-                # Asegurarse de que los campos no sean None antes de mostrarlos
                 title = row[2] or "Sin título"
                 artist = row[3] or "Sin artista"
                 album = row[5] or "Sin álbum"
                 display_text = f"{title} - {artist} - {album}"
                 
                 item = self.results_list.addItem(display_text)
-                # Guardar los datos completos como datos del item
                 self.results_list.item(self.results_list.count() - 1).setData(
                     Qt.ItemDataRole.UserRole, row)
-
+                
         except Exception as e:
             print(f"Error en la búsqueda: {e}")
             import traceback
-            traceback.print_exc()  # Esto nos dará más detalles sobre el error
+            traceback.print_exc()
         finally:
             conn.close()
 
