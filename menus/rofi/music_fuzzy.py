@@ -6,8 +6,8 @@ import sqlite3
 import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLineEdit, QPushButton, QListWidget,
-                            QLabel, QScrollArea, QSplitter)
-from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence
+                            QListWidgetItem, QLabel, QScrollArea, QSplitter)
+from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize
 import subprocess
 
@@ -23,6 +23,19 @@ THEME = {
     'selection': '#364A82',
     'button_hover': '#3d59a1'
 }
+
+class GroupedListItem(QListWidgetItem):
+    def __init__(self, text, is_header=False, paths=None):
+        super().__init__(text)
+        self.is_header = is_header
+        self.paths = paths or []
+        if is_header:
+            font = self.font()
+            font.setBold(True)
+            font.setPointSize(font.pointSize() + 2)
+            self.setFont(font)
+            self.setBackground(QColor(THEME['secondary_bg']))
+            self.setForeground(QColor(THEME['accent']))
 
 class SearchParser:
     def __init__(self):
@@ -328,7 +341,7 @@ class MusicBrowser(QMainWindow):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Consulta base
+        # Consulta base modificada para incluir track_number
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -345,7 +358,8 @@ class MusicBrowser(QMainWindow):
                 s.bit_depth,
                 s.sample_rate,
                 s.last_modified,
-                ai.bio
+                ai.bio,
+                s.track_number
             FROM songs s
             LEFT JOIN artist_info ai ON s.artist = ai.artist
         """
@@ -356,7 +370,6 @@ class MusicBrowser(QMainWindow):
         # Procesar filtros específicos
         for field, value in parsed['filters'].items():
             if field == 'bitrate':
-                # Manejar rangos de bitrate (>192, <192, =192)
                 if value.startswith('>'):
                     conditions.append(f"s.{field} > ?")
                     params.append(int(value[1:]))
@@ -388,26 +401,39 @@ class MusicBrowser(QMainWindow):
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
 
-        # Añadir ORDER BY para una presentación consistente
-        sql += " ORDER BY s.artist, s.album, s.title"
+        # Ordenar por artista, álbum y número de pista
+        sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
         
         try:
             c.execute(sql, params)
             results = c.fetchall()
             
             self.results_list.clear()
+            current_album = None
+            
             for row in results:
-                # Asegurarse de que los campos no sean None
                 artist = row[3] if row[3] else "Sin artista"
                 album = row[5] if row[5] else "Sin álbum"
                 title = row[2] if row[2] else "Sin título"
+                track_number = row[15] if row[15] else "0"
                 
-                # Nuevo formato: artista - álbum - canción
-                display_text = f"{artist} - {album} - {title}"
+                # Si cambiamos de álbum, añadir header
+                album_key = f"{artist} - {album}"
+                if album_key != current_album:
+                    header_item = GroupedListItem(f"📀 {album_key}", is_header=True)
+                    self.results_list.addItem(header_item)
+                    current_album = album_key
                 
-                self.results_list.addItem(display_text)
-                self.results_list.item(self.results_list.count() - 1).setData(
-                    Qt.ItemDataRole.UserRole, row)
+                # Añadir la canción con su número de pista
+                try:
+                    track_num = int(track_number)
+                    display_text = f"    {track_num:02d}. {title}"
+                except (ValueError, TypeError):
+                    display_text = f"    --. {title}"
+                
+                item = GroupedListItem(display_text, paths=[row[1]])
+                item.setData(Qt.ItemDataRole.UserRole, row)
+                self.results_list.addItem(item)
                 
         except Exception as e:
             print(f"Error en la búsqueda: {e}")
@@ -442,15 +468,20 @@ class MusicBrowser(QMainWindow):
 
         data = current.data(Qt.ItemDataRole.UserRole)
         
-        # Mostrar carátula
-        cover_path = self.find_cover_image(data[1])  # data[1] es file_path
-        if cover_path:
-            pixmap = QPixmap(cover_path)
-            pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
-            self.cover_label.setPixmap(pixmap)
+        if not data or len(data) < 2:
+            # Si 'data' es None o no tiene al menos 2 elementos, evitar el error
+            self.cover_label.setText("Album sin carátula")
+            return
         else:
-            # Carátula por defecto
-            self.cover_label.setText("No imagen")
+            # Mostrar carátula
+            cover_path = self.find_cover_image(data[1])  # data[1] es file_path
+            if cover_path:
+                pixmap = QPixmap(cover_path)
+                pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                self.cover_label.setPixmap(pixmap)
+            else:
+                # Carátula por defecto
+                self.cover_label.setText("No imagen")
 
         # Mostrar info de LastFM
         lastfm_text = data[-1] if data[-1] else "No hay información de LastFM disponible"
