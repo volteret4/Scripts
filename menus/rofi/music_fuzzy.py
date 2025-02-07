@@ -403,7 +403,7 @@ class MusicBrowser(QMainWindow):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Consulta base modificada para usar la tabla artists en lugar de artist_info
+        # Modificada la consulta SQL para obtener correctamente la bio del artista
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -420,10 +420,10 @@ class MusicBrowser(QMainWindow):
                 s.bit_depth,
                 s.sample_rate,
                 s.last_modified,
-                a.bio,
-                s.track_number
+                s.track_number,
+                art.bio  -- Movido al final y renombrado para claridad
             FROM songs s
-            LEFT JOIN artists a ON s.artist = a.name
+            LEFT JOIN artists art ON s.artist = art.name
         """
         
         conditions = []
@@ -548,12 +548,14 @@ class MusicBrowser(QMainWindow):
             else:
                 self.cover_label.setText("No imagen")
 
-            # Mostrar info de LastFM
-            lastfm_text = data[-1] if len(data) > 14 and data[-1] else "No hay información de LastFM disponible"
-            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{lastfm_text}")
+            # Mostrar info de LastFM (bio del artista)
+            # El campo bio está ahora en el índice 15
+            artist_bio = data[15] if len(data) > 15 and data[15] else "No hay información del artista disponible"
+            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{artist_bio}")
 
-            # Mostrar metadata si hay suficientes datos
-            if len(data) > 12:
+            # Mostrar metadata
+            if len(data) >= 15:  # Aseguramos que tengamos todos los campos necesarios
+                track_num = data[14] if data[14] else "N/A"  # track_number está en el índice 14
                 metadata = f"""
                     <b>Título:</b> {data[2] or 'N/A'}<br>
                     <b>Artista:</b> {data[3] or 'N/A'}<br>
@@ -566,6 +568,7 @@ class MusicBrowser(QMainWindow):
                     <b>Bitrate:</b> {data[10] or 'N/A'} kbps<br>
                     <b>Profundidad:</b> {data[11] or 'N/A'} bits<br>
                     <b>Frecuencia:</b> {data[12] or 'N/A'} Hz<br>
+                    <b>Número de pista:</b> {track_num}<br>
                 """
                 self.metadata_label.setText(metadata)
             else:
