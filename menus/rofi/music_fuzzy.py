@@ -170,6 +170,7 @@ class MusicBrowser(QMainWindow):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText('Buscar...')
         self.search_box.textChanged.connect(self.search)
+        self.search_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         search_layout.addWidget(self.search_box)
 
         # Botones
@@ -179,9 +180,11 @@ class MusicBrowser(QMainWindow):
         self.custom_button2 = QPushButton('Script 2')
         self.custom_button3 = QPushButton('Script 3')
 
+        # Configurar políticas de foco para los botones
         for button in [self.play_button, self.folder_button, 
-                      self.custom_button1, self.custom_button2, self.custom_button3]:
+                    self.custom_button1, self.custom_button2, self.custom_button3]:
             button.setFixedWidth(100)
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             search_layout.addWidget(button)
 
         top_layout.addLayout(search_layout)
@@ -205,6 +208,8 @@ class MusicBrowser(QMainWindow):
         self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.results_list.currentItemChanged.connect(self.show_details)
+        self.results_list.itemClicked.connect(self.handle_item_click)
+        self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         splitter.addWidget(self.results_list)
 
         # Panel derecho (detalles)
@@ -259,6 +264,63 @@ class MusicBrowser(QMainWindow):
                 font-size: 12px;
             }}
         """)
+
+    def handle_item_click(self, item):
+        if item.is_header:
+            self.show_album_info(item)
+
+    def show_album_info(self, header_item):
+        # Obtener artista y álbum del texto del header
+        album_info = header_item.text().replace("📀 ", "").split(" - ")
+        if len(album_info) != 2:
+            return
+            
+        artist, album = album_info
+        
+        # Contar canciones y obtener información del álbum
+        total_tracks = 0
+        total_duration = 0
+        album_paths = []
+        
+        # Recorrer los items después del header hasta el siguiente header
+        index = self.results_list.row(header_item) + 1
+        while index < self.results_list.count():
+            item = self.results_list.item(index)
+            if item.is_header:
+                break
+                
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data:
+                total_tracks += 1
+                if len(data) > 15:  # Asegurarse de que existe el campo duration
+                    try:
+                        total_duration += float(data[15])
+                    except (ValueError, TypeError):
+                        pass
+                album_paths.extend(item.paths)
+            index += 1
+        
+        # Guardar las rutas en el header para usarlas en play_album y open_album_folder
+        header_item.paths = album_paths
+        
+        # Formatear la duración total
+        hours = int(total_duration // 3600)
+        minutes = int((total_duration % 3600) // 60)
+        seconds = int(total_duration % 60)
+        
+        # Mostrar la información en el panel de detalles
+        album_info = f"""
+            <b>Álbum:</b> {album}<br>
+            <b>Artista:</b> {artist}<br>
+            <b>Pistas:</b> {total_tracks}<br>
+            <b>Duración total:</b> {hours:02d}:{minutes:02d}:{seconds:02d}<br>
+            <br>
+            <i>Presiona Enter para reproducir el álbum completo</i><br>
+            <i>Presiona Ctrl+O para abrir la carpeta del álbum</i>
+        """
+        self.metadata_label.setText(album_info)
+
+
     def setup_shortcuts(self):
         # Enter para reproducir
         QShortcut(QKeySequence(Qt.Key.Key_Return), self, self.play_item)
@@ -463,59 +525,178 @@ class MusicBrowser(QMainWindow):
         return None
 
     def show_details(self, current, previous):
+        """Muestra los detalles del ítem seleccionado."""
         if not current:
+            self.clear_details()
             return
 
         data = current.data(Qt.ItemDataRole.UserRole)
-        
-        if not data or len(data) < 2:
-            # Si 'data' es None o no tiene al menos 2 elementos, evitar el error
-            self.cover_label.setText("Album sin carátula")
+        if not data:
+            self.clear_details()
             return
-        else:
+
+        try:
             # Mostrar carátula
-            cover_path = self.find_cover_image(data[1])  # data[1] es file_path
-            if cover_path:
-                pixmap = QPixmap(cover_path)
-                pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
-                self.cover_label.setPixmap(pixmap)
+            if len(data) > 1:
+                cover_path = self.find_cover_image(data[1])
+                if cover_path:
+                    pixmap = QPixmap(cover_path)
+                    pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                    self.cover_label.setPixmap(pixmap)
+                else:
+                    self.cover_label.setText("No imagen")
             else:
-                # Carátula por defecto
                 self.cover_label.setText("No imagen")
 
-        # Mostrar info de LastFM
-        lastfm_text = data[-1] if data[-1] else "No hay información de LastFM disponible"
-        self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{lastfm_text}")
+            # Mostrar info de LastFM
+            lastfm_text = data[-1] if len(data) > 14 and data[-1] else "No hay información de LastFM disponible"
+            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{lastfm_text}")
 
-        # Mostrar metadata
-        metadata = f"""
-            <b>Título:</b> {data[2]}<br>
-            <b>Artista:</b> {data[3]}<br>
-            <b>Album Artist:</b> {data[4]}<br>
-            <b>Álbum:</b> {data[5]}<br>
-            <b>Fecha:</b> {data[6]}<br>
-            <b>Género:</b> {data[7]}<br>
-            <b>Sello:</b> {data[8]}<br>
-            <b>MBID:</b> {data[9]}<br>
-            <b>Bitrate:</b> {data[10]} kbps<br>
-            <b>Profundidad:</b> {data[11]} bits<br>
-            <b>Frecuencia:</b> {data[12]} Hz<br>
-        """
-        self.metadata_label.setText(metadata)
+            # Mostrar metadata si hay suficientes datos
+            if len(data) > 12:
+                metadata = f"""
+                    <b>Título:</b> {data[2] or 'N/A'}<br>
+                    <b>Artista:</b> {data[3] or 'N/A'}<br>
+                    <b>Album Artist:</b> {data[4] or 'N/A'}<br>
+                    <b>Álbum:</b> {data[5] or 'N/A'}<br>
+                    <b>Fecha:</b> {data[6] or 'N/A'}<br>
+                    <b>Género:</b> {data[7] or 'N/A'}<br>
+                    <b>Sello:</b> {data[8] or 'N/A'}<br>
+                    <b>MBID:</b> {data[9] or 'N/A'}<br>
+                    <b>Bitrate:</b> {data[10] or 'N/A'} kbps<br>
+                    <b>Profundidad:</b> {data[11] or 'N/A'} bits<br>
+                    <b>Frecuencia:</b> {data[12] or 'N/A'} Hz<br>
+                """
+                self.metadata_label.setText(metadata)
+            else:
+                self.metadata_label.setText("No hay suficientes datos de metadata")
+                
+        except Exception as e:
+            print(f"Error al mostrar detalles: {e}")
+            self.clear_details()
+
+    def clear_details(self):
+        """Limpia todos los campos de detalles."""
+        self.cover_label.setText("No imagen")
+        self.lastfm_label.setText("")
+        self.metadata_label.setText("")
 
     def play_item(self):
+        """Reproduce el ítem seleccionado con verificaciones de seguridad."""
         current = self.results_list.currentItem()
-        if current:
-            file_path = current.data(Qt.ItemDataRole.UserRole)[1]
+        if not current:
+            print("No hay ítem seleccionado")
+            return
+            
+        # Verificar si es un header
+        if getattr(current, 'is_header', False):
+            self.play_album()
+            return
+            
+        # Obtener los datos del ítem
+        data = current.data(Qt.ItemDataRole.UserRole)
+        if not data:
+            print("No hay datos asociados al ítem")
+            return
+            
+        try:
+            file_path = data[1]  # Índice 1 contiene file_path
+            if not file_path or not os.path.exists(file_path):
+                print(f"Ruta de archivo no válida: {file_path}")
+                return
+                
             subprocess.Popen([reproductor, file_path])
+        except (IndexError, TypeError) as e:
+            print(f"Error al acceder a los datos del ítem: {e}")
+        except Exception as e:
+            print(f"Error al reproducir el archivo: {e}")
+
+    def play_album(self):
+        """Reproduce todo el álbum del ítem seleccionado."""
+        current_item = self.results_list.currentItem()
+        if not current_item:
+            return
+            
+        if not getattr(current_item, 'is_header', False):
+            return
+            
+        try:
+            # Recolectar todas las rutas de archivo del álbum
+            album_paths = []
+            index = self.results_list.row(current_item) + 1
+            
+            while index < self.results_list.count():
+                item = self.results_list.item(index)
+                if not item or getattr(item, 'is_header', False):
+                    break
+                    
+                data = item.data(Qt.ItemDataRole.UserRole)
+                if data and len(data) > 1:
+                    file_path = data[1]
+                    if file_path and os.path.exists(file_path):
+                        album_paths.append(file_path)
+                index += 1
+            
+            if album_paths:
+                subprocess.Popen([reproductor] + album_paths)
+            else:
+                print("No se encontraron archivos válidos para reproducir")
+                
+        except Exception as e:
+            print(f"Error al reproducir el álbum: {e}")
 
     def open_folder(self):
+        """Abre la carpeta del ítem seleccionado."""
         current = self.results_list.currentItem()
-        if current:
-            file_path = current.data(Qt.ItemDataRole.UserRole)[1]
-            folder_path = str(Path(file_path).parent)
+        if not current:
+            return
+            
+        try:
+            if getattr(current, 'is_header', False):
+                # Si es un header, abrir la carpeta del primer archivo del álbum
+                index = self.results_list.row(current) + 1
+                if index < self.results_list.count():
+                    item = self.results_list.item(index)
+                    if item:
+                        data = item.data(Qt.ItemDataRole.UserRole)
+                        if data and len(data) > 1:
+                            file_path = data[1]
+                        else:
+                            return
+                else:
+                    return
+            else:
+                # Si es una canción individual
+                data = current.data(Qt.ItemDataRole.UserRole)
+                if not data or len(data) <= 1:
+                    return
+                file_path = data[1]
+            
+            if file_path and os.path.exists(file_path):
+                folder_path = str(Path(file_path).parent)
+                subprocess.Popen(['thunar', folder_path])
+            else:
+                print(f"Ruta no válida: {file_path}")
+                
+        except Exception as e:
+            print(f"Error al abrir la carpeta: {e}")
+
+    def open_album_folder(self):
+        current_item = self.results_list.currentItem()
+        if current_item and current_item.is_header and hasattr(current_item, 'paths') and current_item.paths:
+            # Abrir la carpeta del primer archivo del álbum
+            folder_path = str(Path(current_item.paths[0]).parent)
             subprocess.Popen(['thunar', folder_path])
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Tab:
+            # Alternar entre la caja de búsqueda y la lista de resultados
+            if self.search_box.hasFocus():
+                self.results_list.setFocus()
+            else:
+                self.search_box.setFocus()
+            event.accept()
+            return
     def run_custom_script(self, script_num):
         current = self.results_list.currentItem()
         if not current:
