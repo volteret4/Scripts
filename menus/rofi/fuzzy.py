@@ -14,7 +14,7 @@ SEARCH_DIR = "/mnt/windows/FTP/wiki/Obsidian/"
 # Define los paths que quieres mostrar al final con iconos
 SECONDARY_PATHS = [
     "/mnt/windows/FTP/wiki/Obsidian/.space/",
-    #"/mnt/windows/FTP/wiki/Obsidian/Templates/",
+    "/mnt/windows/FTP/wiki/Obsidian/Templates/",
     # Añade más paths aquí
 ]
 
@@ -248,7 +248,7 @@ def create_gui():
     root = tk.Tk()
     root.title("Buscador de archivos Markdown")
     root.configure(bg='#14141e')
-    root.geometry("1800x800")
+    root.geometry("1600x800")
 
     search_frame = tk.Frame(root, bg='#14141e')
     search_frame.pack(pady=(10, 10), padx=5)
@@ -280,7 +280,8 @@ def create_gui():
             body {
                 background-color: #14141e;
                 color: white;
-                font-family: Arial, sans-serif;
+                font-family: Firacode, sans-serif;
+                font-size: 19px;
             }
         </style>
     </head>

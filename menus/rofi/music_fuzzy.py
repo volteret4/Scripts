@@ -341,7 +341,7 @@ class MusicBrowser(QMainWindow):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Consulta base modificada para incluir track_number
+        # Consulta base modificada para usar la tabla artists en lugar de artist_info
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -358,10 +358,10 @@ class MusicBrowser(QMainWindow):
                 s.bit_depth,
                 s.sample_rate,
                 s.last_modified,
-                ai.bio,
+                a.bio,
                 s.track_number
             FROM songs s
-            LEFT JOIN artist_info ai ON s.artist = ai.artist
+            LEFT JOIN artists a ON s.artist = a.name
         """
         
         conditions = []
