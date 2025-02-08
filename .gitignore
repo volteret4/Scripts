@@ -114,3 +114,5 @@ results.txt
 .content/*
 .stfolder
 .stignore
+artist_enrichment.log
+artist_enrichment_checkpoint.json
