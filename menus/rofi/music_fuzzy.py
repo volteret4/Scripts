@@ -6,7 +6,8 @@ import sqlite3
 import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLineEdit, QPushButton, QListWidget,
-                            QListWidgetItem, QLabel, QScrollArea, QSplitter)
+                            QListWidgetItem, QLabel, QScrollArea, QSplitter,
+                            QAbstractItemView)
 from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize
 import subprocess
@@ -207,9 +208,11 @@ class MusicBrowser(QMainWindow):
         self.results_list = QListWidget()
         self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.results_list.currentItemChanged.connect(self.show_details)
+        self.results_list.currentItemChanged.connect(self.handle_item_change)  # Cambiar esta línea
         self.results_list.itemClicked.connect(self.handle_item_click)
         self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.results_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.results_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         splitter.addWidget(self.results_list)
 
         # Panel derecho (detalles)
@@ -266,10 +269,24 @@ class MusicBrowser(QMainWindow):
         """)
 
     def handle_item_click(self, item):
-        if item.is_header:
-            self.show_album_info(item)
+        """Maneja el clic en un ítem. Ya no es necesario hacer nada aquí
+        porque handle_item_change se encargará de todo."""
+        pass  # La funcionalidad ahora está en handle_item_change
+
+
+    def handle_item_change(self, current, previous):
+        """Maneja el cambio de ítem seleccionado, ya sea por clic o navegación con teclado."""
+        if not current:
+            self.clear_details()
+            return
+            
+        if current.is_header:
+            self.show_album_info(current)
+        else:
+            self.show_details(current, previous)
 
     def show_album_info(self, header_item):
+        """Muestra la información del álbum."""
         # Obtener artista y álbum del texto del header
         album_info = header_item.text().replace("📀 ", "").split(" - ")
         if len(album_info) != 2:
@@ -281,6 +298,7 @@ class MusicBrowser(QMainWindow):
         total_tracks = 0
         total_duration = 0
         album_paths = []
+        first_track_data = None
         
         # Recorrer los items después del header hasta el siguiente header
         index = self.results_list.row(header_item) + 1
@@ -291,6 +309,8 @@ class MusicBrowser(QMainWindow):
                 
             data = item.data(Qt.ItemDataRole.UserRole)
             if data:
+                if not first_track_data:
+                    first_track_data = data
                 total_tracks += 1
                 if len(data) > 15:  # Asegurarse de que existe el campo duration
                     try:
@@ -308,17 +328,39 @@ class MusicBrowser(QMainWindow):
         minutes = int((total_duration % 3600) // 60)
         seconds = int(total_duration % 60)
         
+        # Buscar la carátula usando la ruta del primer track
+        if first_track_data and len(first_track_data) > 1:
+            cover_path = self.find_cover_image(first_track_data[1])
+            if cover_path:
+                pixmap = QPixmap(cover_path)
+                pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                self.cover_label.setPixmap(pixmap)
+            else:
+                self.cover_label.setText("No imagen")
+        
         # Mostrar la información en el panel de detalles
-        album_info = f"""
-            <b>Álbum:</b> {album}<br>
-            <b>Artista:</b> {artist}<br>
-            <b>Pistas:</b> {total_tracks}<br>
-            <b>Duración total:</b> {hours:02d}:{minutes:02d}:{seconds:02d}<br>
-            <br>
-            <i>Presiona Enter para reproducir el álbum completo</i><br>
-            <i>Presiona Ctrl+O para abrir la carpeta del álbum</i>
-        """
-        self.metadata_label.setText(album_info)
+        if first_track_data:
+            # Mostrar info de LastFM si está disponible
+            artist_bio = first_track_data[15] if len(first_track_data) > 15 and first_track_data[15] else "No hay información del artista disponible"
+            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{artist_bio}")
+            
+            # Mostrar metadata del álbum
+            metadata = f"""
+                <b>Álbum:</b> {album}<br>
+                <b>Artista:</b> {artist}<br>
+                <b>Fecha:</b> {first_track_data[6] or 'N/A'}<br>
+                <b>Género:</b> {first_track_data[7] or 'N/A'}<br>
+                <b>Sello:</b> {first_track_data[8] or 'N/A'}<br>
+                <b>Pistas:</b> {total_tracks}<br>
+                <b>Duración total:</b> {hours:02d}:{minutes:02d}:{seconds:02d}<br>
+                <b>Bitrate:</b> {first_track_data[10] or 'N/A'} kbps<br>
+                <br>
+                <i>Presiona Enter para reproducir el álbum completo</i><br>
+                <i>Presiona Ctrl+O para abrir la carpeta del álbum</i>
+            """
+            self.metadata_label.setText(metadata)
+        else:
+            self.clear_details()
 
 
     def setup_shortcuts(self):
@@ -700,6 +742,77 @@ class MusicBrowser(QMainWindow):
                 self.search_box.setFocus()
             event.accept()
             return
+        
+        # Solo procesar las flechas si la lista de resultados tiene el foco
+        if self.results_list.hasFocus():
+            if event.key() in [Qt.Key.Key_Left, Qt.Key.Key_Right]:
+                self.navigate_headers(event.key())
+                event.accept()
+                return
+                
+        current_item = self.results_list.currentItem()
+        if current_item and current_item.is_header:
+            if event.key() == Qt.Key.Key_Return:
+                self.play_album()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_O and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                self.open_album_folder()
+                event.accept()
+                return
+                
+        super().keyPressEvent(event)
+
+    def navigate_headers(self, key):
+        """Navega entre los headers de álbumes usando las flechas izquierda/derecha."""
+        current_row = self.results_list.currentRow()
+        if current_row == -1:
+            return
+            
+        total_items = self.results_list.count()
+        header_positions = []
+        
+        # Encontrar todas las posiciones de los headers
+        for i in range(total_items):
+            item = self.results_list.item(i)
+            if item and getattr(item, 'is_header', False):
+                header_positions.append(i)
+        
+        if not header_positions:
+            return
+            
+        # Encontrar el header actual o el más cercano
+        current_header_index = -1
+        for i, pos in enumerate(header_positions):
+            if key == Qt.Key.Key_Right:
+                # Para flecha derecha, buscar el siguiente header
+                if pos > current_row:
+                    current_header_index = i
+                    break
+            else:
+                # Para flecha izquierda, buscar el header anterior
+                if pos >= current_row:
+                    current_header_index = i - 1
+                    break
+        
+        # Si no encontramos un header siguiente, ir al primero
+        if key == Qt.Key.Key_Right and current_header_index == -1:
+            current_header_index = 0
+        # Si no encontramos un header anterior, ir al último
+        elif key == Qt.Key.Key_Left and current_header_index == -1:
+            current_header_index = len(header_positions) - 1
+        
+        # Asegurarse de que el índice es válido
+        if 0 <= current_header_index < len(header_positions):
+            # Seleccionar el nuevo header
+            new_row = header_positions[current_header_index]
+            self.results_list.setCurrentRow(new_row)
+            self.results_list.scrollToItem(
+                self.results_list.item(new_row),
+                QAbstractItemView.ScrollHint.PositionAtCenter
+            )
+
+
     def run_custom_script(self, script_num):
         current = self.results_list.currentItem()
         if not current:
