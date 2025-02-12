@@ -1,10 +1,22 @@
-#!/usr/bin/env python3
+
+#!/usr/bin/env python
+#
+# Script Name: blog_2.py
+# Description: Extraer musica de una url. (yt,bc)
+# Author: volteret4
+# Repository: https://github.com/volteret4/
+# License:
+# TODO: 
+# Notes:
+#   Dependencies:  - python3, requests
+#
 
 import sys
 import re
 import os
 import requests
 from urllib.parse import urlparse, urlunparse, parse_qs
+import datetime
 
 def extract_bandcamp_id(url):
     """Extrae el ID de album/track de Bandcamp desde un iframe"""
@@ -76,29 +88,55 @@ def create_playlist(music_urls, output_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: python script.py <url> <bash_script_path>")
+        print("Uso: python script.py <archivo_de_urls>")
         sys.exit(1)
 
-    url = sys.argv[1]
+    urls_file = sys.argv[1]
     bash_script_path = "/home/huan/Scripts/Musica/mpv/vlc_playlist_file.sh"
 
     temp_dir = os.path.join(os.path.expanduser('~'), '.music_extractor')
     os.makedirs(temp_dir, exist_ok=True)
-    playlist_path = os.path.join(temp_dir, 'playlist.m3u')
 
-    music_urls = extract_music_urls(url)
+    # Nombre de la playlist basado en el mes y año actual
+    current_month = datetime.datetime.now().strftime("%m-%Y")
+    playlist_path = os.path.join(temp_dir, f'{current_month}.m3u')
 
-    if not music_urls:
-        print("No se encontraron URLs de música.")
+    # Verifica si el archivo existe
+    if not os.path.isfile(urls_file):
+        print(f"Error: El archivo '{urls_file}' no existe.")
         sys.exit(1)
 
-    playlist_file = create_playlist(music_urls, playlist_path)
+    with open(urls_file, 'r') as file:
+        urls = [line.strip() for line in file if line.strip()]
+
+    if not urls:
+        print("Error: El archivo de URLs está vacío.")
+        sys.exit(1)
+
+    all_music_urls = []
+
+    for url in urls:
+        print(f"Procesando URL: {url}")
+        music_urls = extract_music_urls(url)
+
+        if not music_urls:
+            print(f"No se encontraron URLs de música en {url}.")
+            continue
+
+        all_music_urls.extend(music_urls)
+
+    if not all_music_urls:
+        print("No se encontraron canciones en ninguna URL.")
+        sys.exit(1)
+
+    # Crear una única playlist con todas las canciones extraídas
+    playlist_file = create_playlist(all_music_urls, playlist_path)
 
     if playlist_file:
         print(f"Playlist generada: {playlist_file}")
-        print("URLs encontradas:")
-        for url in music_urls:
-            print(url)
+        print("Todas las URLs encontradas:")
+        for music_url in all_music_urls:
+            print(music_url)
 
         try:
             os.system(f"bash {bash_script_path} {playlist_file}")
@@ -107,4 +145,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
