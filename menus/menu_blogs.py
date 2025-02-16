@@ -232,7 +232,7 @@ class PlaylistManager(tk.Tk):
         
         try:
             # Ejecutar mpv con opciones para forzar la interfaz de video
-            process = subprocess.run(["mpv", "--player-operation-mode=pseudo-gui", "--force-window=yes", playlist_path])
+            process = subprocess.run(["/home/huan/Scripts/utilities/aliases/mpv_lastfm_starter.sh", "--player-operation-mode=pseudo-gui", "--force-window=yes", playlist_path])
             
             # Si mpv se cerró normalmente, mostrar el diálogo
             if process.returncode == 0:
