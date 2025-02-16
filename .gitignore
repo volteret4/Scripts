@@ -116,3 +116,4 @@ results.txt
 .stignore
 artist_enrichment.log
 artist_enrichment_checkpoint.json
+utilities/aliases/__pycache__/

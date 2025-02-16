@@ -55,7 +55,7 @@ def extract_music_urls(url: str) -> List[str]:
         content = response.text
 
         music_patterns = [
-            r'src="(//bandcamp\.com/EmbeddedPlayer/[^"]+)"',
+            r'https://[a-z0-9\-.]+\.bandcamp\.com/(album|track)/[a-z0-9\-_]+' 
             r'(https?://(www\.)?(soundcloud\.com/[^\s"\']+))',
             r'(https?://(www\.)?(youtube\.com/embed/[^\s"\']+))',
             r'(https?://(www\.)?(youtube\.com/watch\?[^\s"\']+))',
@@ -229,7 +229,7 @@ def main():
     FRESHRSS_URL = "https://freshrss.pollete.duckdns.org"
     USERNAME = "pollo"
     AUTH_TOKEN = os.getenv('AUTH_TOKEN')
-    OUTPUT_DIR = "playlists"
+    OUTPUT_DIR = "/home/huan/Música/blogs_playlists"
     
     if not AUTH_TOKEN:
         logger.error("No se encontró AUTH_TOKEN en el archivo .env")
