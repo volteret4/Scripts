@@ -117,4 +117,5 @@ results.txt
 artist_enrichment.log
 artist_enrichment_checkpoint.json
 utilities/aliases/__pycache__/
-menus/__pycache__
+menus/__pycache__/*
+menus/musica/__pycache__/
