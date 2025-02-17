@@ -1,0 +1,22 @@
+{
+    "modules": [
+        {
+            "name": "Music Browser",
+            "path": "/home/huan/Scripts/menus/musica/music_fuzzy.py",
+            "args": {
+                "db_path": "/home/huan/.moode.sqlite",
+                "font_family": "Inter"
+            }
+        },
+        {
+            "name": "Blog Playlists",
+            "path": "/path/to/blog_playlist.py",
+            "args": {
+                "output_dir": "/home/huan/Música/blogs_playlists",
+                "freshrss_url": "https://freshrss.pollete.duckdns.org",
+                "username": "pollo",
+                "auth_token": "your_auth_token"
+            }
+        }
+    ]
+}
