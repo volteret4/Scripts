@@ -66,6 +66,14 @@ if __name__ == "__main__":
     # exclude = input("Introduce las carpetas a excluir (separadas por comas): ").split(',')
     source = "/home/huan/Scripts"
     destination = "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts"
-    exclude = ["/home/huan/Scripts/.git", "/home/huan/Scripts/.content", "/home/huan/Scripts/.venv", "/home/huan/Scripts/python_venv", "/home/huan/Scripts/.stfolder", "/home/huan/Scripts/.stignore"]
+    exclude = [
+        "/home/huan/Scripts/.git", 
+        "/home/huan/Scripts/.content", 
+        "/home/huan/Scripts/.venv", 
+        "/home/huan/Scripts/python_venv", 
+        "/home/huan/Scripts/.stfolder", 
+        "/home/huan/Scripts/menus/musica/__pycache__/",
+        "/home/huan/Scripts/.stignore"
+        ]
     sync_files(source, destination, exclude)
 
