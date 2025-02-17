@@ -53,7 +53,9 @@ class TabManager(QMainWindow):
                 config = json.load(f)
                 
             for module_config in config['modules']:
-                module_path = module_config['path']
+                parent_dir = Path(__file__).parent  # Directorio donde se encuentra el script padre
+                relative_path = Path(module_config['path'])
+                module_path = str(parent_dir / relative_path)
                 module_name = module_config.get('name', Path(module_path).stem)
                 module_args = module_config.get('args', {})
                 

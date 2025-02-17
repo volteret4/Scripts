@@ -10,5 +10,5 @@
 #   Dependencies:  - python3, 
 #
 
-python3 "/home/huan/Scripts/menus/musica/menu_blogs/mpv_lastfm.py" &
+python3 "/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm.py" &
 /usr/bin/mpv "$@"

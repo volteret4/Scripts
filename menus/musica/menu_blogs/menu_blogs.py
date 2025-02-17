@@ -15,10 +15,11 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel,
     QProgressBar, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
-    QScrollArea
+    QScrollArea, QInputDialog, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from base_module import BaseModule, THEME
+import yt_dlp
 import logging
 import os
 import re
@@ -29,8 +30,8 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs, quote
-from dotenv import load_dotenv
 from typing import List, Dict
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -39,56 +40,81 @@ logging.basicConfig(level=logging.DEBUG)
 
 class MusicManagerModule(BaseModule):
     def __init__(self, **kwargs):
-        # Obtener valores del kwargs o usar valores por defecto
-        self.pending_dir = Path(kwargs.get('pending_dir', 'PENDIENTE'))
-        self.listened_dir = Path(kwargs.get('listened_dir', 'ESCUCHADO'))
+        self.pending_dir = Path(kwargs.get('pending_dir', 'playlists/PENDIENTE'))
+        self.listened_dir = Path(kwargs.get('listened_dir', 'playlists/ESCUCHADO'))
+        self.local_dir = Path(kwargs.get('local_dir', 'playlists/LISTAS_LOCALES'))
         self.output_dir = kwargs.get('output_dir', str(self.pending_dir))
-        self.freshrss_url = kwargs.get('freshrss_url', '')
-        self.username = kwargs.get('username', '')
-        self.auth_token = kwargs.get('auth_token', '')
-        
         self.selected_blog = None
         self.worker = None
         super().__init__()
 
     def init_ui(self):
-        """Initialize the user interface."""
         layout = QVBoxLayout(self)
         
-        # Left side (Blogs)
+        # Main content area with three panels
+        main_panel = QHBoxLayout()
+        
+        # Left panel (Blogs and Local Playlists)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         
-        blog_label = QLabel("Blogs Disponibles:")
+        # Blogs section
+        blog_label = QLabel("Blogs:")
         blog_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
         
         self.blog_list = QListWidget()
         self.blog_list.setStyleSheet(self._get_list_style())
         
+        # Local playlists section
+        local_label = QLabel("Listas Locales:")
+        local_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        
+        self.local_list = QListWidget()
+        self.local_list.setStyleSheet(self._get_list_style())
+        
         left_layout.addWidget(blog_label)
         left_layout.addWidget(self.blog_list)
+        left_layout.addWidget(local_label)
+        left_layout.addWidget(self.local_list)
         
-        # Right side (Playlists)
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
+        # Middle panel (Playlists)
+        middle_panel = QWidget()
+        middle_layout = QVBoxLayout(middle_panel)
         
         playlist_label = QLabel("Playlists:")
         playlist_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
         
         self.playlist_list = QListWidget()
         self.playlist_list.setStyleSheet(self._get_list_style())
+        self.playlist_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.playlist_list.customContextMenuRequested.connect(self.show_playlist_context_menu)
         
         self.play_button = QPushButton("Reproducir Seleccionado")
         self.play_button.setStyleSheet(self._get_button_style())
         
-        right_layout.addWidget(playlist_label)
-        right_layout.addWidget(self.playlist_list)
-        right_layout.addWidget(self.play_button)
+        middle_layout.addWidget(playlist_label)
+        middle_layout.addWidget(self.playlist_list)
+        middle_layout.addWidget(self.play_button)
+        
+        # Right panel (Playlist Content)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        
+        content_label = QLabel("Contenido:")
+        content_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        
+        self.content_list = QListWidget()
+        self.content_list.setStyleSheet(self._get_list_style())
+        self.content_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.content_list.customContextMenuRequested.connect(self.show_track_context_menu)
+        
+        right_layout.addWidget(content_label)
+        right_layout.addWidget(self.content_list)
         
         # Add panels to main layout
-        main_panel = QHBoxLayout()
         main_panel.addWidget(left_panel, stretch=2)
-        main_panel.addWidget(right_panel, stretch=1)
+        main_panel.addWidget(middle_panel, stretch=2)
+        main_panel.addWidget(right_panel, stretch=3)
         layout.addLayout(main_panel)
         
         # URL Processor at the bottom
@@ -105,11 +131,13 @@ class MusicManagerModule(BaseModule):
         
         # Connect signals
         self.blog_list.itemSelectionChanged.connect(self.on_blog_select)
+        self.local_list.itemSelectionChanged.connect(self.on_local_select)
+        self.playlist_list.itemSelectionChanged.connect(self.on_playlist_select)
         self.play_button.clicked.connect(self.play_selected)
         self.playlist_list.itemDoubleClicked.connect(self.play_selected)
         
         # Initial refresh
-        self.refresh_blogs()
+        self.refresh_lists()
 
     def _get_list_style(self):
         return f"""
@@ -186,6 +214,11 @@ class MusicManagerModule(BaseModule):
         shutil.move(str(source), str(destination))
         return destination
 
+    def refresh_lists(self):
+        """Refresh both blog and local lists."""
+        self.refresh_blogs()
+        self.refresh_local_playlists()
+
     def refresh_blogs(self):
         """Refresh the list of available blogs."""
         self.blog_list.clear()
@@ -193,7 +226,180 @@ class MusicManagerModule(BaseModule):
         
         for blog, count in blogs.items():
             item = QListWidgetItem(f"{blog} ({count} playlists)")
+            item.setData(Qt.ItemDataRole.UserRole, {'type': 'blog', 'name': blog})
             self.blog_list.addItem(item)
+
+    def refresh_local_playlists(self):
+        """Refresh the list of local playlists."""
+        self.local_list.clear()
+        if self.local_dir.exists():
+            for playlist in self.local_dir.glob('*.m3u'):
+                item = QListWidgetItem(playlist.stem)
+                item.setData(Qt.ItemDataRole.UserRole, {'type': 'local', 'name': playlist.name})
+                self.local_list.addItem(item)
+
+
+    def get_track_info(self, url):
+        """Get track information using yt-dlp."""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'extract_flat': True,
+                'force_generic_extractor': False
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return info.get('title', url)
+        except:
+            return url
+
+
+    def on_playlist_select(self):
+        """Handle playlist selection event."""
+        self.content_list.clear()
+        
+        selected_items = self.playlist_list.selectedItems()
+        if not selected_items:
+            return
+            
+        playlist_item = selected_items[0]
+        playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
+        
+        if playlist_data['type'] == 'blog':
+            playlist_path = self.pending_dir / self.selected_blog / playlist_data['name']
+        else:
+            playlist_path = self.local_dir / playlist_data['name']
+        
+        if playlist_path.exists():
+            with open(playlist_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        title = self.get_track_info(line)
+                        item = QListWidgetItem(title)
+                        item.setData(Qt.ItemDataRole.UserRole, {'url': line})
+                        self.content_list.addItem(item)
+    
+    def on_local_select(self):
+        """Maneja el evento de selección de una lista local."""
+        self.content_list.clear()
+        
+        selected_items = self.local_list.selectedItems()
+        if not selected_items:
+            return
+        
+        local_item = selected_items[0]
+        playlist_data = local_item.data(Qt.ItemDataRole.UserRole)
+        playlist_path = self.local_dir / playlist_data['name']
+        
+        if playlist_path.exists():
+            try:
+                with open(playlist_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            title = self.get_track_info(line)
+                            item = QListWidgetItem(title)
+                            item.setData(Qt.ItemDataRole.UserRole, {'url': line})
+                            self.content_list.addItem(item)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al leer la playlist: {str(e)}")
+
+
+    def show_playlist_context_menu(self, position):
+        """Show context menu for playlists."""
+        menu = QMenu()
+        delete_action = menu.addAction("Eliminar Playlist")
+        action = menu.exec(self.playlist_list.mapToGlobal(position))
+        
+        if action == delete_action:
+            self.delete_selected_playlist()
+
+    def show_track_context_menu(self, position):
+        """Show context menu for tracks."""
+        menu = QMenu()
+        delete_action = menu.addAction("Eliminar Track")
+        action = menu.exec(self.content_list.mapToGlobal(position))
+        
+        if action == delete_action:
+            self.delete_selected_track()
+
+
+    def delete_selected_playlist(self):
+        """Delete the selected playlist."""
+        selected_items = self.playlist_list.selectedItems()
+        if not selected_items:
+            return
+            
+        reply = QMessageBox.question(
+            self,
+            "Confirmar Eliminación",
+            "¿Estás seguro de que quieres eliminar esta playlist?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            playlist_item = selected_items[0]
+            playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
+            
+            if playlist_data['type'] == 'blog':
+                playlist_path = self.pending_dir / self.selected_blog / playlist_data['name']
+            else:
+                playlist_path = self.local_dir / playlist_data['name']
+            
+            try:
+                playlist_path.unlink()
+                self.refresh_lists()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al eliminar playlist: {str(e)}")
+
+
+
+    def delete_selected_track(self):
+        """Delete the selected track from the playlist."""
+        playlist_items = self.playlist_list.selectedItems()
+        track_items = self.content_list.selectedItems()
+        
+        if not playlist_items or not track_items:
+            return
+            
+        reply = QMessageBox.question(
+            self,
+            "Confirmar Eliminación",
+            "¿Estás seguro de que quieres eliminar esta canción?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            playlist_item = playlist_items[0]
+            playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
+            
+            if playlist_data['type'] == 'blog':
+                playlist_path = self.pending_dir / self.selected_blog / playlist_data['name']
+            else:
+                playlist_path = self.local_dir / playlist_data['name']
+            
+            try:
+                # Read all lines
+                with open(playlist_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                # Remove the selected track
+                track_url = track_items[0].data(Qt.ItemDataRole.UserRole)['url']
+                lines = [line for line in lines if track_url not in line]
+                
+                # Write back the file
+                with open(playlist_path, 'w', encoding='utf-8') as f:
+                    f.writelines(lines)
+                
+                # Refresh the content list
+                self.on_playlist_select()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al eliminar track: {str(e)}")
+
+
+
 
     def on_blog_select(self):
         """Handle blog selection event."""
@@ -243,11 +449,18 @@ class MusicManagerModule(BaseModule):
             return
 
         try:
+             # Obtiene el directorio home del usuario actual
+            home = Path.home()
+            
+            # Construye la ruta completa al script usando el home
+            script_path = home / "Scripts" / "menus" / "musica" / "menu_blogs" / "mpv" / "mpv_lastfm_starter.sh"
+            
+            # Ejecuta el script con subprocess.run
             process = subprocess.run(
-                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv_lastfm_starter.sh", 
-                 "--player-operation-mode=pseudo-gui", 
-                 "--force-window=yes", 
-                 str(playlist_path)]
+                [str(script_path), 
+                "--player-operation-mode=pseudo-gui", 
+                "--force-window=yes", 
+                str(playlist_path)]
             )
             
             if process.returncode == 0:
@@ -269,283 +482,30 @@ class MusicManagerModule(BaseModule):
                 QMessageBox.warning(self, "No URLs", "No se encontraron URLs de música en la página")
                 return
 
-            temp_dir = Path(os.path.expanduser('~')) / '.music_extractor'
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            # Ask for playlist name
+            name, ok = QInputDialog.getText(
+                self, 
+                "Guardar Playlist",
+                "Nombre de la playlist:",
+                QLineEdit.EchoMode.Normal
+            )
             
-            current_month = datetime.now().strftime("%m-%Y")
-            playlist_path = temp_dir / f'{current_month}.m3u'
-            
-            with open(playlist_path, 'w', encoding='utf-8') as f:
-                f.write("#EXTM3U\n")
-                for music_url in music_urls:
-                    f.write(f"{music_url}\n")
-
-            subprocess.run([
-                "/home/huan/Scripts/Musica/mpv/vlc_playlist_file.sh",
-                str(playlist_path)
-            ])
+            if ok and name:
+                # Create playlist file
+                playlist_path = self.local_dir / f"{name}.m3u"
+                
+                with open(playlist_path, 'w', encoding='utf-8') as f:
+                    f.write("#EXTM3U\n")
+                    for music_url in music_urls:
+                        f.write(f"{music_url}\n")
+                
+                self.refresh_local_playlists()
+                QMessageBox.information(self, "Éxito", "Playlist creada correctamente")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al procesar URL: {str(e)}")
 
 
-# class PlaylistManagerModule(BaseModule):
-#     """A module for managing music playlists with pending and listened states."""
-    
-#     def __init__(self, pending_dir="PENDIENTE", listened_dir="ESCUCHADO", **kwargs):
-#         self.pending_dir = Path(pending_dir)
-#         self.listened_dir = Path(listened_dir)
-#         self.selected_blog = None
-#         super().__init__()
-#        # self.init_ui()
-
-#     def init_ui(self):
-#         """Initialize the user interface."""
-#         layout = QHBoxLayout(self)
-        
-#         # Left side (Blogs)
-#         left_panel = QWidget()
-#         left_layout = QVBoxLayout(left_panel)
-        
-#         blog_label = QLabel("Blogs Disponibles:")
-#         blog_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
-        
-#         self.blog_list = QListWidget()
-#         self.blog_list.setStyleSheet(f"""
-#             QListWidget {{
-#                 background-color: {THEME['secondary_bg']};
-#                 border: 1px solid {THEME['border']};
-#                 border-radius: 4px;
-#             }}
-#             QListWidget::item {{
-#                 color: {THEME['fg']};
-#                 padding: 5px;
-#             }}
-#             QListWidget::item:selected {{
-#                 background-color: {THEME['selection']};
-#             }}
-#         """)
-        
-#         left_layout.addWidget(blog_label)
-#         left_layout.addWidget(self.blog_list)
-        
-#         # Right side (Playlists)
-#         right_panel = QWidget()
-#         right_layout = QVBoxLayout(right_panel)
-        
-#         playlist_label = QLabel("Playlists:")
-#         playlist_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
-        
-#         self.playlist_list = QListWidget()
-#         self.playlist_list.setStyleSheet(self.blog_list.styleSheet())
-        
-#         self.play_button = QPushButton("Reproducir Seleccionado")
-#         self.play_button.setStyleSheet(f"""
-#             QPushButton {{
-#                 background-color: {THEME['accent']};
-#                 color: {THEME['bg']};
-#                 border: none;
-#                 padding: 8px;
-#                 border-radius: 4px;
-#             }}
-#             QPushButton:hover {{
-#                 background-color: {THEME['button_hover']};
-#             }}
-#         """)
-        
-#         right_layout.addWidget(playlist_label)
-#         right_layout.addWidget(self.playlist_list)
-#         right_layout.addWidget(self.play_button)
-        
-#         # Add panels to main layout
-#         layout.addWidget(left_panel, stretch=2)
-#         layout.addWidget(right_panel, stretch=1)
-        
-#         # Connect signals
-#         self.blog_list.itemSelectionChanged.connect(self.on_blog_select)
-#         self.play_button.clicked.connect(self.play_selected)
-#         self.playlist_list.itemDoubleClicked.connect(self.play_selected)
-        
-#         # Initial refresh
-#         self.refresh_blogs()
-
-#     def count_tracks_in_playlist(self, playlist_path):
-#         """Count the number of tracks in a playlist file."""
-#         try:
-#             with open(playlist_path, 'r', encoding='utf-8') as f:
-#                 lines = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-#                 return len(lines)
-#         except Exception:
-#             return 0
-
-#     def get_blogs_with_counts(self):
-#         """Get all blogs and their playlist counts."""
-#         blogs = {}
-#         if self.pending_dir.exists():
-#             for blog in self.pending_dir.iterdir():
-#                 if blog.is_dir():
-#                     playlists = list(blog.glob('*.m3u'))
-#                     blogs[blog.name] = len(playlists)
-#         return blogs
-
-#     def get_monthly_playlists_with_counts(self, blog_name):
-#         """Get all playlists for a blog with their track counts."""
-#         blog_path = self.pending_dir / blog_name
-#         playlists = {}
-        
-#         if blog_path.exists():
-#             for playlist in blog_path.glob('*.m3u'):
-#                 track_count = self.count_tracks_in_playlist(playlist)
-#                 playlists[playlist.name] = track_count
-        
-#         return playlists
-
-#     def move_to_listened(self, blog_name, playlist_name):
-#         """Move a playlist to the listened directory."""
-#         source = self.pending_dir / blog_name / playlist_name
-#         listened_blog_dir = self.listened_dir / blog_name
-        
-#         listened_blog_dir.mkdir(parents=True, exist_ok=True)
-        
-#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
-#         new_name = timestamp + playlist_name
-#         destination = listened_blog_dir / new_name
-        
-#         shutil.move(str(source), str(destination))
-#         return destination
-
-#     def refresh_blogs(self):
-#         """Refresh the list of available blogs."""
-#         self.blog_list.clear()
-#         blogs = self.get_blogs_with_counts()
-        
-#         for blog, count in blogs.items():
-#             item = QListWidgetItem(f"{blog} ({count} playlists)")
-#             self.blog_list.addItem(item)
-
-#     def on_blog_select(self):
-#         """Handle blog selection event."""
-#         items = self.blog_list.selectedItems()
-#         if not items:
-#             return
-        
-#         selection = items[0].text()
-#         self.selected_blog = selection.split(" (")[0]
-
-#         self.playlist_list.clear()
-#         playlists = self.get_monthly_playlists_with_counts(self.selected_blog)
-        
-#         for playlist, count in playlists.items():
-#             item = QListWidgetItem(f"{playlist} ({count} canciones)")
-#             self.playlist_list.addItem(item)
-
-#     def show_move_dialog(self, blog_name, playlist_name):
-#         """Show dialog asking whether to move the playlist to listened."""
-#         reply = QMessageBox.question(
-#             self,
-#             "Mover Playlist",
-#             "¿Has terminado la lista?",
-#             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-#         )
-        
-#         if reply == QMessageBox.StandardButton.Yes:
-#             self.move_to_listened(blog_name, playlist_name)
-#             self.refresh_blogs()
-
-#     def play_selected(self):
-#         """Play the selected playlist."""
-#         if not self.selected_blog or not self.playlist_list.selectedItems():
-#             QMessageBox.warning(
-#                 self,
-#                 "Selección requerida",
-#                 "Por favor, selecciona un blog y una playlist"
-#             )
-#             return
-
-#         playlist_selection = self.playlist_list.selectedItems()[0].text()
-#         playlist_name = playlist_selection.split(" (")[0]
-#         playlist_path = self.pending_dir / self.selected_blog / playlist_name
-        
-#         if not playlist_path.exists():
-#             QMessageBox.critical(self, "Error", "No se encuentra el archivo de la playlist")
-#             return
-
-#         try:
-#             process = subprocess.run(
-#                 ["/home/huan/Scripts/menus/musica/menu_blogs/mpv_lastfm_starter.sh", 
-#                  "--player-operation-mode=pseudo-gui", 
-#                  "--force-window=yes", 
-#                  str(playlist_path)]
-#             )
-            
-#             if process.returncode == 0:
-#                 self.show_move_dialog(self.selected_blog, playlist_name)
-            
-#         except Exception as e:
-#             QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
-    
-
-#     def process_url(self):
-#         url = self.url_process_input.text().strip()
-#         if not url:
-#             QMessageBox.warning(self, "Error", "Por favor ingrese una URL")
-#             return
-
-#         try:
-#             music_urls = extract_music_urls(url)
-#             if not music_urls:
-#                 QMessageBox.warning(self, "No URLs", "No se encontraron URLs de música en la página")
-#                 return
-
-#             temp_dir = Path(os.path.expanduser('~')) / '.music_extractor'
-#             temp_dir.mkdir(parents=True, exist_ok=True)
-            
-#             current_month = datetime.now().strftime("%m-%Y")
-#             playlist_path = temp_dir / f'{current_month}.m3u'
-            
-#             with open(playlist_path, 'w', encoding='utf-8') as f:
-#                 f.write("#EXTM3U\n")
-#                 for music_url in music_urls:
-#                     f.write(f"{music_url}\n")
-
-#             subprocess.run([
-#                 "/home/huan/Scripts/Musica/mpv/vlc_playlist_file.sh",
-#                 str(playlist_path)
-#             ])
-
-#         except Exception as e:
-#             QMessageBox.critical(self, "Error", f"Error al procesar URL: {str(e)}")
-
-#     def start_fetch(self):
-#         self.fetch_button.setEnabled(False)
-#         self.progress_bar.setRange(0, 0)
-#         self.log_text.clear()
-
-#         self.reader.base_url = self.url_input.text().rstrip('/')
-#         self.playlist_manager.output_dir = Path(self.output_dir_input.text())
-
-#         self.worker = FetchWorker(self.reader, self.playlist_manager)
-#         self.worker.progress_signal.connect(self.update_progress)
-#         self.worker.error_signal.connect(self.handle_error)
-#         self.worker.finished_signal.connect(self.handle_finished)
-#         self.worker.start()
-
-#     def update_progress(self, message):
-#         self.log_text.append(message)
-#         self.log_text.ensureCursorVisible()
-
-#     def handle_error(self, error_message):
-#         self.log_text.append(f"ERROR: {error_message}")
-#         self.log_text.ensureCursorVisible()
-
-#     def handle_finished(self, success):
-#         self.fetch_button.setEnabled(True)
-#         self.progress_bar.setRange(0, 100)
-#         self.progress_bar.setValue(100 if success else 0)
-#         self.worker = None
-
-#     def open_output_dir(self):
-#         os.system(f'xdg-open "{self.output_dir_input.text()}"')
 
 class FetchWorker(QThread):
     """Worker thread para operaciones en segundo plano"""
