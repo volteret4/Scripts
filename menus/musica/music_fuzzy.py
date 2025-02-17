@@ -11,19 +11,122 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize
 import subprocess
+import importlib.util
+from base_module import BaseModule, THEME  # Importar la clase base
 
 
 reproductor = 'deadbeef'
 # Tema Tokyo Night
-THEME = {
-    'bg': '#1a1b26',
-    'fg': '#a9b1d6',
-    'accent': '#7aa2f7',
-    'secondary_bg': '#24283b',
-    'border': '#414868',
-    'selection': '#364A82',
-    'button_hover': '#3d59a1'
-}
+# THEME = {
+#     'bg': '#1a1b26',
+#     'fg': '#a9b1d6',
+#     'accent': '#7aa2f7',
+#     'secondary_bg': '#24283b',
+#     'border': '#414868',
+#     'selection': '#364A82',
+#     'button_hover': '#3d59a1'
+# }
+
+
+
+# class TabManager(QMainWindow):
+#     def __init__(self, config_path: str, font_family="Inter"):
+#         super().__init__()
+#         self.font_family = font_family
+#         self.config_path = config_path
+#         self.tabs = {}
+#         self.init_ui()
+#         self.load_modules()
+
+#     def init_ui(self):
+#         self.setWindowTitle('Music Browser')
+#         self.setMinimumSize(1200, 800)
+
+#         # Widget principal
+#         main_widget = QWidget()
+#         self.setCentralWidget(main_widget)
+#         layout = QVBoxLayout(main_widget)
+
+#         # Crear el widget de pestañas
+#         self.tab_widget = QTabWidget()
+#         layout.addWidget(self.tab_widget)
+
+#         self.apply_theme()
+
+#     def load_modules(self):
+#         """Carga los módulos desde la configuración."""
+#         try:
+#             with open(self.config_path, 'r') as f:
+#                 config = json.load(f)
+                
+#             for module_config in config['modules']:
+#                 module_path = module_config['path']
+#                 module_name = module_config.get('name', Path(module_path).stem)
+#                 module_args = module_config.get('args', {})
+                
+#                 try:
+#                     # Cargar el módulo dinámicamente
+#                     spec = importlib.util.spec_from_file_location(module_name, module_path)
+#                     if spec and spec.loader:
+#                         module = importlib.util.module_from_spec(spec)
+#                         spec.loader.exec_module(module)
+                        
+#                         # Buscar la clase principal del módulo
+#                         main_class = None
+#                         for attr_name in dir(module):
+#                             attr = getattr(module, attr_name)
+#                             if isinstance(attr, type) and issubclass(attr, QWidget) and attr != QWidget:
+#                                 main_class = attr
+#                                 break
+                        
+#                         if main_class:
+#                             # Instanciar el módulo
+#                             module_instance = main_class(**module_args)
+#                             # Añadir al gestor de pestañas
+#                             self.tab_widget.addTab(module_instance, module_name)
+#                             self.tabs[module_name] = module_instance
+                        
+#                 except Exception as e:
+#                     print(f"Error loading module {module_name}: {e}")
+                    
+#         except Exception as e:
+#             print(f"Error loading configuration: {e}")
+
+#     def apply_theme(self):
+#         """Aplica el tema a toda la aplicación."""
+#         self.setStyleSheet(f"""
+#             QMainWindow, QWidget {{
+#                 background-color: {THEME['bg']};
+#                 color: {THEME['fg']};
+#                 font-family: {self.font_family};
+#             }}
+            
+#             QTabWidget::pane {{
+#                 border: 1px solid {THEME['border']};
+#                 background-color: {THEME['bg']};
+#                 border-radius: 3px;
+#             }}
+            
+#             QTabBar::tab {{
+#                 background-color: {THEME['secondary_bg']};
+#                 color: {THEME['fg']};
+#                 border: 1px solid {THEME['border']};
+#                 padding: 5px 10px;
+#                 margin-right: 2px;
+#                 border-top-left-radius: 3px;
+#                 border-top-right-radius: 3px;
+#             }}
+            
+#             QTabBar::tab:selected {{
+#                 background-color: {THEME['bg']};
+#                 border-bottom-color: {THEME['bg']};
+#             }}
+            
+#             QTabBar::tab:hover {{
+#                 background-color: {THEME['button_hover']};
+#             }}
+#         """)
+
 
 class GroupedListItem(QListWidgetItem):
     def __init__(self, text, is_header=False, paths=None):
@@ -37,6 +140,7 @@ class GroupedListItem(QListWidgetItem):
             self.setFont(font)
             self.setBackground(QColor(THEME['secondary_bg']))
             self.setForeground(QColor(THEME['accent']))
+    pass
 
 class SearchParser:
     def __init__(self):
@@ -136,25 +240,18 @@ class SearchParser:
                 conditions.append(f"({' OR '.join(general_conditions)})")
         
         return conditions, params
-
-class MusicBrowser(QMainWindow):
-    def __init__(self, db_path: str, font_family="Inter"):
-        self.font_family = font_family
-        super().__init__()
+        pass
+class MusicBrowser(BaseModule):
+    def __init__(self, db_path: str, font_family="Inter", parent=None):
         self.db_path = db_path
+        self.font_family = font_family
+        super().__init__(parent)
         self.search_parser = SearchParser()
-        self.init_ui()
-        self.apply_theme()
         self.setup_shortcuts()
 
     def init_ui(self):
-        self.setWindowTitle('Navegador Musical')
-        self.setMinimumSize(1200, 800)
-
-        # Widget principal
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        layout = QVBoxLayout(main_widget)
+        """Inicializa la interfaz del módulo."""
+        layout = QVBoxLayout(self)
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
 
@@ -208,7 +305,7 @@ class MusicBrowser(QMainWindow):
         self.results_list = QListWidget()
         self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.results_list.currentItemChanged.connect(self.handle_item_change)  # Cambiar esta línea
+        self.results_list.currentItemChanged.connect(self.handle_item_change)
         self.results_list.itemClicked.connect(self.handle_item_click)
         self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.results_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -267,6 +364,8 @@ class MusicBrowser(QMainWindow):
                 font-size: 12px;
             }}
         """)
+
+        self.apply_theme()
 
     def handle_item_click(self, item):
         """Maneja el clic en un ítem. Ya no es necesario hacer nada aquí
@@ -372,69 +471,19 @@ class MusicBrowser(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, self.search_box.setFocus)
 
     def apply_theme(self):
-        self.setStyleSheet(self.styleSheet() + f"""
-            QMainWindow, QWidget {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
+        """Aplica el tema específico del módulo."""
+        self.setStyleSheet(f"""
+            QLabel {{
+                font-size: 12px;
             }}
-            
             QLineEdit {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
-                padding: 5px;
-                border-radius: 3px;
+                font-size: 13px;
             }}
-            
             QPushButton {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
-                padding: 5px 10px;
-                border-radius: 3px;
+                font-size: 12px;
             }}
-            
-            QPushButton:hover {{
-                background-color: {THEME['button_hover']};
-            }}
-            
             QListWidget {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
-                border-radius: 3px;
-                padding: 5px;
-            }}
-            
-            QListWidget::item:selected {{
-                background-color: {THEME['selection']};
-            }}
-            
-            QScrollArea {{
-                border: 1px solid {THEME['border']};
-                border-radius: 3px;
-            }}
-
-            QScrollBar:vertical {{
-                border: none;
-                background: {THEME['secondary_bg']};
-                width: 10px;
-                margin: 0px;
-            }}
-
-            QScrollBar::handle:vertical {{
-                background-color: {THEME['border']};
-                border-radius: 5px;
-                min-height: 20px;
-            }}
-
-            QScrollBar::handle:vertical:hover {{
-                background-color: {THEME['accent']};
-            }}
-
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical,
-            QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {{
-                height: 0px;
-                background: none;
+                font-size: 12px;
             }}
         """)
 

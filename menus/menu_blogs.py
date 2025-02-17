@@ -12,65 +12,90 @@
 #                  - mpv
 #                  - servidor freshrss y categoria blog creada en el.
 #
-
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
+                            QPushButton, QLabel, QMessageBox, QListWidgetItem)
+from PyQt6.QtCore import Qt
+from datetime import datetime
 import os
 import shutil
 import subprocess
-from datetime import datetime
-import tkinter as tk
-from tkinter import ttk, messagebox
-import sys
+from pathlib import Path
 
-class PlaylistManager(tk.Tk):
-    def __init__(self):
+class PlaylistManagerModule(QWidget):
+    def __init__(self, pending_dir="PENDIENTE", listened_dir="ESCUCHADO", **kwargs):
         super().__init__()
-
-        self.title("Gestor de Playlists")
-        self.geometry("800x400")
-        self.configure(bg='#14141e')
-
-        style = ttk.Style()
-        style.configure("TFrame", background="#14141e", borderwidth=0, relief="flat")
-        style.configure("TLabel", background="#14141e", foreground="white")
-        style.configure("TButton", background="#1f1f2e", foreground="white")
-
-        main_frame = ttk.Frame(self, padding="10")
-        main_frame.grid(row=0, column=0, sticky="nsew")
-
-        self.columnconfigure(0, weight=2)
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        main_frame.columnconfigure(0, weight=2, minsize=250)
-        main_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(main_frame, text="Blogs Disponibles:", font=("Helvetica", 14, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(main_frame, text="Playlists:", font=("Helvetica", 14, "bold")).grid(row=0, column=1, sticky="w", padx=(10,0))
-
-        self.blog_listbox = tk.Listbox(
-            main_frame, height=15, bg='#14141e', fg='white',
-            selectbackground="#A084CA", selectforeground="black",
-            highlightthickness=0, borderwidth=0
-        )
-        self.blog_listbox.grid(row=1, column=0, sticky="nsew")
-
-        self.playlist_listbox = tk.Listbox(
-            main_frame, height=15, bg='#14141e', fg='white',
-            selectbackground="#A084CA", selectforeground="black",
-            highlightthickness=0, borderwidth=0
-        )
-        self.playlist_listbox.grid(row=1, column=1, sticky="nsew", padx=(10,0))
-
-        self.play_button = ttk.Button(main_frame, text="Reproducir Seleccionado", command=self.play_selected)
-        self.play_button.grid(row=2, column=0, columnspan=2, pady=10)
-
-        self.blog_listbox.bind('<<ListboxSelect>>', self.on_blog_select)
-        self.after(100, lambda: self.blog_listbox.focus_set())
-        self.blog_listbox.bind("<Tab>", lambda e: self.playlist_listbox.focus_set())
-        self.playlist_listbox.bind("<Shift-Tab>", lambda e: self.blog_listbox.focus_set())
-        self.playlist_listbox.bind("<Return>", lambda e: self.play_selected())
-
+        self.pending_dir = Path(pending_dir)
+        self.listened_dir = Path(listened_dir)
         self.selected_blog = None
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QHBoxLayout(self)
+        
+        # Left side (Blogs)
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        
+        blog_label = QLabel("Blogs Disponibles:")
+        blog_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        
+        self.blog_list = QListWidget()
+        self.blog_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {THEME['secondary_bg']};
+                border: 1px solid {THEME['border']};
+                border-radius: 4px;
+            }}
+            QListWidget::item {{
+                color: {THEME['fg']};
+                padding: 5px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {THEME['selection']};
+            }}
+        """)
+        
+        left_layout.addWidget(blog_label)
+        left_layout.addWidget(self.blog_list)
+        
+        # Right side (Playlists)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        
+        playlist_label = QLabel("Playlists:")
+        playlist_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        
+        self.playlist_list = QListWidget()
+        self.playlist_list.setStyleSheet(self.blog_list.styleSheet())
+        
+        self.play_button = QPushButton("Reproducir Seleccionado")
+        self.play_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {THEME['accent']};
+                color: {THEME['bg']};
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {THEME['button_hover']};
+            }}
+        """)
+        
+        right_layout.addWidget(playlist_label)
+        right_layout.addWidget(self.playlist_list)
+        right_layout.addWidget(self.play_button)
+        
+        # Add panels to main layout
+        layout.addWidget(left_panel, stretch=2)
+        layout.addWidget(right_panel, stretch=1)
+        
+        # Connect signals
+        self.blog_list.itemSelectionChanged.connect(self.on_blog_select)
+        self.play_button.clicked.connect(self.play_selected)
+        self.playlist_list.itemDoubleClicked.connect(self.play_selected)
+        
+        # Initial refresh
         self.refresh_blogs()
 
     def show_move_dialog(self, blog_name, playlist_name):
@@ -143,6 +168,7 @@ class PlaylistManager(tk.Tk):
         
         dialog.mainloop()
 
+
     def count_tracks_in_playlist(self, playlist_path):
         try:
             with open(playlist_path, 'r', encoding='utf-8') as f:
@@ -152,98 +178,107 @@ class PlaylistManager(tk.Tk):
             return 0
 
     def get_blogs_with_counts(self):
-        pending_dir = "PENDIENTE"
         blogs = {}
-        
-        if os.path.exists(pending_dir):
-            for blog in os.listdir(pending_dir):
-                blog_path = os.path.join(pending_dir, blog)
-                if os.path.isdir(blog_path):
-                    playlists = [f for f in os.listdir(blog_path) if f.endswith('.m3u')]
-                    blogs[blog] = len(playlists)
-        
+        if self.pending_dir.exists():
+            for blog in self.pending_dir.iterdir():
+                if blog.is_dir():
+                    playlists = list(blog.glob('*.m3u'))
+                    blogs[blog.name] = len(playlists)
         return blogs
-
+  
     def get_monthly_playlists_with_counts(self, blog_name):
-        blog_path = os.path.join("PENDIENTE", blog_name)
+        blog_path = self.pending_dir / blog_name
         playlists = {}
         
-        if os.path.exists(blog_path):
-            for playlist in os.listdir(blog_path):
-                if playlist.endswith('.m3u'):
-                    full_path = os.path.join(blog_path, playlist)
-                    track_count = self.count_tracks_in_playlist(full_path)
-                    playlists[playlist] = track_count
+        if blog_path.exists():
+            for playlist in blog_path.glob('*.m3u'):
+                track_count = self.count_tracks_in_playlist(playlist)
+                playlists[playlist.name] = track_count
         
         return playlists
 
+
     def move_to_listened(self, blog_name, playlist_name):
-        source = os.path.join("PENDIENTE", blog_name, playlist_name)
-        listened_blog_dir = os.path.join("ESCUCHADO", blog_name)
+        source = self.pending_dir / blog_name / playlist_name
+        listened_blog_dir = self.listened_dir / blog_name
         
-        os.makedirs(listened_blog_dir, exist_ok=True)
+        listened_blog_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
         new_name = timestamp + playlist_name
-        destination = os.path.join(listened_blog_dir, new_name)
+        destination = listened_blog_dir / new_name
         
-        shutil.move(source, destination)
+        shutil.move(str(source), str(destination))
         return destination
 
+
     def refresh_blogs(self):
-        self.blog_listbox.delete(0, tk.END)
+        self.blog_list.clear()
         blogs = self.get_blogs_with_counts()
         
         for blog, count in blogs.items():
-            self.blog_listbox.insert(tk.END, f"{blog} ({count} playlists)")
+            item = QListWidgetItem(f"{blog} ({count} playlists)")
+            self.blog_list.addItem(item)
 
-    def on_blog_select(self, event):
-        if not self.blog_listbox.curselection():
+    def on_blog_select(self):
+        items = self.blog_list.selectedItems()
+        if not items:
             return
         
-        selection = self.blog_listbox.get(self.blog_listbox.curselection())
+        selection = items[0].text()
         self.selected_blog = selection.split(" (")[0]
 
-        self.playlist_listbox.delete(0, tk.END)
+        self.playlist_list.clear()
         playlists = self.get_monthly_playlists_with_counts(self.selected_blog)
         
         for playlist, count in playlists.items():
-            self.playlist_listbox.insert(tk.END, f"{playlist} ({count} canciones)")
+            item = QListWidgetItem(f"{playlist} ({count} canciones)")
+            self.playlist_list.addItem(item)
+
+
+    def show_move_dialog(self, blog_name, playlist_name):
+        reply = QMessageBox.question(
+            self,
+            "Mover Playlist",
+            "¿Has terminado la lista?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.move_to_listened(blog_name, playlist_name)
+            self.refresh_blogs()
+
 
     def play_selected(self):
-        if not self.selected_blog or not self.playlist_listbox.curselection():
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un blog y una playlist")
+        if not self.selected_blog or not self.playlist_list.selectedItems():
+            QMessageBox.warning(
+                self,
+                "Selección requerida",
+                "Por favor, selecciona un blog y una playlist"
+            )
             return
 
-        playlist_selection = self.playlist_listbox.get(self.playlist_listbox.curselection())
+        playlist_selection = self.playlist_list.selectedItems()[0].text()
         playlist_name = playlist_selection.split(" (")[0]
+        playlist_path = self.pending_dir / self.selected_blog / playlist_name
         
-        playlist_path = os.path.join("PENDIENTE", self.selected_blog, playlist_name)
-        
-        if not os.path.exists(playlist_path):
-            messagebox.showerror("Error", "No se encuentra el archivo de la playlist")
+        if not playlist_path.exists():
+            QMessageBox.critical(self, "Error", "No se encuentra el archivo de la playlist")
             return
 
-        # Guardar variables antes de destruir la ventana principal
-        selected_blog = self.selected_blog
-        
-        # Destruir la ventana de tkinter
-        self.destroy()
-        
         try:
-            # Ejecutar mpv con opciones para forzar la interfaz de video
-            process = subprocess.run(["/home/huan/Scripts/utilities/aliases/mpv_lastfm_starter.sh", "--player-operation-mode=pseudo-gui", "--force-window=yes", playlist_path])
+            process = subprocess.run(
+                ["/home/huan/Scripts/utilities/aliases/mpv_lastfm_starter.sh", 
+                 "--player-operation-mode=pseudo-gui", 
+                 "--force-window=yes", 
+                 str(playlist_path)]
+            )
             
-            # Si mpv se cerró normalmente, mostrar el diálogo
             if process.returncode == 0:
-                # Crear nueva instancia de tkinter para el diálogo
-                self.show_move_dialog(selected_blog, playlist_name)
-            else:
-                sys.exit()
+                self.show_move_dialog(self.selected_blog, playlist_name)
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error al reproducir: {str(e)}")
-            sys.exit()
+            QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
 
 if __name__ == "__main__":
     app = PlaylistManager()
