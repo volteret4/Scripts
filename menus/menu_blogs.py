@@ -12,14 +12,300 @@
 #                  - mpv
 #                  - servidor freshrss y categoria blog creada en el.
 #
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                            QPushButton, QLabel, QMessageBox, QListWidgetItem)
-from PyQt6.QtCore import Qt
-from datetime import datetime
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel,
+    QProgressBar, QLineEdit, QListWidget, QListWidgetItem, QMessageBox
+)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from base_module import BaseModule, THEME
+import logging
 import os
-import shutil
-import subprocess
 from pathlib import Path
+from datetime import datetime
+from collections import defaultdict
+import re
+import requests
+from typing import List, Dict
+from urllib.parse import quote
+from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class FetchWorker(QThread):
+    """Worker thread para operaciones en segundo plano"""
+    progress_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool)
+    error_signal = pyqtSignal(str)
+
+    def __init__(self, reader, playlist_manager):
+        super().__init__()
+        self.reader = reader
+        self.playlist_manager = playlist_manager
+
+    def run(self):
+        try:
+            # Login
+            if not self.reader.login():
+                self.error_signal.emit("Error en la autenticación")
+                return
+
+            # Obtener feeds
+            self.progress_signal.emit("Obteniendo feeds de blogs...")
+            blog_feeds = self.reader.get_blog_feeds()
+            self.progress_signal.emit(f"Encontrados {len(blog_feeds)} feeds en la categoría Blogs")
+
+            # Procesar posts
+            all_posts = []
+            for feed in blog_feeds:
+                self.progress_signal.emit(f"Procesando feed: {feed['title']}")
+                try:
+                    posts = self.reader.get_unread_posts(feed['id'])
+                    all_posts.extend(posts)
+                    self.progress_signal.emit(f"  Obtenidos {len(posts)} posts nuevos")
+                except Exception as e:
+                    self.error_signal.emit(f"Error procesando feed {feed['title']}: {str(e)}")
+                    continue
+
+            # Crear playlists
+            self.progress_signal.emit("Creando playlists...")
+            self.playlist_manager.process_posts(all_posts)
+            self.progress_signal.emit(f"Proceso completado. Posts totales procesados: {len(all_posts)}")
+            self.finished_signal.emit(True)
+
+        except Exception as e:
+            self.error_signal.emit(f"Error: {str(e)}")
+            self.finished_signal.emit(False)
+
+class BlogPlaylistModule(BaseModule):
+    def __init__(self, output_dir: str, freshrss_url: str, username: str, auth_token: str, parent=None):
+        self.output_dir = output_dir
+        self.freshrss_url = freshrss_url
+        self.username = username
+        self.auth_token = auth_token
+        super().__init__(parent)
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        # Configuración
+        config_layout = QHBoxLayout()
+        
+        self.url_input = QLineEdit(self.freshrss_url)
+        self.url_input.setPlaceholderText("FreshRSS URL")
+        config_layout.addWidget(QLabel("URL:"))
+        config_layout.addWidget(self.url_input)
+
+        self.output_dir_input = QLineEdit(self.output_dir)
+        self.output_dir_input.setPlaceholderText("Output Directory")
+        config_layout.addWidget(QLabel("Output:"))
+        config_layout.addWidget(self.output_dir_input)
+
+        layout.addLayout(config_layout)
+
+        # Botones
+        button_layout = QHBoxLayout()
+        self.fetch_button = QPushButton("Fetch Playlists")
+        self.fetch_button.clicked.connect(self.start_fetch)
+        button_layout.addWidget(self.fetch_button)
+
+        self.open_output_button = QPushButton("Open Output Directory")
+        self.open_output_button.clicked.connect(self.open_output_dir)
+        button_layout.addWidget(self.open_output_button)
+
+        layout.addLayout(button_layout)
+
+        # Progress and Log
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        layout.addWidget(self.progress_bar)
+
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        layout.addWidget(self.log_text)
+
+        # Inicializar objetos
+        self.reader = FreshRSSReader(self.freshrss_url, self.username, self.auth_token)
+        self.playlist_manager = PlaylistManager(self.output_dir)
+        
+        # Worker
+        self.worker = None
+
+    def start_fetch(self):
+        self.fetch_button.setEnabled(False)
+        self.progress_bar.setRange(0, 0)  # Modo indeterminado
+        self.log_text.clear()
+
+        # Actualizar configuración con valores actuales
+        self.reader.base_url = self.url_input.text().rstrip('/')
+        self.playlist_manager.output_dir = Path(self.output_dir_input.text())
+
+        # Crear y configurar worker
+        self.worker = FetchWorker(self.reader, self.playlist_manager)
+        self.worker.progress_signal.connect(self.update_progress)
+        self.worker.error_signal.connect(self.handle_error)
+        self.worker.finished_signal.connect(self.handle_finished)
+        self.worker.start()
+
+    def update_progress(self, message):
+        self.log_text.append(message)
+
+    def handle_error(self, error_message):
+        self.log_text.append(f"ERROR: {error_message}")
+
+    def handle_finished(self, success):
+        self.fetch_button.setEnabled(True)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100 if success else 0)
+        self.worker = None
+
+    def open_output_dir(self):
+        os.system(f'xdg-open "{self.output_dir_input.text()}"')
+
+class FreshRSSReader:
+    def __init__(self, base_url: str, username: str, api_password: str):
+        self.base_url = base_url.rstrip('/')
+        self.username = username
+        self.api_password = api_password
+        self.api_endpoint = f"{self.base_url}/api/greader.php"
+        self.auth_token = None
+        
+    def login(self) -> bool:
+        endpoint = f"{self.api_endpoint}/accounts/ClientLogin"
+        params = {
+            'Email': self.username,
+            'Passwd': self.api_password
+        }
+        
+        try:
+            response = requests.get(endpoint, params=params)
+            response.raise_for_status()
+            
+            for line in response.text.splitlines():
+                if line.startswith('Auth='):
+                    self.auth_token = line.replace('Auth=', '').strip()
+                    logger.debug(f"Token obtenido correctamente")
+                    return True
+            
+            return False
+        except Exception as e:
+            logger.error(f"Error en login: {str(e)}")
+            return False
+            
+    def get_headers(self) -> Dict[str, str]:
+        if not self.auth_token:
+            raise ValueError("No se ha realizado el login")
+            
+        return {
+            'Authorization': f'GoogleLogin auth={self.auth_token}',
+            'User-Agent': 'FreshRSS-Script/1.0'
+        }
+
+    def get_feed_subscriptions(self) -> List[Dict]:
+        endpoint = f"{self.api_endpoint}/reader/api/0/subscription/list"
+        params = {'output': 'json'}
+        
+        response = requests.get(endpoint, headers=self.get_headers(), params=params)
+        response.raise_for_status()
+        
+        return response.json().get('subscriptions', [])
+
+    def get_blog_feeds(self) -> List[Dict]:
+        subscriptions = self.get_feed_subscriptions()
+        blog_feeds = []
+        
+        for feed in subscriptions:
+            for category in feed.get('categories', []):
+                if category['label'] == 'Blogs':
+                    blog_feeds.append(feed)
+                    break
+                    
+        return blog_feeds
+
+    def get_unread_posts(self, feed_id: str) -> List[Dict[str, str]]:
+        endpoint = f"{self.api_endpoint}/reader/api/0/stream/contents/{quote(feed_id)}"
+        params = {
+            'output': 'json',
+            'n': 1000,
+            'xt': 'user/-/state/com.google/read'
+        }
+        
+        response = requests.get(endpoint, headers=self.get_headers(), params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        posts = []
+        for item in data.get('items', []):
+            url = None
+            if 'canonical' in item and item['canonical']:
+                url = item['canonical'][0]['href']
+            elif 'alternate' in item and item['alternate']:
+                url = item['alternate'][0]['href']
+            
+            if url:
+                published_date = datetime.fromtimestamp(item.get('published', 0))
+                posts.append({
+                    'url': url,
+                    'date': published_date,
+                    'title': item.get('title', 'Sin título'),
+                    'month_key': published_date.strftime('%Y-%m'),
+                    'feed_title': item.get('origin', {}).get('title', 'Unknown Feed')
+                })
+                
+        return posts        
+
+
+class PlaylistManager:
+    def __init__(self, output_dir: str):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+    def create_m3u_playlist(self, urls: List[str], feed_dir: Path, filename: str):
+        """Crea un archivo .m3u con las URLs proporcionadas"""
+        # Asegurarse de que existe el directorio del feed
+        feed_dir.mkdir(parents=True, exist_ok=True)
+        
+        playlist_path = feed_dir / f"{filename}.m3u"
+        
+        with open(playlist_path, 'w', encoding='utf-8') as f:
+            f.write("#EXTM3U\n")
+            for url in urls:
+                f.write(f"{url}\n")
+                
+        logger.info(f"Playlist creada: {playlist_path}")
+        
+    def process_posts(self, posts: List[Dict[str, str]]):
+        """Procesa los posts y crea playlists organizadas por feed y mes"""
+        # Organizar posts por feed y luego por mes
+        posts_by_feed_and_month = defaultdict(lambda: defaultdict(list))
+        
+        for post in posts:
+            feed_title = post['feed_title']
+            month_key = post['month_key']
+            posts_by_feed_and_month[feed_title][month_key].append(post)
+        
+        # Procesar cada feed
+        for feed_title, months in posts_by_feed_and_month.items():
+            # Crear un nombre seguro para el directorio del feed
+            safe_feed_name = re.sub(r'[^\w\-_]', '_', feed_title)
+            feed_dir = self.output_dir / safe_feed_name
+            
+            # Procesar cada mes del feed
+            for month_key, month_posts in months.items():
+                all_music_urls = set()
+                for post in month_posts:
+                    music_urls = extract_music_urls(post['url'])
+                    all_music_urls.update(music_urls)
+                
+                if all_music_urls:
+                    self.create_m3u_playlist(
+                        list(all_music_urls),
+                        feed_dir,
+                        month_key
+                    )
+
 
 class PlaylistManagerModule(QWidget):
     def __init__(self, pending_dir="PENDIENTE", listened_dir="ESCUCHADO", **kwargs):
