@@ -26,9 +26,10 @@ fecha_proxima="$(date -d "1 year" +%Y-%m-%dT%H:%M:%SZ)"
 
 # Crear copias del archivo json anterior
 mv ${json_file} ${bak_file}
+country_code="ES"
 
 # Obtener datos de la API de Ticketmaster
-url="https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime=$fecha_actual&endDateTime=$fecha_proxima&countryCode=ES&apikey=$apikey"
+url="https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime=$fecha_actual&endDateTime=$fecha_proxima&countryCode=$country_code&apikey=$apikey"
 
 json="$(curl ${url})"
 json="$(echo $json | jq .)"

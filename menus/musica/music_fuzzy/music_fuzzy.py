@@ -7,9 +7,9 @@ import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLineEdit, QPushButton, QListWidget,
                             QListWidgetItem, QLabel, QScrollArea, QSplitter,
-                            QAbstractItemView)
+                            QAbstractItemView, QSpinBox, QComboBox)
 from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QDate
 import subprocess
 import importlib.util
 from base_module import BaseModule, THEME  # Importar la clase base
@@ -152,8 +152,78 @@ class SearchParser:
             't:': 'title',
             'aa:': 'album_artist',
             'br:': 'bitrate',
-            'd:': 'date'
+            'd:': 'date',
+            'w:': 'weeks',      # Últimas X semanas
+            'm:': 'months',     # Últimos X meses
+            'y:': 'years',      # Últimos X años
+            'am:': 'added_month', # Añadido en mes X del año Y
+            'ay:': 'added_year'   # Añadido en año Z
         }
+
+    def build_sql_conditions(self, parsed_query: Dict) -> tuple:
+        """Construye las condiciones SQL y parámetros basados en la query parseada."""
+        conditions = []
+        params = []
+        
+        # Procesar filtros específicos
+        for field, value in parsed_query['filters'].items():
+            if field in ['weeks', 'months', 'years']:
+                try:
+                    value = int(value)
+                    if field == 'weeks':
+                        conditions.append("s.last_modified >= datetime('now', '-' || ? || ' weeks')")
+                    elif field == 'months':
+                        conditions.append("s.last_modified >= datetime('now', '-' || ? || ' months')")
+                    else:  # years
+                        conditions.append("s.last_modified >= datetime('now', '-' || ? || ' years')")
+                    params.append(value)
+                except ValueError:
+                    print(f"Valor inválido para {field}: {value}")
+                    continue
+            elif field == 'added_month':
+                try:
+                    month, year = value.split('/')
+                    month = int(month)
+                    year = int(year)
+                    conditions.append("strftime('%m', s.last_modified) = ? AND strftime('%Y', s.last_modified) = ?")
+                    params.extend([f"{month:02d}", str(year)])
+                except (ValueError, TypeError):
+                    print(f"Formato inválido para mes/año: {value}")
+                    continue
+            elif field == 'added_year':
+                try:
+                    year = int(value)
+                    conditions.append("strftime('%Y', s.last_modified) = ?")
+                    params.append(str(year))
+                except ValueError:
+                    print(f"Año inválido: {value}")
+                    continue
+            elif field == 'bitrate':
+                # Manejar rangos de bitrate (>192, <192, =192)
+                if value.startswith('>'):
+                    conditions.append(f"s.{field} > ?")
+                    params.append(int(value[1:]))
+                elif value.startswith('<'):
+                    conditions.append(f"s.{field} < ?")
+                    params.append(int(value[1:]))
+                else:
+                    conditions.append(f"s.{field} = ?")
+                    params.append(int(value))
+            else:
+                conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{value}%")
+        
+        # Procesar términos generales
+        if parsed_query['general']:
+            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
+            general_conditions = []
+            for field in general_fields:
+                general_conditions.append(f"s.{field} LIKE ?")
+                params.append(f"%{parsed_query['general']}%")
+            if general_conditions:
+                conditions.append(f"({' OR '.join(general_conditions)})")
+        
+        return conditions, params
     
     def parse_query(self, query: str) -> Dict:
         """Parsea la query y devuelve diccionario con filtros y término general."""
@@ -207,45 +277,50 @@ class SearchParser:
             'general': ' '.join(general_terms)
         }
 
-    def build_sql_conditions(self, parsed_query: Dict) -> tuple:
-        """Construye las condiciones SQL y parámetros basados en la query parseada."""
-        conditions = []
-        params = []
+    # def build_sql_conditions(self, parsed_query: Dict) -> tuple:
+    #     """Construye las condiciones SQL y parámetros basados en la query parseada."""
+    #     conditions = []
+    #     params = []
         
-        # Procesar filtros específicos
-        for field, value in parsed_query['filters'].items():
-            if field == 'bitrate':
-                # Manejar rangos de bitrate (>192, <192, =192)
-                if value.startswith('>'):
-                    conditions.append(f"s.{field} > ?")
-                    params.append(int(value[1:]))
-                elif value.startswith('<'):
-                    conditions.append(f"s.{field} < ?")
-                    params.append(int(value[1:]))
-                else:
-                    conditions.append(f"s.{field} = ?")
-                    params.append(int(value))
-            else:
-                conditions.append(f"s.{field} LIKE ?")
-                params.append(f"%{value}%")
+    #     # Procesar filtros específicos
+    #     for field, value in parsed_query['filters'].items():
+    #         if field == 'bitrate':
+    #             # Manejar rangos de bitrate (>192, <192, =192)
+    #             if value.startswith('>'):
+    #                 conditions.append(f"s.{field} > ?")
+    #                 params.append(int(value[1:]))
+    #             elif value.startswith('<'):
+    #                 conditions.append(f"s.{field} < ?")
+    #                 params.append(int(value[1:]))
+    #             else:
+    #                 conditions.append(f"s.{field} = ?")
+    #                 params.append(int(value))
+    #         else:
+    #             conditions.append(f"s.{field} LIKE ?")
+    #             params.append(f"%{value}%")
         
-        # Procesar términos generales
-        if parsed_query['general']:
-            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
-            general_conditions = []
-            for field in general_fields:
-                general_conditions.append(f"s.{field} LIKE ?")
-                params.append(f"%{parsed_query['general']}%")
-            if general_conditions:
-                conditions.append(f"({' OR '.join(general_conditions)})")
+    #     # Procesar términos generales
+    #     if parsed_query['general']:
+    #         general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
+    #         general_conditions = []
+    #         for field in general_fields:
+    #             general_conditions.append(f"s.{field} LIKE ?")
+    #             params.append(f"%{parsed_query['general']}%")
+    #         if general_conditions:
+    #             conditions.append(f"({' OR '.join(general_conditions)})")
         
-        return conditions, params
-        pass
+    #     return conditions, params
+    #     pass
 class MusicBrowser(BaseModule):
-    def __init__(self, db_path: str, font_family="Inter", parent=None):
-        self.db_path = db_path
-        self.font_family = font_family
-        super().__init__(parent)
+    def __init__(self, parent=None, **kwargs):
+        # Extraer los argumentos específicos de MusicBrowser
+        self.db_path = kwargs.pop('db_path', '')
+        self.font_family = kwargs.pop('font_family', 'Inter')
+        
+        # Llamar al constructor de la clase padre con los argumentos restantes
+        super().__init__(parent=parent, **kwargs)
+        
+        # Inicializar componentes específicos de MusicBrowser
         self.search_parser = SearchParser()
         self.setup_shortcuts()
 
@@ -255,42 +330,95 @@ class MusicBrowser(BaseModule):
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        # Contenedor superior con altura máxima
+        # Contenedor superior
         top_container = QWidget()
-        top_container.setMaximumHeight(100)
+        top_container.setMaximumHeight(150)  # Aumentado para acomodar los nuevos controles
         top_layout = QVBoxLayout(top_container)
         top_layout.setSpacing(5)
         
-        # Barra de búsqueda
-        search_layout = QHBoxLayout()
-        
-        # Búsqueda
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('Buscar...')
-        self.search_box.textChanged.connect(self.search)
-        self.search_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        search_layout.addWidget(self.search_box)
-
-        # Botones
+        # Inicializar los botones antes de usarlos
         self.play_button = QPushButton('Reproducir')
         self.folder_button = QPushButton('Abrir Carpeta')
         self.custom_button1 = QPushButton('Script 1')
         self.custom_button2 = QPushButton('Script 2')
         self.custom_button3 = QPushButton('Script 3')
+        
+        # Barra de búsqueda
+        search_layout = QHBoxLayout()
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText('Buscar...')
+        self.search_box.textChanged.connect(self.search)
+        search_layout.addWidget(self.search_box)
 
-        # Configurar políticas de foco para los botones
+        # Botones existentes
         for button in [self.play_button, self.folder_button, 
-                    self.custom_button1, self.custom_button2, self.custom_button3]:
+                      self.custom_button1, self.custom_button2, self.custom_button3]:
             button.setFixedWidth(100)
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             search_layout.addWidget(button)
 
         top_layout.addLayout(search_layout)
 
-        # Leyenda de argumentos
+        # Nuevo layout para filtros temporales
+        time_filters_layout = QHBoxLayout()
+
+        # Filtro de últimas X unidades de tiempo
+        time_unit_layout = QHBoxLayout()
+        self.time_value = QSpinBox()
+        self.time_value.setRange(1, 999)
+        self.time_value.setValue(1)
+        time_unit_layout.addWidget(self.time_value)
+
+        self.time_unit = QComboBox()
+        self.time_unit.addItems(['Semanas', 'Meses', 'Años'])
+        time_unit_layout.addWidget(self.time_unit)
+
+        self.apply_time_filter = QPushButton('Aplicar')
+        self.apply_time_filter.clicked.connect(self.apply_temporal_filter)
+        time_unit_layout.addWidget(self.apply_time_filter)
+        time_filters_layout.addLayout(time_unit_layout)
+
+        # Separador
+        time_filters_layout.addWidget(QLabel('|'))
+
+        # Filtro de mes/año específico
+        month_year_layout = QHBoxLayout()
+        self.month_combo = QComboBox()
+        self.month_combo.addItems([f"{i:02d}" for i in range(1, 13)])
+        month_year_layout.addWidget(self.month_combo)
+
+        self.year_spin = QSpinBox()
+        self.year_spin.setRange(1900, 2100)
+        self.year_spin.setValue(QDate.currentDate().year())
+        month_year_layout.addWidget(self.year_spin)
+
+        self.apply_month_year = QPushButton('Filtrar por Mes/Año')
+        self.apply_month_year.clicked.connect(self.apply_month_year_filter)
+        month_year_layout.addWidget(self.apply_month_year)
+        time_filters_layout.addLayout(month_year_layout)
+
+        # Separador
+        time_filters_layout.addWidget(QLabel('|'))
+
+        # Filtro de año específico
+        year_layout = QHBoxLayout()
+        self.year_only_spin = QSpinBox()
+        self.year_only_spin.setRange(1900, 2100)
+        self.year_only_spin.setValue(QDate.currentDate().year())
+        year_layout.addWidget(self.year_only_spin)
+
+        self.apply_year = QPushButton('Filtrar por Año')
+        self.apply_year.clicked.connect(self.apply_year_filter)
+        year_layout.addWidget(self.apply_year)
+        time_filters_layout.addLayout(year_layout)
+
+        top_layout.addLayout(time_filters_layout)
+
+        # Leyenda de filtros
         legend_label = QLabel(
             '<span style="color: #7aa2f7;">'
-            'Filtros: a:artista -   b:álbum -    g:género -   l:sello -    t:título -   aa:album-artist  -   br:bitrate  -    d:fecha'
+            'Filtros: a:artista - b:álbum - g:género - l:sello - t:título - aa:album-artist - br:bitrate - d:fecha - '
+            'w:semanas - m:meses - y:años - am:mes/año - ay:año'
             '</span>'
         )
         legend_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -298,7 +426,7 @@ class MusicBrowser(BaseModule):
 
         layout.addWidget(top_container)
 
-        # Splitter principal
+        # Resto de la interfaz (lista de resultados y panel de detalles)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Panel izquierdo (resultados)
@@ -308,36 +436,25 @@ class MusicBrowser(BaseModule):
         self.results_list.currentItemChanged.connect(self.handle_item_change)
         self.results_list.itemClicked.connect(self.handle_item_click)
         self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.results_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.results_list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         splitter.addWidget(self.results_list)
 
         # Panel derecho (detalles)
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
-        details_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Imagen
         self.cover_label = QLabel()
         self.cover_label.setFixedSize(300, 300)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         details_layout.addWidget(self.cover_label)
 
-        # Información
         self.info_scroll = QScrollArea()
         self.info_scroll.setWidgetResizable(True)
-        self.info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
         
         self.lastfm_label = QLabel()
-        self.lastfm_label.setWordWrap(True)
-        self.info_layout.addWidget(self.lastfm_label)
-        
         self.metadata_label = QLabel()
-        self.metadata_label.setWordWrap(True)
+        self.info_layout.addWidget(self.lastfm_label)
         self.info_layout.addWidget(self.metadata_label)
         
         self.info_scroll.setWidget(self.info_widget)
@@ -346,26 +463,37 @@ class MusicBrowser(BaseModule):
         splitter.addWidget(details_widget)
         layout.addWidget(splitter)
 
-        # Aplicar la fuente a toda la aplicación
-        self.setStyleSheet(f"""
-            * {{
-                font-family: {self.font_family};
-            }}
-            QLabel {{
-                font-size: 12px;
-            }}
-            QLineEdit {{
-                font-size: 13px;
-            }}
-            QPushButton {{
-                font-size: 12px;
-            }}
-            QListWidget {{
-                font-size: 12px;
-            }}
-        """)
-
         self.apply_theme()
+
+
+
+    def apply_temporal_filter(self):
+        """Aplica el filtro de últimas X unidades de tiempo."""
+        value = self.time_value.value()
+        unit = self.time_unit.currentText()
+        
+        filter_map = {
+            'Semanas': 'w',
+            'Meses': 'm',
+            'Años': 'y'
+        }
+        
+        unit_code = filter_map.get(unit, 'w')
+        self.search_box.setText(f"{unit_code}:{value}")
+        self.search()
+
+    def apply_month_year_filter(self):
+        """Aplica el filtro de mes/año específico."""
+        month = self.month_combo.currentText()
+        year = self.year_spin.value()
+        self.search_box.setText(f"am:{month}/{year}")
+        self.search()
+
+    def apply_year_filter(self):
+        """Aplica el filtro de año específico."""
+        year = self.year_only_spin.value()
+        self.search_box
+
 
     def handle_item_click(self, item):
         """Maneja el clic en un ítem. Ya no es necesario hacer nada aquí
