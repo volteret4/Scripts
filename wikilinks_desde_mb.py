@@ -1,3 +1,16 @@
+
+#!/usr/bin/env python
+#
+# Script Name: wikilinks_desde_mb.py
+# Description: Obtiene info de wikipedia para base de datos de la biblioteca de musica y añade los confirmados.
+# Author: volteret4
+# Repository: https://github.com/volteret4/
+# License:
+# TODO: 
+# Notes:
+#   Dependencies:  - python3, sqlite3, musicbrainzngs
+#                  - base de datos sobre biblioteca digital
+
 import sqlite3
 import musicbrainzngs as mb
 import requests
