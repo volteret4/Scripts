@@ -29,6 +29,8 @@ from typing import List, Dict
 from urllib.parse import quote
 from dotenv import load_dotenv
 
+load_dotenv()
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 

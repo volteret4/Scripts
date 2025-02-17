@@ -4,7 +4,7 @@
 BLOG_URL="https://banbantonton.com"
 FEED_URL="$BLOG_URL/feed"
 LINK_PATTERN='https?://\(bandcamp\|youtube\|soundcloud\)\.com[^"]*'
-PLAYLIST_FILE="/tmp/playlist.m3u"
+PLAYLIST_FILE="$HOME/Scripts/.content/playlist-post.m3u"
 
 # Función para obtener URLs de los posts desde el feed
 fetch_post_urls_from_feed() {
@@ -42,7 +42,7 @@ create_playlist() {
 # Reproducir la playlist con MPC
 play_with_mpd() {
     echo "Reproduciendo la playlist con MPC..."  # Depuración
-    celluloid --input-ipc-server="/tmp/mpvsocket" --ytdl-format="best" --replaygain="track" --force-window --osd-level=3 --osd-msg3="${media-title}" --term-playing-msg="Title: ""${media-title}""" --playlist="${1}"
+    mpv --ytdl-format="best" --replaygain="track" --force-window --osd-level=3 --osd-msg3="${media-title}" --term-playing-msg="Title: ""${media-title}""" --playlist="${1}"
 #    mpd --kill && mpd play
 }
 
