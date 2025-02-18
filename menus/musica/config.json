@@ -32,19 +32,50 @@
       }
     },
     {
-      "name": "Conciertos",
-      "path": "conciertos/conciertos_module.py",
-      "args": {
-        "api_key": "Xi2hxYskE2Yj93yMPNyNmI3j6VPL7YG1",
-        "country_code": "ES",
-        "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt"
-      }
+        "name": "Conciertos",
+        "path": "conciertos/conciertos_module.py",
+        "args": {
+          "config": {
+            "country_code": "ES",
+            "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
+            "apis": {
+              "ticketmaster": {
+                "enabled": true,
+                "api_key": "Xi2hxYskE2Yj93yMPNyNmI3j6VPL7YG1"
+              },
+              "songkick": {
+                "enabled": false,
+                "api_key": "TU_API_KEY_SONGKICK"
+              },
+              "concerts_metal": {
+                "enabled": true
+              },
+              "rapidapi": {
+                "enabled": true,
+                "api_key": "TU_API_KEY_RAPIDAPI"
+              },
+              "bandsintown": {
+                "enabled": false,
+                "app_id": "TU_APP_ID_BANDSINTOWN"
+              }
+            }
+          }
+        }
     },
     {
       "name": "Config Editor",
       "path": "config_editor/config_editor_module.py",
       "args": {
         "config_path": "/home/huan/Scripts/menus/musica/config.json"
+      }
+    },
+    {
+        "path": "spotify/spotify_module.py",
+        "name": "Spotify Playlists",
+        "args": {
+          "client_id": "31f8f25e58cc4c7b8ec2ce40ebd773a4",
+          "client_secret": "3463936083af4cef9b64ccab0bdebe96",
+          "cache_path": "/home/huan/Scripts/menus/musica/spotify/token.txt"
       }
     }
   ]
