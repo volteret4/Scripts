@@ -13,35 +13,36 @@
 
 
 
-chromium --profile-directory="Profile 4" https://www.wordpress.com &
+#zen-browser " https://www.wordpress.com &
 
-artist=$(playerctl -p strawberry metadata xesam:albumArtist)
-album=$(playerctl -p strawberry metadata album)
-busqueda="${artist} ${album}"
+busqueda=$(deadbeef --nowplaying-tf "%artist%-%album%")
+copyq add "${busqueda}"
 
-sleep 0.2
 
-chromium --profile-directory="Profile 4" https://www.google.com/search?tbm=isch&q="${busqueda}" & #busqueda de portada
-chromium --profile-directory="Profile 4" https://www.discogs.com/search/?q="${busqueda}" &
-chromium --profile-directory="Profile 4" https://rateyourmusic.com/search?searchterm="${busqueda}" &
-chromium --profile-directory="Profile 4" https://www.last.fm/search?q="${busqueda}"
-chromium --profile-directory="Profile 4" https://en.wikipedia.org/w/index.php?search="${busqueda}"
-chromium --profile-directory="Profile 4" https://bandcamp.com/search?q="${busqueda}" &
+#zen-browser https://www.google.com/search?tbm=isch&q="${busqueda}" & #busqueda de portada
+zen-browser https://www.discogs.com/search/?q="${busqueda}" &
+zen-browser https://rateyourmusic.com/search?searchterm="${busqueda}" &
+zen-browser https://www.last.fm/search?q="${busqueda}"
+zen-browser https://en.wikipedia.org/w/index.php?search="${busqueda}"
+zen-browser https://bandcamp.com/search?q="${busqueda}" &
 
 
 
 sello="${busqueda} label"
 
-chromium --profile-directory="Profile 4" https://www.google.com/search?q="${sello}" &
+zen-browser https://www.google.com/search?q="${sello}" &
 
 
 
 ra="site:ra.co ${busqueda}"
 
-chromium --profile-directory="Profile 4"  https://www.google.com/search?q="${ra}" &
+zen-browser https://www.google.com/search?q="${ra}" &
+
+
+
 
 
 
 bbtt="${busqueda} banbantonton"
 
-chromium --profile-directory="Profile 4"  https://www.google.com/search?q="${bbtt}" &
+zen-browser https://www.google.com/search?q="${bbtt}" &

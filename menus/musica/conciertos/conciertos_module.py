@@ -32,7 +32,7 @@ class ConcertEvent:
 
 class BaseAPIFetcher(QThread):
     """Clase base para los fetcheres de API"""
-    finished = pyqtSignal(object, str)
+    finished = pyqtSignal(object, str)  # Usar 'object' en lugar de List[ConcertEvent]
     error = pyqtSignal(str)
     
     def __init__(self, country_code: str, artists_file: str):
@@ -40,7 +40,13 @@ class BaseAPIFetcher(QThread):
         self.country_code = country_code
         self.artists_file = artists_file
         self.directorio_actual = os.path.dirname(os.path.abspath(self.artists_file))
-        
+        self._is_running = True
+    
+    def stop(self):
+        """Método para detener el hilo correctamente"""
+        self._is_running = False
+        self.wait()  # Espera a que el hilo termine
+    
     def get_artists_list(self) -> List[str]:
         """Obtiene la lista de artistas del archivo"""
         try:
@@ -383,6 +389,13 @@ class ConciertosModule(BaseModule):
         # Llamamos al inicializador de la clase base
         super().__init__()
     
+    def __del__(self):
+        """Método destructor para limpiar recursos"""
+        # Detener cualquier fetcher activo
+        for fetcher in getattr(self, '_fetchers', []):
+            if fetcher and fetcher.isRunning():
+                fetcher.stop()
+
     def update_config(self, new_config: Dict):
         """Actualiza la configuración con valores nuevos, manteniendo la estructura"""
         for key, value in new_config.items():
@@ -424,20 +437,21 @@ class ConciertosModule(BaseModule):
         # Pestañas para las diferentes APIs
         self.tabs = QTabWidget()
         
-        # Pestaña de Ticketmaster
-        self.create_ticketmaster_tab()
+        # Crear pestañas solo para servicios habilitados
+        if self.config["apis"]["ticketmaster"].get("enabled", False):
+            self.create_ticketmaster_tab()
         
-        # Pestaña de Songkick
-        self.create_songkick_tab()
+        if self.config["apis"]["songkick"].get("enabled", False):
+            self.create_songkick_tab()
         
-        # Pestaña de Concerts-Metal
-        self.create_concerts_metal_tab()
+        if self.config["apis"]["concerts_metal"].get("enabled", False):
+            self.create_concerts_metal_tab()
         
-        # Pestaña de RapidAPI
-        self.create_rapidapi_tab()
+        if self.config["apis"]["rapidapi"].get("enabled", False):
+            self.create_rapidapi_tab()
         
-        # Pestaña de Bandsintown
-        self.create_bandsintown_tab()
+        if self.config["apis"]["bandsintown"].get("enabled", False):
+            self.create_bandsintown_tab()
         
         main_layout.addWidget(self.tabs)
         
@@ -578,6 +592,9 @@ class ConciertosModule(BaseModule):
         self.fetch_all_btn.setEnabled(False)
         self.active_fetchers = 0
         
+        # Inicializar lista de fetchers
+        self._fetchers = []
+
         # Actualizar configuración (solo API keys y App IDs)
         self.update_service_configs()
         
@@ -671,6 +688,7 @@ class ConciertosModule(BaseModule):
         fetcher = TicketmasterFetcher(api_key, self.config["country_code"], self.config["artists_file"])
         fetcher.finished.connect(self.on_fetcher_finished)
         fetcher.error.connect(self.on_fetcher_error)
+        self._fetchers.append(fetcher)  # Agregar a la lista de fetchers
         fetcher.start()
     
     def launch_songkick_fetcher(self):
