@@ -51,7 +51,7 @@
                 "enabled": true
               },
               "rapidapi": {
-                "enabled": true,
+                "enabled": false,
                 "api_key": "TU_API_KEY_RAPIDAPI"
               },
               "bandsintown": {
