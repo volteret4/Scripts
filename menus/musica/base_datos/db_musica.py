@@ -213,7 +213,7 @@ class MusicLibraryManager:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        error_log_path = self.root_path / 'music_library_scan_errors.log'
+        error_log_path = 'music_library_scan_errors.log'
         error_logger = logging.getLogger('error_log')
         error_logger.setLevel(logging.ERROR)
         error_handler = logging.FileHandler(error_log_path, encoding='utf-8')
@@ -233,7 +233,7 @@ class MusicLibraryManager:
                         last_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
                         
                         # Check if file needs processing
-                        c.execute("SELECT last_modified FROM songs WHERE file_path = ?", (abs_path,))
+                        c.execute("SELECT last_modified, added_timestamp FROM songs WHERE file_path = ?", (abs_path,))
                         existing_record = c.fetchone()
                         
                         # Modificación aquí: Convertir la fecha de la base de datos a datetime
@@ -244,7 +244,7 @@ class MusicLibraryManager:
                             except ValueError:
                                 # Si falla, intentamos sin la fracción de segundos
                                 db_last_modified = datetime.strptime(existing_record[0], '%Y-%m-%d %H:%M:%S')
-                                original_added_timestamp = datetime.strptime(existing_record[1], '%Y-%m-%d %H:%M:%S.%f') if existing_record[1] else None
+                                original_added_timestamp = datetime.strptime(existing_record[1], '%Y-%m-%d %H:%M:%S') if existing_record[1] else None
                         else:
                             db_last_modified = None
                             original_added_timestamp = None

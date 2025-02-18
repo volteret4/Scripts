@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 from base_module import BaseModule
+import traceback
 
 # Tema Tokyo Night (puedes personalizarlo o cargar desde config)
 THEME = {
@@ -53,7 +54,7 @@ class TabManager(QMainWindow):
                 config = json.load(f)
                 
             for module_config in config['modules']:
-                parent_dir = Path(__file__).parent  # Directorio donde se encuentra el script padre
+                parent_dir = Path(__file__).parent
                 relative_path = Path(module_config['path'])
                 module_path = str(parent_dir / relative_path)
                 module_name = module_config.get('name', Path(module_path).stem)
@@ -73,24 +74,27 @@ class TabManager(QMainWindow):
                             if isinstance(attr, type) and issubclass(attr, BaseModule) and attr != BaseModule:
                                 main_class = attr
                                 break
-                        
+                                
                         if main_class:
                             # Instanciar el módulo
                             module_instance = main_class(**module_args)
+                            
+                            # Si es el editor de configuración, conectar la señal
+                            if module_name == "Config Editor":
+                                module_instance.config_updated.connect(self.reload_application)
+                            
                             # Añadir al gestor de pestañas
                             self.tab_widget.addTab(module_instance, module_name)
                             self.tabs[module_name] = module_instance
                         else:
                             print(f"No se encontró una clase válida en el módulo {module_name}")
-                        
+                            
                 except Exception as e:
                     print(f"Error loading module {module_name}: {e}")
-                    import traceback
                     traceback.print_exc()
                     
         except Exception as e:
             print(f"Error loading configuration: {e}")
-            import traceback
             traceback.print_exc()
 
     def apply_theme(self):
@@ -156,6 +160,26 @@ class TabManager(QMainWindow):
                 background-color: {THEME['selection']};
             }}
         """)
+
+
+    def reload_application(self):
+        """Recarga todos los módulos después de un cambio en la configuración"""
+        # Guardar el índice de la pestaña actual
+        current_index = self.tab_widget.currentIndex()
+        
+        # Eliminar todas las pestañas existentes
+        while self.tab_widget.count() > 0:
+            self.tab_widget.removeTab(0)
+        
+        # Limpiar el diccionario de pestañas
+        self.tabs.clear()
+        
+        # Recargar los módulos
+        self.load_modules()
+        
+        # Restaurar el índice de la pestaña si es posible
+        if current_index < self.tab_widget.count():
+            self.tab_widget.setCurrentIndex(current_index)
 
 
 
