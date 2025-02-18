@@ -8,9 +8,12 @@
 # TODO: 
 # Notes:
 #
-
 # Obtener la ruta del directorio del script actual
-directorio_actual=$(dirname "$0")
+directorio_actual="$(dirname "$0")"
+
+source "$directorio_actual"/.env
+
+echo "$APIKEY"
 
 # Leer la lista de artistas desde el archivo
 artistas_lista=$(cat "$directorio_actual/artistas.txt")
@@ -29,10 +32,12 @@ mv ${json_file} ${bak_file}
 country_code="ES"
 
 # Obtener datos de la API de Ticketmaster
-url="https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime=$fecha_actual&endDateTime=$fecha_proxima&countryCode=$country_code&apikey=$apikey"
+url="https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime=$fecha_actual&endDateTime=$fecha_proxima&countryCode=$country_code&apikey=$APIKEY"
 
 json="$(curl ${url})"
 json="$(echo $json | jq .)"
+
+echo "$json" > test
 
 # Filtrar los conciertos según los artistas
 conciertos_filtrados=""

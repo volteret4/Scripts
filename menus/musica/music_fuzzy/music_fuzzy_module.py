@@ -277,40 +277,6 @@ class SearchParser:
             'general': ' '.join(general_terms)
         }
 
-    # def build_sql_conditions(self, parsed_query: Dict) -> tuple:
-    #     """Construye las condiciones SQL y parámetros basados en la query parseada."""
-    #     conditions = []
-    #     params = []
-        
-    #     # Procesar filtros específicos
-    #     for field, value in parsed_query['filters'].items():
-    #         if field == 'bitrate':
-    #             # Manejar rangos de bitrate (>192, <192, =192)
-    #             if value.startswith('>'):
-    #                 conditions.append(f"s.{field} > ?")
-    #                 params.append(int(value[1:]))
-    #             elif value.startswith('<'):
-    #                 conditions.append(f"s.{field} < ?")
-    #                 params.append(int(value[1:]))
-    #             else:
-    #                 conditions.append(f"s.{field} = ?")
-    #                 params.append(int(value))
-    #         else:
-    #             conditions.append(f"s.{field} LIKE ?")
-    #             params.append(f"%{value}%")
-        
-    #     # Procesar términos generales
-    #     if parsed_query['general']:
-    #         general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
-    #         general_conditions = []
-    #         for field in general_fields:
-    #             general_conditions.append(f"s.{field} LIKE ?")
-    #             params.append(f"%{parsed_query['general']}%")
-    #         if general_conditions:
-    #             conditions.append(f"({' OR '.join(general_conditions)})")
-        
-    #     return conditions, params
-    #     pass
 class MusicBrowser(BaseModule):
     def __init__(self, parent=None, **kwargs):
         # Extraer los argumentos específicos de MusicBrowser
@@ -492,7 +458,8 @@ class MusicBrowser(BaseModule):
     def apply_year_filter(self):
         """Aplica el filtro de año específico."""
         year = self.year_only_spin.value()
-        self.search_box
+        self.search_box.setText(f"ay:{year}")
+        self.search()
 
 
     def handle_item_click(self, item):
@@ -622,7 +589,7 @@ class MusicBrowser(BaseModule):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Modificada la consulta SQL para obtener correctamente la bio del artista
+        # Base SQL query
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -640,49 +607,19 @@ class MusicBrowser(BaseModule):
                 s.sample_rate,
                 s.last_modified,
                 s.track_number,
-                art.bio  -- Movido al final y renombrado para claridad
+                art.bio  
             FROM songs s
             LEFT JOIN artists art ON s.artist = art.name
         """
         
-        conditions = []
-        params = []
-
-        # Procesar filtros específicos
-        for field, value in parsed['filters'].items():
-            if field == 'bitrate':
-                if value.startswith('>'):
-                    conditions.append(f"s.{field} > ?")
-                    params.append(int(value[1:]))
-                elif value.startswith('<'):
-                    conditions.append(f"s.{field} < ?")
-                    params.append(int(value[1:]))
-                else:
-                    conditions.append(f"s.{field} = ?")
-                    try:
-                        params.append(int(value))
-                    except ValueError:
-                        print(f"Error: valor de bitrate inválido: {value}")
-                        continue
-            else:
-                conditions.append(f"s.{field} LIKE ?")
-                params.append(f"%{value}%")
-
-        # Procesar términos generales
-        if parsed['general']:
-            general_fields = ['artist', 'title', 'album', 'genre', 'label', 'album_artist']
-            general_conditions = []
-            for field in general_fields:
-                general_conditions.append(f"s.{field} LIKE ?")
-                params.append(f"%{parsed['general']}%")
-            if general_conditions:
-                conditions.append(f"({' OR '.join(general_conditions)})")
-
-        # Añadir WHERE si hay condiciones
+        # Use build_sql_conditions from SearchParser
+        conditions, params = self.search_parser.build_sql_conditions(parsed)
+        
+        # Add WHERE clause if there are conditions
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
-
-        # Ordenar por artista, álbum y número de pista
+        
+        # Ordering
         sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
         
         try:

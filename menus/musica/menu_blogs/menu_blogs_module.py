@@ -37,7 +37,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 
-
 class MusicManagerModule(BaseModule):
     def __init__(self, **kwargs):
         self.pending_dir = Path(kwargs.get('pending_dir', 'playlists/PENDIENTE'))
@@ -253,57 +252,69 @@ class MusicManagerModule(BaseModule):
         except:
             return url
 
-
     def on_playlist_select(self):
-        """Handle playlist selection event."""
-        self.content_list.clear()
-        
-        selected_items = self.playlist_list.selectedItems()
-        if not selected_items:
-            return
+            """Handle playlist selection event."""
+            self.content_list.clear()
             
-        playlist_item = selected_items[0]
-        playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
-        
-        if playlist_data['type'] == 'blog':
-            playlist_path = self.pending_dir / self.selected_blog / playlist_data['name']
-        else:
-            playlist_path = self.local_dir / playlist_data['name']
-        
-        if playlist_path.exists():
-            with open(playlist_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        title = self.get_track_info(line)
-                        item = QListWidgetItem(title)
-                        item.setData(Qt.ItemDataRole.UserRole, {'url': line})
-                        self.content_list.addItem(item)
-    
-    def on_local_select(self):
-        """Maneja el evento de selección de una lista local."""
-        self.content_list.clear()
-        
-        selected_items = self.local_list.selectedItems()
-        if not selected_items:
-            return
-        
-        local_item = selected_items[0]
-        playlist_data = local_item.data(Qt.ItemDataRole.UserRole)
-        playlist_path = self.local_dir / playlist_data['name']
-        
-        if playlist_path.exists():
-            try:
+            selected_items = self.playlist_list.selectedItems()
+            if not selected_items:
+                return
+                
+            playlist_item = selected_items[0]
+            playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
+            
+            if not playlist_data:
+                return
+                
+            if playlist_data['type'] == 'blog':
+                playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
+                titles_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.titles"
+            else:
+                playlist_path = self.local_dir / playlist_data['name']
+                titles_path = self.local_dir / f"{playlist_path.stem}.titles"
+            
+            if playlist_path.exists():
+                # Cargar los títulos si existe el archivo
+                titles = {}
+                if titles_path.exists():
+                    with open(titles_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            try:
+                                url, title = line.strip().split(' | ', 1)
+                                titles[url] = title
+                            except ValueError:
+                                continue
+
+                # Leer la playlist y mostrar los títulos
                 with open(playlist_path, 'r', encoding='utf-8') as f:
                     for line in f:
                         line = line.strip()
                         if line and not line.startswith('#'):
-                            title = self.get_track_info(line)
+                            # Usar el título del archivo .titles si existe, si no usar la URL
+                            title = titles.get(line, line)
                             item = QListWidgetItem(title)
                             item.setData(Qt.ItemDataRole.UserRole, {'url': line})
                             self.content_list.addItem(item)
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Error al leer la playlist: {str(e)}")
+
+    
+    def on_local_select(self):
+        """Handle local playlist selection event."""
+        items = self.local_list.selectedItems()
+        if not items:
+            return
+        
+        # Deselect any selected blog
+        self.blog_list.clearSelection()
+        self.selected_blog = None
+        
+        self.playlist_list.clear()
+        item_data = items[0].data(Qt.ItemDataRole.UserRole)
+        item = QListWidgetItem(item_data['name'])
+        item.setData(Qt.ItemDataRole.UserRole, {
+            'type': 'local',
+            'name': item_data['name']
+        })
+        self.playlist_list.addItem(item)
 
 
     def show_playlist_context_menu(self, position):
@@ -354,7 +365,6 @@ class MusicManagerModule(BaseModule):
                 QMessageBox.critical(self, "Error", f"Error al eliminar playlist: {str(e)}")
 
 
-
     def delete_selected_track(self):
         """Delete the selected track from the playlist."""
         playlist_items = self.playlist_list.selectedItems()
@@ -375,22 +385,39 @@ class MusicManagerModule(BaseModule):
             playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
             
             if playlist_data['type'] == 'blog':
-                playlist_path = self.pending_dir / self.selected_blog / playlist_data['name']
+                playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
+                titles_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.titles"
             else:
                 playlist_path = self.local_dir / playlist_data['name']
+                titles_path = self.local_dir / f"{playlist_path.stem}.titles"
             
             try:
-                # Read all lines
+                # Read all lines from playlist
                 with open(playlist_path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
+                    playlist_lines = f.readlines()
+                
+                # Read all lines from titles if it exists
+                titles_lines = []
+                if titles_path.exists():
+                    with open(titles_path, 'r', encoding='utf-8') as f:
+                        titles_lines = f.readlines()
                 
                 # Remove the selected track
                 track_url = track_items[0].data(Qt.ItemDataRole.UserRole)['url']
-                lines = [line for line in lines if track_url not in line]
                 
-                # Write back the file
+                # Filter out the track from playlist
+                playlist_lines = [line for line in playlist_lines if track_url not in line]
+                
+                # Filter out the track from titles
+                titles_lines = [line for line in titles_lines if not line.startswith(track_url + ' | ')]
+                
+                # Write back the files
                 with open(playlist_path, 'w', encoding='utf-8') as f:
-                    f.writelines(lines)
+                    f.writelines(playlist_lines)
+                    
+                if titles_path.exists():
+                    with open(titles_path, 'w', encoding='utf-8') as f:
+                        f.writelines(titles_lines)
                 
                 # Refresh the content list
                 self.on_playlist_select()
@@ -402,20 +429,29 @@ class MusicManagerModule(BaseModule):
 
 
     def on_blog_select(self):
-        """Handle blog selection event."""
-        items = self.blog_list.selectedItems()
-        if not items:
-            return
-        
-        selection = items[0].text()
-        self.selected_blog = selection.split(" (")[0]
-
-        self.playlist_list.clear()
-        playlists = self.get_monthly_playlists_with_counts(self.selected_blog)
-        
-        for playlist, count in playlists.items():
-            item = QListWidgetItem(f"{playlist} ({count} canciones)")
-            self.playlist_list.addItem(item)
+            """Handle blog selection event."""
+            items = self.blog_list.selectedItems()
+            if not items:
+                return
+            
+            # Deselect any selected local playlist
+            self.local_list.clearSelection()
+            
+            item_data = items[0].data(Qt.ItemDataRole.UserRole)
+            self.selected_blog = item_data['name']
+            
+            self.playlist_list.clear()
+            playlists = self.get_monthly_playlists_with_counts(self.selected_blog)
+            
+            for playlist, count in playlists.items():
+                item = QListWidgetItem(f"{playlist} ({count} canciones)")
+                # Añadir datos extra al item
+                item.setData(Qt.ItemDataRole.UserRole, {
+                    'type': 'blog',
+                    'name': playlist,
+                    'blog': self.selected_blog
+                })
+                self.playlist_list.addItem(item)
 
     def show_move_dialog(self, blog_name, playlist_name):
         """Show dialog asking whether to move the playlist to listened."""
@@ -432,42 +468,40 @@ class MusicManagerModule(BaseModule):
 
     def play_selected(self):
         """Play the selected playlist."""
-        if not self.selected_blog or not self.playlist_list.selectedItems():
+        if not self.playlist_list.selectedItems():
             QMessageBox.warning(
                 self,
                 "Selección requerida",
-                "Por favor, selecciona un blog y una playlist"
+                "Por favor, selecciona una playlist"
             )
             return
 
-        playlist_selection = self.playlist_list.selectedItems()[0].text()
-        playlist_name = playlist_selection.split(" (")[0]
-        playlist_path = self.pending_dir / self.selected_blog / playlist_name
+        playlist_selection = self.playlist_list.selectedItems()[0]
+        playlist_data = playlist_selection.data(Qt.ItemDataRole.UserRole)
+        
+        if playlist_data['type'] == 'blog':
+            playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
+        else:
+            playlist_path = self.local_dir / playlist_data['name']
         
         if not playlist_path.exists():
             QMessageBox.critical(self, "Error", "No se encuentra el archivo de la playlist")
             return
 
         try:
-             # Obtiene el directorio home del usuario actual
-            home = Path.home()
-            
-            # Construye la ruta completa al script usando el home
-            script_path = home / "Scripts" / "menus" / "musica" / "menu_blogs" / "mpv" / "mpv_lastfm_starter.sh"
-            
-            # Ejecuta el script con subprocess.run
             process = subprocess.run(
-                [str(script_path), 
-                "--player-operation-mode=pseudo-gui", 
-                "--force-window=yes", 
-                str(playlist_path)]
+                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv_lastfm_starter.sh", 
+                 "--player-operation-mode=pseudo-gui", 
+                 "--force-window=yes", 
+                 str(playlist_path)]
             )
             
-            if process.returncode == 0:
-                self.show_move_dialog(self.selected_blog, playlist_name)
+            if process.returncode == 0 and playlist_data['type'] == 'blog':
+                self.show_move_dialog(playlist_data['blog'], playlist_data['name'])
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
+
 
     def process_url(self):
         """Process a blog URL to extract music links."""
@@ -504,7 +538,6 @@ class MusicManagerModule(BaseModule):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al procesar URL: {str(e)}")
-
 
 
 class FetchWorker(QThread):
@@ -650,12 +683,10 @@ class PlaylistManager:
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+         
     def create_m3u_playlist(self, urls: List[str], feed_dir: Path, filename: str):
         """Crea un archivo .m3u con las URLs proporcionadas"""
-        # Asegurarse de que existe el directorio del feed
         feed_dir.mkdir(parents=True, exist_ok=True)
-        
         playlist_path = feed_dir / f"{filename}.m3u"
         
         with open(playlist_path, 'w', encoding='utf-8') as f:
@@ -667,7 +698,6 @@ class PlaylistManager:
         
     def process_posts(self, posts: List[Dict[str, str]]):
         """Procesa los posts y crea playlists organizadas por feed y mes"""
-        # Organizar posts por feed y luego por mes
         posts_by_feed_and_month = defaultdict(lambda: defaultdict(list))
         
         for post in posts:
@@ -675,13 +705,10 @@ class PlaylistManager:
             month_key = post['month_key']
             posts_by_feed_and_month[feed_title][month_key].append(post)
         
-        # Procesar cada feed
         for feed_title, months in posts_by_feed_and_month.items():
-            # Crear un nombre seguro para el directorio del feed
             safe_feed_name = re.sub(r'[^\w\-_]', '_', feed_title)
             feed_dir = self.output_dir / safe_feed_name
             
-            # Procesar cada mes del feed
             for month_key, month_posts in months.items():
                 all_music_urls = set()
                 for post in month_posts:
@@ -695,63 +722,64 @@ class PlaylistManager:
                         month_key
                     )
 
-def extract_bandcamp_id(url):
-    """Extrae el ID de álbum/track de Bandcamp desde un iframe."""
-    album_match = re.search(r'album=(\d+)', url)
-    track_match = re.search(r'track=(\d+)', url)
+# def extract_music_urls(url):
+#     """
+#     Extrae las URLs de música (Bandcamp, SoundCloud, YouTube) del contenido HTML de la URL dada.
+#     """
+#     try:
+#         response = requests.get(url)
+#         content = response.text
+
+#         music_patterns = [
+#             r'"(bandcamp\.com/[^"]+)"',
+#             r'(https?://(?:www\.)?soundcloud\.com/[^\s"\'<>]+)',
+#             r'(https?://(?:www\.)?youtube\.com/embed/[^\s"\'<>]+)',
+#             r'(https?://(?:www\.)?youtube\.com/watch\?[^\s"\'<>]+)',
+#             r'(https?://(?:www\.)?youtu\.be/[^\s"\'<>]+)'
+#         ]
+
+#         music_urls = set()
+#         for pattern in music_patterns:
+#             matches = re.findall(pattern, content)
+#             for match in matches:
+#                 extracted_url = match[0] if isinstance(match, tuple) else match
+#                 if 'bandcamp.com' in extracted_url:
+#                     if extracted_url.startswith('//'):
+#                         extracted_url = 'https:' + extracted_url
+#                     extracted_url = extract_bandcamp_id(extracted_url)
+#                 else:
+#                     extracted_url = clean_youtube_url(extracted_url)
+#                 music_urls.add(extracted_url)
+
+#         return list(music_urls)
+
+#     except Exception as e:
+#         print(f"Error al extraer URLs: {e}")
+#         return [] 
+
+# def extract_bandcamp_id(url):
+#     """Extrae el ID de álbum/track de Bandcamp desde un iframe."""
+#     album_match = re.search(r'album=(\d+)', url)
+#     track_match = re.search(r'track=(\d+)', url)
     
-    if album_match:
-        return f"https://bandcamp.com/album/{album_match.group(1)}"
-    elif track_match:
-        return f"https://bandcamp.com/track/{track_match.group(1)}"
-    return url
+#     if album_match:
+#         return f"https://bandcamp.com/album/{album_match.group(1)}"
+#     elif track_match:
+#         return f"https://bandcamp.com/track/{track_match.group(1)}"
+#     return url
 
-def clean_youtube_url(url):
-    """Normaliza la URL de YouTube para obtener el formato watch?v=."""
-    parsed_url = urlparse(url)
-    if 'youtube.com/embed/' in url:
-        video_id = parsed_url.path.split('/')[-1]
-        return f'https://youtube.com/watch?v={video_id}'
-    if 'youtu.be' in url:
-        video_id = parsed_url.path.lstrip('/')
-        return f'https://youtube.com/watch?v={video_id}'
-    if 'youtube.com/watch' in url:
-        parsed_query = parse_qs(parsed_url.query)
-        video_id = parsed_query.get('v', [''])[0]
-        return f'https://youtube.com/watch?v={video_id}'
-    return url
+# def clean_youtube_url(url):
+#     """Normaliza la URL de YouTube para obtener el formato watch?v=."""
+#     parsed_url = urlparse(url)
+#     if 'youtube.com/embed/' in url:
+#         video_id = parsed_url.path.split('/')[-1]
+#         return f'https://youtube.com/watch?v={video_id}'
+#     if 'youtu.be' in url:
+#         video_id = parsed_url.path.lstrip('/')
+#         return f'https://youtube.com/watch?v={video_id}'
+#     if 'youtube.com/watch' in url:
+#         parsed_query = parse_qs(parsed_url.query)
+#         video_id = parsed_query.get('v', [''])[0]
+#         return f'https://youtube.com/watch?v={video_id}'
+#     return url
 
-def extract_music_urls(url):
-    """
-    Extrae las URLs de música (Bandcamp, SoundCloud, YouTube) del contenido HTML de la URL dada.
-    """
-    try:
-        response = requests.get(url)
-        content = response.text
-
-        music_patterns = [
-            r'src="(//bandcamp\.com/EmbeddedPlayer/[^"]+)"',
-            r'(https?://(?:www\.)?soundcloud\.com/[^\s"\'<>]+)',
-            r'(https?://(?:www\.)?youtube\.com/embed/[^\s"\'<>]+)',
-            r'(https?://(?:www\.)?youtube\.com/watch\?[^\s"\'<>]+)',
-            r'(https?://(?:www\.)?youtu\.be/[^\s"\'<>]+)'
-        ]
-
-        music_urls = set()
-        for pattern in music_patterns:
-            matches = re.findall(pattern, content)
-            for match in matches:
-                extracted_url = match[0] if isinstance(match, tuple) else match
-                if 'bandcamp.com' in extracted_url:
-                    if extracted_url.startswith('//'):
-                        extracted_url = 'https:' + extracted_url
-                    extracted_url = extract_bandcamp_id(extracted_url)
-                else:
-                    extracted_url = clean_youtube_url(extracted_url)
-                music_urls.add(extracted_url)
-
-        return list(music_urls)
-
-    except Exception as e:
-        print(f"Error al extraer URLs: {e}")
-        return []

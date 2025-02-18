@@ -14,7 +14,8 @@
 #
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel,
-    QProgressBar, QLineEdit, QListWidget, QListWidgetItem, QMessageBox
+    QProgressBar, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from base_module import BaseModule, THEME
@@ -28,11 +29,157 @@ import requests
 from typing import List, Dict
 from urllib.parse import quote
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+def clean_youtube_url(url):
+    """Limpia y normaliza URLs de YouTube"""
+    # Eliminar parámetros innecesarios
+    if 'youtube.com/watch' in url:
+        video_id = re.search(r'v=([^&]+)', url)
+        if video_id:
+            return f'https://youtube.com/watch?v={video_id.group(1)}'
+    elif 'youtu.be/' in url:
+        video_id = url.split('/')[-1].split('?')[0]
+        return f'https://youtube.com/watch?v={video_id}'
+    elif 'youtube.com/embed/' in url:
+        video_id = url.split('/')[-1].split('?')[0]
+        return f'https://youtube.com/watch?v={video_id}'
+    return url
+
+def extract_bandcamp_id(url):
+    """Extrae y normaliza URLs de Bandcamp"""
+    # Asegurarse de que la URL es completa
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url.lstrip('/')
+    return url
+
+def extract_music_urls(url):
+    """
+    Extrae las URLs de música (Bandcamp, SoundCloud, YouTube) del contenido HTML de la URL dada.
+    """
+    try:
+        response = requests.get(url)
+        content = response.text
+        music_patterns = [
+            r'"(bandcamp\.com/[^"]+)"',
+            r'(https?://(?:www\.)?soundcloud\.com/[^\s"\'<>]+)',
+            r'(https?://(?:www\.)?youtube\.com/embed/[^\s"\'<>]+)',
+            r'(https?://(?:www\.)?youtube\.com/watch\?[^\s"\'<>]+)',
+            r'(https?://(?:www\.)?youtu\.be/[^\s"\'<>]+)'
+        ]
+        music_urls = set()
+        
+        for pattern in music_patterns:
+            matches = re.findall(pattern, content)
+            for match in matches:
+                extracted_url = match[0] if isinstance(match, tuple) else match
+                if 'bandcamp.com' in extracted_url:
+                    if extracted_url.startswith('//'):
+                        extracted_url = 'https:' + extracted_url
+                    extracted_url = extract_bandcamp_id(extracted_url)
+                else:
+                    extracted_url = clean_youtube_url(extracted_url)
+                music_urls.add(extracted_url)
+                
+        return list(music_urls)
+    except Exception as e:
+        print(f"Error al extraer URLs: {e}")
+        return []
+
+class TitleExtractorWorker(QThread):
+    """Worker thread for extracting titles from media URLs"""
+    progress_signal = pyqtSignal(str)
+    error_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal()
+
+    def __init__(self, playlist_path):
+        super().__init__()
+        self.playlist_path = playlist_path
+
+    def run(self):
+        try:
+            # Read URLs from playlist
+            with open(self.playlist_path, 'r', encoding='utf-8') as f:
+                urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
+            titles = []
+            for url in urls:
+                self.progress_signal.emit(f"Extracting title from: {url}")
+                try:
+                    # Use yt-dlp to get video title
+                    result = subprocess.run(
+                        ['yt-dlp', '--get-title', url],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    title = result.stdout.strip()
+                    if title:
+                        titles.append(title)
+                except subprocess.CalledProcessError as e:
+                    self.error_signal.emit(f"Error extracting title from {url}: {str(e)}")
+                    continue
+
+            # Write titles to .titles file
+            titles_path = self.playlist_path.with_suffix('.titles')
+            with open(titles_path, 'w', encoding='utf-8') as f:
+                for title in titles:
+                    f.write(f"{title}\n")
+
+            self.progress_signal.emit(f"Created titles file: {titles_path}")
+            self.finished_signal.emit()
+
+        except Exception as e:
+            self.error_signal.emit(f"Error: {str(e)}")
+            self.finished_signal.emit()
+
+
+class ScrollableModuleContainer(QWidget):
+    """Container for multiple module widgets"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                width: 0px;
+            }
+        """)
+
+        # Container widget for modules
+        self.container = QWidget()
+        self.container_layout = QVBoxLayout(self.container)
+        self.container_layout.setSpacing(10)
+        self.container_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_area.setWidget(self.container)
+
+        main_layout.addWidget(scroll_area)
+
+    def add_module(self, module: QWidget):
+        """Add a new module widget to the container"""
+        self.container_layout.addWidget(module)
+
+
 
 class FetchWorker(QThread):
     """Worker thread para operaciones en segundo plano"""
@@ -554,6 +701,9 @@ class PlaylistManagerModule(QWidget):
             QMessageBox.critical(self, "Error", "No se encuentra el archivo de la playlist")
             return
 
+        # Create titles file before playing
+        self.extract_titles(playlist_path)
+
         try:
             process = subprocess.run(
                 ["/home/huan/Scripts/utilities/aliases/mpv_lastfm_starter.sh", 
@@ -568,6 +718,28 @@ class PlaylistManagerModule(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
 
+    def extract_titles(self, playlist_path):
+            """Extract titles from playlist URLs using yt-dlp"""
+            self.title_worker = TitleExtractorWorker(playlist_path)
+            self.title_worker.progress_signal.connect(lambda msg: print(f"Title extraction: {msg}"))
+            self.title_worker.error_signal.connect(lambda err: print(f"Title extraction error: {err}"))
+            self.title_worker.start()
+
 if __name__ == "__main__":
-    app = PlaylistManager()
-    app.mainloop()
+    from PyQt6.QtWidgets import QApplication
+    import sys
+
+    app = QApplication(sys.argv)
+    
+    # Create the main container
+    container = ScrollableModuleContainer()
+    
+    # Add multiple playlist manager modules
+    module1 = PlaylistManagerModule(pending_dir="PENDIENTE1", listened_dir="ESCUCHADO1")
+    module2 = PlaylistManagerModule(pending_dir="PENDIENTE2", listened_dir="ESCUCHADO2")
+    
+    container.add_module(module1)
+    container.add_module(module2)
+    
+    container.show()
+    sys.exit(app.exec())
