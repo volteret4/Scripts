@@ -344,3 +344,21 @@
 2025-02-17 23:49:08,124 - ERROR - Metadata extraction failed: /mnt/NFS/moode/moode/T/Traumprinz/(2012) Say Or Do/Marcel Fengler - Fokus (2013)/03. The Stampede.flac
 2025-02-17 23:49:08,184 - ERROR - Metadata extraction failed: /mnt/NFS/moode/moode/T/Traumprinz/(2012) Say Or Do/Marcel Fengler - Fokus (2013)/11. Liquid Torso.flac
 2025-02-17 23:52:38,489 - ERROR - Metadata extraction failed: /mnt/NFS/moode/moode/S/Str4ta/Str4ta.Aspects.2021.flac
+2025-02-18 14:18:31,115 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(1996) Insomnia (Orange Records) (ORCDM 53166)/Disc 1/03 - Insomnia (Monster mix).flac: unconverted data remains: .498951
+2025-02-18 14:18:31,116 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(1996) Insomnia (Orange Records) (ORCDM 53166)/Disc 1/02 - Insomnia (Original radio edit).flac: unconverted data remains: .053174
+2025-02-18 14:18:31,116 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(1996) Insomnia (Orange Records) (ORCDM 53166)/Disc 1/04 - Insomnia (Moody mix).flac: unconverted data remains: .850531
+2025-02-18 14:18:31,116 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(1996) Insomnia (Orange Records) (ORCDM 53166)/Disc 1/05 - Insomnia (Tuff mix).flac: unconverted data remains: .390174
+2025-02-18 14:18:31,116 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(1996) Insomnia (Orange Records) (ORCDM 53166)/Disc 1/01 - Insomnia (Monster radio edit).flac: unconverted data remains: .592518
+2025-02-18 14:18:31,148 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/03 - Salva Mea.flac: unconverted data remains: .758845
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/02 - Don't Leave.flac: unconverted data remains: .150038
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/12 - Don't Leave (Floating remix).flac: unconverted data remains: .323588
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/11 - Salva Mea (Way Out West mix).flac: unconverted data remains: .455354
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/10 - Drifting Away.flac: unconverted data remains: .608534
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/06 - Insomnia.flac: unconverted data remains: .742986
+2025-02-18 14:18:31,149 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/13 - Insomnia (Moody mix).flac: unconverted data remains: .844621
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/01 - Reverence.flac: unconverted data remains: .981410
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/08 - Flowerstand Man.flac: unconverted data remains: .103393
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/05 - Angeline.flac: unconverted data remains: .264281
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/09 - Baseball Cap.flac: unconverted data remains: .334991
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/04 - If Lovin' You Is Wrong.flac: unconverted data remains: .454394
+2025-02-18 14:18:31,150 - ERROR - File processing error /mnt/NFS/moode/moode/F/Faithless/(2006) Reverence (Cheeky Records) (88697028272)/Disc 1/07 - Dirty Ol' Man.flac: unconverted data remains: .583353

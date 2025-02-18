@@ -479,6 +479,8 @@ class MusicBrowser(BaseModule):
         else:
             self.show_details(current, previous)
 
+
+    # Modificar la función show_album_info para mostrar los enlaces del álbum
     def show_album_info(self, header_item):
         """Muestra la información del álbum."""
         # Obtener artista y álbum del texto del header
@@ -538,7 +540,7 @@ class MusicBrowser(BaseModule):
             artist_bio = first_track_data[15] if len(first_track_data) > 15 and first_track_data[15] else "No hay información del artista disponible"
             self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{artist_bio}")
             
-            # Mostrar metadata del álbum
+            # Construir la metadata básica del álbum
             metadata = f"""
                 <b>Álbum:</b> {album}<br>
                 <b>Artista:</b> {artist}<br>
@@ -548,11 +550,55 @@ class MusicBrowser(BaseModule):
                 <b>Pistas:</b> {total_tracks}<br>
                 <b>Duración total:</b> {hours:02d}:{minutes:02d}:{seconds:02d}<br>
                 <b>Bitrate:</b> {first_track_data[10] or 'N/A'} kbps<br>
-                <br>
-                <i>Presiona Enter para reproducir el álbum completo</i><br>
-                <i>Presiona Ctrl+O para abrir la carpeta del álbum</i>
             """
+            
+            # Añadir enlaces externos del álbum si existen
+            if len(first_track_data) > 21:
+                metadata += "<br><b>Enlaces del Álbum:</b><br>"
+                
+                album_links = []
+                if first_track_data[21]:  # album_spotify
+                    album_links.append(f"<a href='{first_track_data[21]}'>Spotify</a>")
+                if first_track_data[22]:  # album_youtube
+                    album_links.append(f"<a href='{first_track_data[22]}'>YouTube</a>")
+                if first_track_data[23]:  # album_musicbrainz
+                    album_links.append(f"<a href='{first_track_data[23]}'>MusicBrainz</a>")
+                if first_track_data[24]:  # album_discogs
+                    album_links.append(f"<a href='{first_track_data[24]}'>Discogs</a>")
+                if first_track_data[25]:  # album_rateyourmusic
+                    album_links.append(f"<a href='{first_track_data[25]}'>RateYourMusic</a>")
+                
+                if album_links:
+                    metadata += " | ".join(album_links)
+                else:
+                    metadata += "No hay enlaces disponibles."
+            
+            # Añadir enlaces externos del artista si existen
+            if len(first_track_data) > 16:
+                metadata += "<br><br><b>Enlaces del Artista:</b><br>"
+                
+                artist_links = []
+                if first_track_data[16]:  # artist_spotify
+                    artist_links.append(f"<a href='{first_track_data[16]}'>Spotify</a>")
+                if first_track_data[17]:  # artist_youtube
+                    artist_links.append(f"<a href='{first_track_data[17]}'>YouTube</a>")
+                if first_track_data[18]:  # artist_musicbrainz
+                    artist_links.append(f"<a href='{first_track_data[18]}'>MusicBrainz</a>")
+                if first_track_data[19]:  # artist_discogs
+                    artist_links.append(f"<a href='{first_track_data[19]}'>Discogs</a>")
+                if first_track_data[20]:  # artist_rateyourmusic
+                    artist_links.append(f"<a href='{first_track_data[20]}'>RateYourMusic</a>")
+                
+                if artist_links:
+                    metadata += " | ".join(artist_links)
+                else:
+                    metadata += "No hay enlaces disponibles."
+            
+            metadata += "<br><br><i>Presiona Enter para reproducir el álbum completo</i><br>"
+            metadata += "<i>Presiona Ctrl+O para abrir la carpeta del álbum</i>"
+            
             self.metadata_label.setText(metadata)
+            self.metadata_label.setOpenExternalLinks(True)
         else:
             self.clear_details()
 
@@ -581,7 +627,6 @@ class MusicBrowser(BaseModule):
                 font-size: 12px;
             }}
         """)
-
     def search(self):
         query = self.search_box.text()
         parsed = self.search_parser.parse_query(query)
@@ -589,7 +634,7 @@ class MusicBrowser(BaseModule):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Base SQL query
+        # Base SQL query con join a tabla artists y albums para obtener los enlaces
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -607,9 +652,20 @@ class MusicBrowser(BaseModule):
                 s.sample_rate,
                 s.last_modified,
                 s.track_number,
-                art.bio  
+                art.bio,
+                art.spotify_url AS artist_spotify,
+                art.youtube_url AS artist_youtube,
+                art.musicbrainz_url AS artist_musicbrainz,
+                art.discogs_url AS artist_discogs,
+                art.rateyourmusic_url AS artist_rateyourmusic,
+                alb.spotify_url AS album_spotify,
+                alb.youtube_url AS album_youtube,
+                alb.musicbrainz_url AS album_musicbrainz,
+                alb.discogs_url AS album_discogs,
+                alb.rateyourmusic_url AS album_rateyourmusic
             FROM songs s
             LEFT JOIN artists art ON s.artist = art.name
+            LEFT JOIN albums alb ON s.album = alb.name AND s.artist = alb.artist
         """
         
         # Use build_sql_conditions from SearchParser
@@ -679,7 +735,6 @@ class MusicBrowser(BaseModule):
                 return str(file)
 
         return None
-
     def show_details(self, current, previous):
         """Muestra los detalles del ítem seleccionado."""
         if not current:
@@ -712,6 +767,8 @@ class MusicBrowser(BaseModule):
             # Mostrar metadata
             if len(data) >= 15:  # Aseguramos que tengamos todos los campos necesarios
                 track_num = data[14] if data[14] else "N/A"  # track_number está en el índice 14
+                
+                # Construir la sección de metadata básica
                 metadata = f"""
                     <b>Título:</b> {data[2] or 'N/A'}<br>
                     <b>Artista:</b> {data[3] or 'N/A'}<br>
@@ -726,7 +783,30 @@ class MusicBrowser(BaseModule):
                     <b>Frecuencia:</b> {data[12] or 'N/A'} Hz<br>
                     <b>Número de pista:</b> {track_num}<br>
                 """
+                
+                # Añadir enlaces externos del artista si existen
+                if len(data) > 16:
+                    metadata += "<br><b>Enlaces del Artista:</b><br>"
+                    
+                    artist_links = []
+                    if data[16]:  # spotify_url
+                        artist_links.append(f"<a href='{data[16]}'>Spotify</a>")
+                    if data[17]:  # youtube_url
+                        artist_links.append(f"<a href='{data[17]}'>YouTube</a>")
+                    if data[18]:  # musicbrainz_url
+                        artist_links.append(f"<a href='{data[18]}'>MusicBrainz</a>")
+                    if data[19]:  # discogs_url
+                        artist_links.append(f"<a href='{data[19]}'>Discogs</a>")
+                    if data[20]:  # rateyourmusic_url
+                        artist_links.append(f"<a href='{data[20]}'>RateYourMusic</a>")
+                    
+                    if artist_links:
+                        metadata += " | ".join(artist_links)
+                    else:
+                        metadata += "No hay enlaces disponibles."
+                
                 self.metadata_label.setText(metadata)
+                self.metadata_label.setOpenExternalLinks(True)
             else:
                 self.metadata_label.setText("No hay suficientes datos de metadata")
                 
