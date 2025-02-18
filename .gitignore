@@ -120,3 +120,4 @@ utilities/aliases/__pycache__/
 menus/__pycache__/*
 menus/musica/__pycache__/
 **/__pycache__/
+**/token.txt
