@@ -490,7 +490,7 @@ class MusicManagerModule(BaseModule):
 
         try:
             process = subprocess.run(
-                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv_lastfm_starter.sh", 
+                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm_starter.sh", 
                  "--player-operation-mode=pseudo-gui", 
                  "--force-window=yes", 
                  str(playlist_path)]

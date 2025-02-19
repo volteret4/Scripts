@@ -1,14 +1,18 @@
 
 #!/usr/bin/env python
 #
-# Script Name: db_musica.py
-# Description:  Lee una ruta, extrae información de canciones y las guarda en una base de datos
-#               Muestra el contenido de la base de datos, con filtros, permitiendo reproducir, abrir carpeta o ejecutar unos scripts.
-# Author: volteret4
-# Repository: https://github.com/volteret4/
+# Script Name:      db_musica.py
+# Description:      Lee una ruta, extrae información de canciones y las guarda en una base de datos.
+# Author:           volteret4
+# Repository:       https://github.com/volteret4/
 # License:
 # TODO: 
-# Notes:
+# Notes: Es el primero de una colección de scripts para gestionar una base de datos de canciones:
+#                   - db_musica.py: Lee una ruta, extrae información de canciones y las guarda en una base de datos.
+#                   - letras_genius_db_musica.py: Lee la base de datos creada por db_musica.py y busca las letras de las canciones en Genius,añadiéndolas a la base de datos.
+#                   - enlaces_db_musica.py: Lee la base de datos creada por db_musica.py y busca enlaces a servicios externos (Spotify, YouTube, MusicBrainz, Discogs, RateYourMusic) para artistas y álbumes en la base de datos.
+#                   - wikilinks_desde_mb.py: Lee la base de datos creada por db_musica.py y busca info de wikipedia para base de datos de la biblioteca de musica y añade los confirmados.
+#
 #   Dependencies:   - python3, mutagen, pylast, dotenv, sqlite3
 #                   - carpeta con musica en flac o mp3
 
@@ -138,6 +142,22 @@ class MusicLibraryManager:
             )
         ''')
         
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS albums (
+                id INTEGER PRIMARY KEY,
+                artist_id INTEGER,
+                name TEXT,
+                year TEXT,
+                label TEXT,
+                genre TEXT,
+                total_tracks INTEGER,
+                album_art_path TEXT,
+                last_updated TIMESTAMP,
+                FOREIGN KEY(artist_id) REFERENCES artists(id),
+                UNIQUE(artist_id, name)
+            )
+        ''')
+
         conn.commit()
         conn.close()
 
@@ -332,18 +352,31 @@ class MusicLibraryManager:
 
     def _update_album_info(self, cursor, metadata):
         """Update album information selectively."""
+        # Primero verificar si el álbum ya existe para este artista
         cursor.execute('''
-            INSERT OR REPLACE INTO albums 
-            (artist_id, name, year, label, genre, last_updated)
-            VALUES (
-                (SELECT id FROM artists WHERE name = ?),
-                ?, ?, ?, ?, ?
-            )
-        ''', (
-            metadata['artist'], metadata['album'], 
-            metadata['date'], metadata['label'], 
-            metadata['genre'], datetime.now()
-        ))
+            SELECT a.id, a.last_updated 
+            FROM albums a 
+            JOIN artists ar ON a.artist_id = ar.id 
+            WHERE ar.name = ? AND a.name = ?
+        ''', (metadata['artist'], metadata['album']))
+        
+        existing_album = cursor.fetchone()
+        
+        # Solo insertar o actualizar si el álbum no existe o 
+        # si la última actualización fue hace más de 30 días
+        if not existing_album or (datetime.now() - datetime.strptime(existing_album[1], '%Y-%m-%d %H:%M:%S.%f')) > timedelta(days=30):
+            cursor.execute('''
+                INSERT OR REPLACE INTO albums 
+                (artist_id, name, year, label, genre, last_updated)
+                VALUES (
+                    (SELECT id FROM artists WHERE name = ?),
+                    ?, ?, ?, ?, ?
+                )
+            ''', (
+                metadata['artist'], metadata['album'], 
+                metadata['date'], metadata['label'], 
+                metadata['genre'], datetime.now()
+            ))
 
     def _update_genre_info(self, cursor, genre_name):
         """Update genre information if not exists."""

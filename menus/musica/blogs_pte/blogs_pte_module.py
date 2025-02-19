@@ -6,7 +6,9 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
-# TODO: 
+# TODO:     QUIERO AÑADIR MAS WIDGETS, 
+#           Y LA POSIBILIDAD DE CREAR UNA LISTA DE POSTS/PAGINAS DE LAS QUE CREAR UNA PLAYLIST A GUARDAR EN LA CARPETA LOCAL
+#           CUANDO SE MIREN POR POSTS NUEVOS NO QUIERO REEMPLAZAR LAS QUE HAY, SINO QUE MIRE SI HAY NUEVAS, Y EN CASO DE HABER NUEVAS, LAS AGREGA AL FINAL DE LA LISTA.
 # Notes:
 #   Dependencies:  - python3, tkinter
 #                  - mpv
@@ -67,7 +69,7 @@ def extract_music_urls(url):
         response = requests.get(url)
         content = response.text
         music_patterns = [
-            r'"(bandcamp\.com/[^"]+)"',
+            r'"\b(https?://[a-zA-Z0-9-]+\.bandcamp\.com)\b"'
             r'(https?://(?:www\.)?soundcloud\.com/[^\s"\'<>]+)',
             r'(https?://(?:www\.)?youtube\.com/embed/[^\s"\'<>]+)',
             r'(https?://(?:www\.)?youtube\.com/watch\?[^\s"\'<>]+)',
