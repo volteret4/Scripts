@@ -1,0 +1,11 @@
+{
+    "available_scripts": {
+      "Base de datos": {
+        "path": "base_datos/db_musica.py",
+        "args": {
+            "db_path": "/home/huan/Música/moode.sqlite",
+            "path": "/mnt/NFS/moode/moode"
+        }
+      }
+    }
+}

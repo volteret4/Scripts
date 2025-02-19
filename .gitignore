@@ -124,3 +124,5 @@ menus/musica/__pycache__/
 moode_def_18.sqlite
 moode_nuevo.sqlite
 .cache
+.cache
+.cache/*

@@ -49,13 +49,22 @@ class BaseAPIFetcher(QThread):
     
     def get_artists_list(self) -> List[str]:
         """Obtiene la lista de artistas del archivo"""
+        self.log(f"Intentando leer artistas desde: {self.artists_file}")
         try:
             with open(self.artists_file, 'r', encoding='utf-8') as f:
-                return [line.strip() for line in f if line.strip()]
+                artistas = [line.strip() for line in f if line.strip()]
+                self.log(f"Artistas leídos: {len(artistas)}")
+                if artistas:
+                    self.log(f"Primeros 5 artistas: {artistas[:5]}")
+                    self.log(f"Último artista: {artistas[-1]}")
+                else:
+                    self.log("¡Advertencia! No se encontraron artistas en el archivo")
+                return artistas
         except Exception as e:
-            self.error.emit(f"Error al leer archivo de artistas: {str(e)}")
+            error_msg = f"Error al leer archivo de artistas: {str(e)}"
+            self.log(error_msg)
+            self.error.emit(error_msg)
             return []
-
 
 class TicketmasterFetcher(BaseAPIFetcher):
     def __init__(self, api_key: str, country_code: str, artists_file: str):
@@ -76,6 +85,7 @@ class TicketmasterFetcher(BaseAPIFetcher):
             # Obtener datos de la API de Ticketmaster
             url = f"https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime={fecha_actual}&endDateTime={fecha_proxima}&countryCode={self.country_code}&apikey={self.api_key}"
             
+            self.log(f"Realizando petición a Ticketmaster: {url}")
             response = requests.get(url)
             if response.status_code != 200:
                 self.error.emit(f"Error en la API de Ticketmaster: {response.status_code} - {response.text}")
@@ -83,48 +93,128 @@ class TicketmasterFetcher(BaseAPIFetcher):
                 
             json_data = response.json()
             
+            # Mostrar estadísticas de eventos devueltos por la API
+            total_eventos = len(json_data.get('_embedded', {}).get('events', []))
+            self.log(f"La API de Ticketmaster devolvió {total_eventos} eventos totales")
+            
+            if total_eventos > 0:
+                # Mostrar algunos nombres de eventos para verificar
+                event_names = [event['name'] for event in json_data.get('_embedded', {}).get('events', [])[:5]]
+                self.log(f"Ejemplos de eventos: {event_names}")
+            
             # Filtrar los conciertos según los artistas
             eventos_filtrados = []
+            artistas_encontrados = set()
             
-            if 'events' in json_data and json_data['events']:
-                for event in json_data['events']:
+            if '_embedded' in json_data and 'events' in json_data['_embedded']:
+                for event in json_data['_embedded']['events']:
+                    event_name = event['name']
+                    matched_artist = None
+                    
                     for artista in artistas_lista:
-                        if artista.lower() in event['name'].lower():
-                            # Crear un objeto ConcertEvent estandarizado
-                            venue_name = event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'Desconocido')
-                            city = event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'Desconocido')
-                            url = next((link['url'] for link in event.get('links', {}).get('self', []) 
-                                      if link.get('method') == 'GET'), '')
-                            
-                            # Imagen del evento
-                            image_url = None
-                            if 'images' in event and event['images']:
-                                image_url = next((img['url'] for img in event['images'] 
-                                                if img.get('ratio') == '16_9' and img.get('width') > 500), None)
-                                if not image_url and event['images']:
-                                    image_url = event['images'][0].get('url')
-                            
-                            concierto = ConcertEvent(
-                                id=event.get('id', ''),
-                                name=event.get('name', 'Sin nombre'),
-                                artist=artista,
-                                date=event.get('dates', {}).get('start', {}).get('localDate', 'Sin fecha'),
-                                venue=venue_name,
-                                city=city,
-                                country=self.country_code,
-                                url=url,
-                                source="Ticketmaster",
-                                image_url=image_url
-                            )
-                            eventos_filtrados.append(concierto)
+                        if self.artist_match(artista, event_name):
+                            matched_artist = artista
+                            artistas_encontrados.add(artista)
                             break
+                    
+                    if matched_artist:
+                        # Crear un objeto ConcertEvent estandarizado
+                        venue_name = event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'Desconocido')
+                        city = event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'Desconocido')
+                        url = event.get('url', '')
+                        if not url and 'links' in event:
+                            url = next((link['url'] for link in event.get('links', {}).get('self', []) 
+                                    if link.get('method') == 'GET'), '')
+                        
+                        # Imagen del evento
+                        image_url = None
+                        if 'images' in event and event['images']:
+                            image_url = next((img['url'] for img in event['images'] 
+                                            if img.get('ratio') == '16_9' and img.get('width') > 500), None)
+                            if not image_url and event['images']:
+                                image_url = event['images'][0].get('url')
+                        
+                        concierto = ConcertEvent(
+                            id=event.get('id', ''),
+                            name=event.get('name', 'Sin nombre'),
+                            artist=matched_artist,
+                            date=event.get('dates', {}).get('start', {}).get('localDate', 'Sin fecha'),
+                            venue=venue_name,
+                            city=city,
+                            country=self.country_code,
+                            url=url,
+                            source="Ticketmaster",
+                            image_url=image_url
+                        )
+                        eventos_filtrados.append(concierto)
+                        self.log(f"¡Coincidencia encontrada! Evento: '{event['name']}' coincide con artista: '{matched_artist}'")
+                
+                # Mostrar estadísticas de coincidencias
+                self.log(f"Se encontraron coincidencias para {len(artistas_encontrados)} artistas de {len(artistas_lista)}")
+                if artistas_encontrados:
+                    self.log(f"Artistas con coincidencias: {list(artistas_encontrados)}")
+                
+                # Mostrar artistas sin coincidencias (primeros 10)
+                artistas_sin_coincidencia = set(artistas_lista) - artistas_encontrados
+                if artistas_sin_coincidencia:
+                    self.log(f"Ejemplos de artistas sin coincidencias: {list(artistas_sin_coincidencia)[:10]}")
+            else:
+                self.log("No se encontraron eventos en la respuesta de Ticketmaster")
             
             # Enviar los eventos encontrados
             self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Ticketmaster")
                 
         except Exception as e:
             import traceback
-            self.error.emit(f"Error durante la obtención de conciertos de Ticketmaster: {str(e)}\n{traceback.format_exc()}")
+            error_msg = f"Error durante la obtención de conciertos de Ticketmaster: {str(e)}\n{traceback.format_exc()}"
+            self.log(error_msg)
+            self.error.emit(error_msg)
+
+    # Implementa esta función de comparación en la clase BaseAPIFetcher
+    def artist_match(self, artist_name: str, event_name: str) -> bool:
+        """
+        Comprueba si un nombre de artista coincide con el nombre de un evento
+        usando diferentes estrategias para aumentar la probabilidad de coincidencia
+        """
+        artist_lower = artist_name.lower().strip()
+        event_lower = event_name.lower().strip()
+        
+        # Estrategia 1: Coincidencia exacta
+        if artist_lower == event_lower:
+            return True
+        
+        # Estrategia 2: El artista está en el nombre del evento
+        if artist_lower in event_lower:
+            # Verificar que sea una palabra completa (evita coincidencias parciales)
+            words = event_lower.split()
+            for i, word in enumerate(words):
+                # Eliminar signos de puntuación al principio o final de la palabra
+                word = word.strip(".,;:!?()[]{}")
+                if word == artist_lower:
+                    return True
+                # También verificar combinaciones de palabras (para artistas con nombres compuestos)
+                for j in range(1, min(5, len(words) - i)):  # Limitar a combinaciones de hasta 5 palabras
+                    phrase = " ".join(words[i:i+j])
+                    if phrase == artist_lower:
+                        return True
+        
+        # Estrategia 3: Comparación de palabras clave
+        artist_words = set(artist_lower.split())
+        event_words = set(event_lower.split())
+        # Si todas las palabras del nombre del artista están en el nombre del evento
+        # y el artista tiene al menos 2 palabras (para evitar falsos positivos con nombres cortos)
+        if len(artist_words) >= 2 and artist_words.issubset(event_words):
+            return True
+        
+        return False
+
+
+    def log(self, message: str):
+        """Envía mensaje de log desde el fetcher"""
+        print(f"[{self.__class__.__name__}] {message}")
+        # No podemos llamar directamente a QTextEdit desde un hilo
+        # Usamos la señal de error para mostrar mensajes informativos también
+        self.error.emit(f"[INFO] {message}")
 
 
 class SongkickFetcher(BaseAPIFetcher):
@@ -622,7 +712,6 @@ class ConciertosModule(BaseModule):
         if self.active_fetchers == 0:
             self.log("No hay servicios habilitados para buscar")
             self.fetch_all_btn.setEnabled(True)
-    
     def fetch_single_service(self, service_name: str):
         """Inicia la búsqueda en un servicio específico"""
         # Actualizar la configuración global
@@ -637,6 +726,9 @@ class ConciertosModule(BaseModule):
         # Resetear eventos y desactivar botones
         self.all_events = []
         self.concerts_list.clear()
+        
+        # Inicializar la lista de fetchers
+        self._fetchers = []
         
         # Desactivar botones
         getattr(self, f"{service_name}_enabled").setEnabled(False)
@@ -660,20 +752,24 @@ class ConciertosModule(BaseModule):
     
     def update_service_configs(self):
         """Actualiza la configuración de todos los servicios desde la UI"""
-        # Actualizar solo las claves API, manteniendo el estado enabled original
+        # Actualizar solo las claves API para los servicios que tienen UI creada
         # Ticketmaster
-        self.config["apis"]["ticketmaster"]["api_key"] = self.ticketmaster_api_key.text().strip()
+        if hasattr(self, 'ticketmaster_api_key'):
+            self.config["apis"]["ticketmaster"]["api_key"] = self.ticketmaster_api_key.text().strip()
         
         # Songkick
-        self.config["apis"]["songkick"]["api_key"] = self.songkick_api_key.text().strip()
+        if hasattr(self, 'songkick_api_key'):
+            self.config["apis"]["songkick"]["api_key"] = self.songkick_api_key.text().strip()
         
         # Concerts-Metal no tiene API key, no necesita actualización
         
         # RapidAPI
-        self.config["apis"]["rapidapi"]["api_key"] = self.rapidapi_api_key.text().strip()
+        if hasattr(self, 'rapidapi_api_key'):
+            self.config["apis"]["rapidapi"]["api_key"] = self.rapidapi_api_key.text().strip()
         
         # Bandsintown
-        self.config["apis"]["bandsintown"]["app_id"] = self.bandsintown_app_id.text().strip()
+        if hasattr(self, 'bandsintown_app_id'):
+            self.config["apis"]["bandsintown"]["app_id"] = self.bandsintown_app_id.text().strip()
     
     def launch_ticketmaster_fetcher(self):
         """Inicia el fetcher de Ticketmaster"""
@@ -688,6 +784,11 @@ class ConciertosModule(BaseModule):
         fetcher = TicketmasterFetcher(api_key, self.config["country_code"], self.config["artists_file"])
         fetcher.finished.connect(self.on_fetcher_finished)
         fetcher.error.connect(self.on_fetcher_error)
+        
+        # Asegurarse de que exista la lista _fetchers
+        if not hasattr(self, '_fetchers'):
+            self._fetchers = []
+        
         self._fetchers.append(fetcher)  # Agregar a la lista de fetchers
         fetcher.start()
     
@@ -714,7 +815,14 @@ class ConciertosModule(BaseModule):
         fetcher = MetalConcertsFetcher(self.config["country_code"], self.config["artists_file"])
         fetcher.finished.connect(self.on_fetcher_finished)
         fetcher.error.connect(self.on_fetcher_error)
+        
+        # Asegurarse de que exista la lista _fetchers
+        if not hasattr(self, '_fetchers'):
+            self._fetchers = []
+        
+        self._fetchers.append(fetcher)
         fetcher.start()
+
     
     def launch_rapidapi_fetcher(self):
         """Inicia el fetcher de RapidAPI"""
@@ -729,6 +837,12 @@ class ConciertosModule(BaseModule):
         fetcher = RapidAPIFetcher(api_key, self.config["country_code"], self.config["artists_file"])
         fetcher.finished.connect(self.on_fetcher_finished)
         fetcher.error.connect(self.on_fetcher_error)
+            # Asegurarse de que exista la lista _fetchers
+        if not hasattr(self, '_fetchers'):
+            self._fetchers = []
+        
+        self._fetchers.append(fetcher)
+    
         fetcher.start()
     
     def launch_bandsintown_fetcher(self):
@@ -744,6 +858,12 @@ class ConciertosModule(BaseModule):
         fetcher = BandsintownFetcher(app_id, self.config["country_code"], self.config["artists_file"])
         fetcher.finished.connect(self.on_fetcher_finished)
         fetcher.error.connect(self.on_fetcher_error)
+            # Asegurarse de que exista la lista _fetchers
+        if not hasattr(self, '_fetchers'):
+            self._fetchers = []
+        
+        self._fetchers.append(fetcher)
+    
         fetcher.start()
     
     def on_fetcher_finished(self, events: List[ConcertEvent], message: str):
@@ -755,6 +875,7 @@ class ConciertosModule(BaseModule):
         self.active_fetchers -= 1
         if self.active_fetchers == 0:
             self.fetch_all_btn.setEnabled(True)
+            # Solo habilitar los botones de servicios que existen
             for service in ["ticketmaster", "songkick", "concerts_metal", "rapidapi", "bandsintown"]:
                 if hasattr(self, f"{service}_enabled"):
                     getattr(self, f"{service}_enabled").setEnabled(True)
@@ -763,15 +884,23 @@ class ConciertosModule(BaseModule):
     
     def on_fetcher_error(self, error_message: str):
         """Maneja errores de los fetchers"""
-        self.log(f"ERROR: {error_message}")
+        if error_message.startswith("[INFO]"):
+            # Es un mensaje informativo, no un error
+            self.log(error_message.replace("[INFO] ", ""))
+        else:
+            # Es un error real
+            self.log(f"ERROR: {error_message}")
         
-        self.active_fetchers -= 1
-        if self.active_fetchers == 0:
-            self.fetch_all_btn.setEnabled(True)
-            for service in ["ticketmaster", "songkick", "concerts_metal", "rapidapi", "bandsintown"]:
-                if hasattr(self, f"{service}_enabled"):
-                    getattr(self, f"{service}_enabled").setEnabled(True)
-    
+        # Solo decrementamos contador si el mensaje no es informativo y contiene "Error"
+        if not error_message.startswith("[INFO]") and "Error" in error_message:
+            self.active_fetchers -= 1
+            if self.active_fetchers == 0:
+                self.fetch_all_btn.setEnabled(True)
+                for service in ["ticketmaster", "songkick", "concerts_metal", "rapidapi", "bandsintown"]:
+                    if hasattr(self, f"{service}_enabled"):
+                        getattr(self, f"{service}_enabled").setEnabled(True)
+
+
     def display_events(self, events: List[ConcertEvent]):
         """Muestra los eventos en la lista de conciertos"""
         for event in events:
@@ -807,9 +936,8 @@ class ConciertosModule(BaseModule):
             self.log("Este concierto no tiene URL asociada")
     
     def log(self, message: str):
-        """Añade un mensaje al área de log"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_area.append(f"[{timestamp}] {message}")
-        # Desplazar hacia abajo
-        scrollbar = self.log_area.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        """Envía mensaje de log desde el fetcher"""
+        print(f"[{self.__class__.__name__}] {message}")
+        # No podemos llamar directamente a QTextEdit desde un hilo
+        # Usamos la señal de error para mostrar mensajes informativos también
+        #self.error.emit(f"[INFO] {message}")
