@@ -121,3 +121,6 @@ menus/__pycache__/*
 menus/musica/__pycache__/
 **/__pycache__/
 **/token.txt
+moode_def_18.sqlite
+moode_nuevo.sqlite
+.cache
