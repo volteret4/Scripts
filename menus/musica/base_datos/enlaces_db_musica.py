@@ -35,9 +35,10 @@ sqlite3.register_adapter(datetime, adapt_datetime)
 load_dotenv()
 
 class MusicLinksManager:
-    def __init__(self, db_path: str, disabled_services=None):
+    def __init__(self, db_path: str, disabled_services=None, rate_limit=0.5):
         self.db_path = Path(db_path).resolve()
         self.disabled_services = disabled_services or []
+        self.rate_limit = rate_limit  # Tiempo en segundos entre solicitudes API
         
         # Logging configuration
         logging.basicConfig(
@@ -265,21 +266,71 @@ class MusicLinksManager:
         
         self.update_artist_links(days_threshold, force_update)
         self.update_album_and_track_links(days_threshold, force_update)
+    def update_links(self, days_threshold=30, force_update=False, recent_only=True):
+        """
+        Actualiza los enlaces externos para artistas y álbumes
+        
+        Args:
+            days_threshold: Si recent_only=True, actualizar solo registros más recientes que estos días
+                           Si recent_only=False, actualizar solo registros más antiguos que estos días
+            force_update: Forzar actualización de todos los registros independientemente de su fecha
+            recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+        """
+        # Mostrar conteos antes de comenzar
+        counts = self.get_table_counts()
+        table_count_info = ", ".join([f"{k}: {v}" for k, v in counts.items()])
+        self.logger.info(f"Database contains {table_count_info}")
+        
+        # Mostrar servicios habilitados/deshabilitados y configuración de rate limit
+        enabled_services = []
+        if self.spotify: enabled_services.append("Spotify")
+        if self.youtube: enabled_services.append("YouTube")
+        if not 'musicbrainz' in self.disabled_services: enabled_services.append("MusicBrainz")
+        if self.discogs: enabled_services.append("Discogs")
+        if self.rateyourmusic_enabled: enabled_services.append("RateYourMusic")
+        
+        self.logger.info(f"Enabled services: {', '.join(enabled_services)}")
+        self.logger.info(f"Disabled services: {', '.join(self.disabled_services)}")
+        self.logger.info(f"Rate limit: {self.rate_limit} seconds between API requests")
+        
+        if recent_only:
+            self.logger.info(f"Updating only records added/modified in the last {days_threshold} days")
+        else:
+            self.logger.info(f"Updating only records with links older than {days_threshold} days")
+        
+        self.update_artist_links(days_threshold, force_update, recent_only)
+        self.update_album_and_track_links(days_threshold, force_update, recent_only)
     
-    def update_artist_links(self, days_threshold=30, force_update=False):
-        """Actualiza los enlaces externos para artistas"""
+    def update_artist_links(self, days_threshold=30, force_update=False, recent_only=True):
+        """
+        Actualiza los enlaces externos para artistas
+        
+        Args:
+            days_threshold: Umbral de días para filtrar registros
+            force_update: Forzar actualización de todos los registros
+            recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+        """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
         if force_update:
             c.execute("SELECT id, name FROM artists")
         else:
-            # Filtrar por fecha de actualización de enlaces
-            c.execute("""
-                SELECT id, name FROM artists 
-                WHERE links_updated IS NULL 
-                OR datetime(links_updated) < datetime('now', ?)
-            """, (f'-{days_threshold} days',))
+            if recent_only:
+                # Filtrar registros recientes (creados/modificados en los últimos X días)
+                # Asumiendo que hay una columna 'updated' o similar para la fecha de modificación
+                c.execute("""
+                    SELECT id, name FROM artists 
+                    WHERE datetime(last_updated) > datetime('now', ?)
+                    OR last_updated IS NULL
+                """, (f'-{days_threshold} days',))
+            else:
+                # Filtrar por fecha de actualización de enlaces (antiguos)
+                c.execute("""
+                    SELECT id, name FROM artists 
+                    WHERE links_updated IS NULL 
+                    OR datetime(links_updated) < datetime('now', ?)
+                """, (f'-{days_threshold} days',))
         
         artists = c.fetchall()
         total_artists = len(artists)
@@ -312,14 +363,21 @@ class MusicLinksManager:
             
             conn.commit()
             
-            # Pausa para evitar límites de tasa en APIs
-            time.sleep(0.5)
+            # Pausa usando el rate limiter
+            self._rate_limit_pause()
         
         conn.close()
         self.logger.info(f"Updated links for {total_artists} artists")
     
-    def update_album_and_track_links(self, days_threshold=30, force_update=False):
-        """Actualiza los enlaces externos para álbumes y sus pistas"""
+    def update_album_and_track_links(self, days_threshold=30, force_update=False, recent_only=True):
+        """
+        Actualiza los enlaces externos para álbumes y sus pistas
+        
+        Args:
+            days_threshold: Umbral de días para filtrar registros
+            force_update: Forzar actualización de todos los registros
+            recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+        """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
@@ -332,13 +390,22 @@ class MusicLinksManager:
                 FROM albums JOIN artists ON albums.artist_id = artists.id
             """)
         else:
-            # Filtrar por fecha de actualización de enlaces
-            c.execute("""
-                SELECT albums.id, albums.name, artists.name 
-                FROM albums JOIN artists ON albums.artist_id = artists.id
-                WHERE albums.links_updated IS NULL 
-                OR datetime(albums.links_updated) < datetime('now', ?)
-            """, (f'-{days_threshold} days',))
+            if recent_only:
+                # Filtrar registros recientes (creados/modificados en los últimos X días)
+                c.execute("""
+                    SELECT albums.id, albums.name, artists.name 
+                    FROM albums JOIN artists ON albums.artist_id = artists.id
+                    WHERE datetime(albums.last_updated) > datetime('now', ?)
+                    OR albums.last_updated IS NULL
+                """, (f'-{days_threshold} days',))
+            else:
+                # Filtrar por fecha de actualización de enlaces (antiguos)
+                c.execute("""
+                    SELECT albums.id, albums.name, artists.name 
+                    FROM albums JOIN artists ON albums.artist_id = artists.id
+                    WHERE albums.links_updated IS NULL 
+                    OR datetime(albums.links_updated) < datetime('now', ?)
+                """, (f'-{days_threshold} days',))
         
         albums = c.fetchall()
         total_albums = len(albums)
@@ -385,11 +452,15 @@ class MusicLinksManager:
             
             conn.commit()
             
-            # Pausa para evitar límites de tasa en APIs
-            time.sleep(0.5)
+            # Pausa usando el rate limiter
+            self._rate_limit_pause()
         
         conn.close()
         self.logger.info(f"Updated links for {total_albums} albums")
+    
+    def _rate_limit_pause(self):
+        """Realiza una pausa según la configuración del rate limiter"""
+        time.sleep(self.rate_limit)
 
     def _update_track_links(self, conn, album_id, spotify_tracks):
         """Actualiza los enlaces de pistas para un álbum específico"""
@@ -644,18 +715,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Music Library External Links Manager')
     parser.add_argument('db_path', help='Path to SQLite database')
     parser.add_argument('--force-update', action='store_true', help='Force update all records')
-    parser.add_argument('--days', type=int, default=30, help='Update records older than this many days')
+    parser.add_argument('--days', type=int, default=30, help='Update records based on threshold of days')
     parser.add_argument('--disable-services', nargs='+', choices=['spotify', 'youtube', 'musicbrainz', 'discogs', 'rateyourmusic'], 
                         help='Disable specific services')
     parser.add_argument('--summary-only', action='store_true', help='Only show summary information without updating')
+    parser.add_argument('--rate-limit', type=float, default=0.5, help='Rate limit in seconds between API requests')
+    parser.add_argument('--older-only', action='store_true', 
+                        help='Update only older records (default is newer records)')
     
     args = parser.parse_args()
     
-    manager = MusicLinksManager(args.db_path, disabled_services=args.disable_services or [])
+    manager = MusicLinksManager(args.db_path, disabled_services=args.disable_services or [], rate_limit=args.rate_limit)
     
     if args.summary_only:
         counts = manager.get_table_counts()
         for table, count in counts.items():
             print(f"{table.capitalize()}: {count}")
     else:
-        manager.update_links(days_threshold=args.days, force_update=args.force_update)
+        manager.update_links(days_threshold=args.days, force_update=args.force_update, recent_only=not args.older_only)
