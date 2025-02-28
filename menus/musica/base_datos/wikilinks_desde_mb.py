@@ -1,335 +1,537 @@
-
-#!/usr/bin/env python
-#
-# Script Name: wikilinks_desde_mb.py
-# Description: Obtiene info de wikipedia para base de datos de la biblioteca de musica y añade los confirmados.
-# Author: volteret4
-# Repository: https://github.com/volteret4/
-# License:
-# TODO: 
-# Notes:
-#   Dependencies:  - python3, sqlite3, musicbrainzngs
-#                  - base de datos sobre biblioteca digital
-
 import sqlite3
-import musicbrainzngs as mb
-import requests
-import json
-import logging
-import sys
-from pathlib import Path
-import time
-from urllib.parse import quote
-import webbrowser
-import subprocess
-import platform
 import argparse
+import json
+import os
+import webbrowser
+import datetime
+import requests
+from urllib.parse import quote
+from bs4 import BeautifulSoup
 
-class ArtistEnricher:
-    def __init__(self, db_path, processed_file="processed_artists.txt", max_links=None):
-        self.db_path = db_path
-        self.processed_file = Path(processed_file)
-        self.max_links = max_links
-        self.processed_links = 0
-        self.processed_artists = self.load_processed_artists()
-        self.total_artists = self.count_total_artists()
+def init_database(db_path):
+    """Inicializa la base de datos añadiendo las columnas necesarias si no existen"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Comprobamos si las columnas existen en la tabla artists
+    cursor.execute("PRAGMA table_info(artists)")
+    columns = cursor.fetchall()
+    column_names = [column[1] for column in columns]
+    
+    if 'wikipedia_url' not in column_names:
+        cursor.execute("ALTER TABLE artists ADD COLUMN wikipedia_url TEXT")
+        print("Columna 'wikipedia_url' añadida a la tabla 'artists'")
+    
+    if 'wikipedia_content' not in column_names:
+        cursor.execute("ALTER TABLE artists ADD COLUMN wikipedia_content TEXT")
+        print("Columna 'wikipedia_content' añadida a la tabla 'artists'")
+    
+    if 'wikipedia_updated' not in column_names:
+        cursor.execute("ALTER TABLE artists ADD COLUMN wikipedia_updated TIMESTAMP")
+        print("Columna 'wikipedia_updated' añadida a la tabla 'artists'")
+    
+    # Comprobamos si las columnas existen en la tabla albums
+    cursor.execute("PRAGMA table_info(albums)")
+    columns = cursor.fetchall()
+    column_names = [column[1] for column in columns]
+    
+    if 'wikipedia_url' not in column_names:
+        cursor.execute("ALTER TABLE albums ADD COLUMN wikipedia_url TEXT")
+        print("Columna 'wikipedia_url' añadida a la tabla 'albums'")
+    
+    if 'wikipedia_content' not in column_names:
+        cursor.execute("ALTER TABLE albums ADD COLUMN wikipedia_content TEXT")
+        print("Columna 'wikipedia_content' añadida a la tabla 'albums'")
+    
+    if 'wikipedia_updated' not in column_names:
+        cursor.execute("ALTER TABLE albums ADD COLUMN wikipedia_updated TIMESTAMP")
+        print("Columna 'wikipedia_updated' añadida a la tabla 'albums'")
+    
+    # Actualizamos la base de datos
+    conn.commit()
+    conn.close()
+
+def load_log_file(log_file):
+    """Carga el archivo de registro o crea uno nuevo si no existe"""
+    if os.path.exists(log_file):
+        with open(log_file, 'r') as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                print("Error al cargar el archivo de registro. Creando uno nuevo.")
+                return {"last_artist_id": 0, "last_album_id": 0}
+    else:
+        return {"last_artist_id": 0, "last_album_id": 0}
+
+def save_log_file(log_file, data):
+    """Guarda el estado actual en el archivo de registro"""
+    with open(log_file, 'w') as f:
+        json.dump(data, f)
+
+def get_database_stats(db_path):
+    """Obtiene estadísticas sobre enlaces existentes y faltantes"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Artistas
+    cursor.execute("SELECT COUNT(*) FROM artists")
+    total_artists = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM artists WHERE wikipedia_url IS NOT NULL AND wikipedia_url != ''")
+    artists_with_wiki = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM artists WHERE wikipedia_content IS NOT NULL AND wikipedia_content != ''")
+    artists_with_content = cursor.fetchone()[0]
+    
+    # Álbumes
+    cursor.execute("SELECT COUNT(*) FROM albums")
+    total_albums = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM albums WHERE wikipedia_url IS NOT NULL AND wikipedia_url != ''")
+    albums_with_wiki = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM albums WHERE wikipedia_content IS NOT NULL AND wikipedia_content != ''")
+    albums_with_content = cursor.fetchone()[0]
+    
+    conn.close()
+    
+    return {
+        "total_artists": total_artists,
+        "artists_with_wiki": artists_with_wiki,
+        "artists_with_content": artists_with_content,
+        "artists_missing_wiki": total_artists - artists_with_wiki,
+        "total_albums": total_albums,
+        "albums_with_wiki": albums_with_wiki,
+        "albums_with_content": albums_with_content,
+        "albums_missing_wiki": total_albums - albums_with_wiki
+    }
+
+def extract_wikipedia_url_from_musicbrainz(mb_url):
+    """Intenta extraer un enlace a Wikipedia desde MusicBrainz"""
+    if not mb_url:
+        return None
+    
+    # Obtener el ID de MusicBrainz
+    mb_id = mb_url.split('/')[-1]
+    
+    # Consultar la API de MusicBrainz para obtener relaciones
+    try:
+        if 'artist' in mb_url:
+            endpoint = f"https://musicbrainz.org/ws/2/artist/{mb_id}?inc=url-rels&fmt=json"
+        else:
+            endpoint = f"https://musicbrainz.org/ws/2/release/{mb_id}?inc=url-rels&fmt=json"
         
-        # Configurar logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler('artist_enrichment.log'),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
+        response = requests.get(endpoint, headers={"User-Agent": "MusicLibraryWikipediaUpdater/1.0"})
         
-        # Configurar MusicBrainz
-        mb.set_useragent("MusicLibraryEnricher", "1.0", "your@email.com")
-
-
-    def count_total_artists(self):
-        """Contar el total de artistas y los que faltan por procesar"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+        if response.status_code == 200:
+            data = response.json()
             
-            # Total de artistas
-            cursor.execute("SELECT COUNT(*) FROM artists")
-            total = cursor.fetchone()[0]
-            
-            # Artistas con Wikipedia
-            cursor.execute("SELECT COUNT(*) FROM artists WHERE wikipedia_url IS NOT NULL AND wikipedia_url != ''")
-            with_wiki = cursor.fetchone()[0]
-            
-            # Artistas por procesar (excluyendo los ya procesados)
-            pendientes = cursor.execute("""
-                SELECT COUNT(*) FROM artists 
-                WHERE id NOT IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
-            """, (json.dumps(list(self.processed_artists)),)).fetchone()[0]
-            
-            print("\nEstadísticas iniciales:")
-            print(f"Total de artistas: {total}")
-            print(f"Artistas con Wikipedia: {with_wiki}")
-            print(f"Artistas procesados anteriormente: {len(self.processed_artists)}")
-            print(f"Artistas pendientes por procesar: {pendientes}")
-            print("----------------------------------------\n")
-            
-            return total
-    def show_progress(self):
-        """Mostrar el progreso actual"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM artists WHERE wikipedia_url IS NOT NULL AND wikipedia_url != ''")
-            with_wiki = cursor.fetchone()[0]
-            
-            pendientes = cursor.execute("""
-                SELECT COUNT(*) FROM artists 
-                WHERE id NOT IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
-            """, (json.dumps(list(self.processed_artists)),)).fetchone()[0]
-            
-            print("\nProgreso actual:")
-            print(f"Artistas con Wikipedia: {with_wiki}/{self.total_artists} ({(with_wiki/self.total_artists)*100:.1f}%)")
-            print(f"Enlaces añadidos en esta sesión: {self.processed_links}")
-            if self.max_links:
-                print(f"Enlaces restantes hasta el límite: {self.max_links - self.processed_links}")
-            print(f"Artistas pendientes por procesar: {pendientes}")
-            print("----------------------------------------\n")
-
-
-    def load_processed_artists(self):
-        """Cargar la lista de artistas procesados desde el archivo"""
-        if not self.processed_file.exists():
-            return set()
-            
-        with open(self.processed_file, 'r', encoding='utf-8') as f:
-            return {line.split('|')[0].strip() for line in f if line.strip()}
-
-    def mark_as_processed(self, artist_id, artist_name):
-        """Marcar un artista como procesado en el archivo"""
-        with open(self.processed_file, 'a', encoding='utf-8') as f:
-            f.write(f"{artist_id}|{artist_name}\n")
-        self.processed_artists.add(str(artist_id))
-
-    def setup_database(self):
-        """Añadir las nuevas columnas necesarias si no existen"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # Verificar si las columnas existen
-            cursor.execute("PRAGMA table_info(artists)")
-            columns = {col[1] for col in cursor.fetchall()}
-            
-            if 'wikidata_id' not in columns:
-                cursor.execute("ALTER TABLE artists ADD COLUMN wikidata_id TEXT")
-            if 'wikipedia_url' not in columns:
-                cursor.execute("ALTER TABLE artists ADD COLUMN wikipedia_url TEXT")
-            if 'wikipedia_lang' not in columns:
-                cursor.execute("ALTER TABLE artists ADD COLUMN wikipedia_lang TEXT")
-
-    def open_in_browser(self, url):
-        """Abrir la URL en el navegador predeterminado en segundo plano"""
-        try:
-            if platform.system() == 'Darwin':  # macOS
-                subprocess.Popen(['open', url], 
-                               stdout=subprocess.DEVNULL, 
-                               stderr=subprocess.DEVNULL)
-            elif platform.system() == 'Windows':  # Windows
-                subprocess.Popen(['start', '', url], 
-                               shell=True, 
-                               stdout=subprocess.DEVNULL, 
-                               stderr=subprocess.DEVNULL)
-            else:  # Linux
-                subprocess.Popen(['xdg-open', url], 
-                               stdout=subprocess.DEVNULL, 
-                               stderr=subprocess.DEVNULL)
-        except Exception as e:
-            self.logger.error(f"Error abriendo el navegador: {e}")
-
-    def get_wikidata_id(self, mbid):
-        """Obtener el ID de Wikidata desde MusicBrainz"""
-        try:
-            if not mbid:
-                return None
-                
-            result = mb.get_artist_by_id(mbid, includes=['url-rels'])
-            
-            for relation in result['artist'].get('url-relation-list', []):
-                if relation['type'] == 'wikidata':
-                    return relation['target'].split('/')[-1]
-        except Exception as e:
-            self.logger.error(f"Error obteniendo Wikidata ID: {str(e)}")
+            # Buscar relación con Wikipedia
+            if 'relations' in data:
+                for relation in data['relations']:
+                    if relation['type'] == 'wikipedia' and 'url' in relation:
+                        return relation['url']['resource']
+        
+        return None
+    except Exception as e:
+        print(f"Error al consultar MusicBrainz: {e}")
         return None
 
-    def get_wikipedia_url(self, wikidata_id):
-        """Obtener URLs de Wikipedia desde Wikidata"""
-        if not wikidata_id:
-            return None, None
-            
-        try:
-            url = f"https://www.wikidata.org/w/api.php?action=wbgetentities&ids={wikidata_id}&format=json&props=sitelinks"
-            response = requests.get(url)
+def search_wikipedia(query):
+    """Busca en la API de Wikipedia y devuelve el primer resultado"""
+    try:
+        encoded_query = quote(query)
+        url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={encoded_query}&limit=1&namespace=0&format=json"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
             data = response.json()
-            
-            if 'entities' in data and wikidata_id in data['entities']:
-                sitelinks = data['entities'][wikidata_id].get('sitelinks', {})
-                
-                # Intentar primero español, luego inglés
-                if 'eswiki' in sitelinks:
-                    return f"https://es.wikipedia.org/wiki/{sitelinks['eswiki']['title']}", 'es'
-                elif 'enwiki' in sitelinks:
-                    return f"https://en.wikipedia.org/wiki/{sitelinks['enwiki']['title']}", 'en'
-                
-        except Exception as e:
-            self.logger.error(f"Error obteniendo URL de Wikipedia: {str(e)}")
-        return None, None
-
-    def search_wikipedia(self, artist_name, lang='es'):
-        """Buscar directamente en Wikipedia"""
-        try:
-            base_url = f"https://{lang}.wikipedia.org/w/api.php"
-            params = {
-                'action': 'query',
-                'list': 'search',
-                'srsearch': f"intitle:{artist_name} musician",
-                'format': 'json'
-            }
-            
-            response = requests.get(base_url, params=params)
+            if len(data) > 3 and len(data[3]) > 0:
+                return data[3][0]  # Primera URL
+        
+        # Intentar en español si no hay resultados
+        url = f"https://es.wikipedia.org/w/api.php?action=opensearch&search={encoded_query}&limit=1&namespace=0&format=json"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
             data = response.json()
+            if len(data) > 3 and len(data[3]) > 0:
+                return data[3][0]  # Primera URL
+        
+        return None
+    except Exception as e:
+        print(f"Error al buscar en Wikipedia: {e}")
+        return None
+
+def get_wikipedia_content(url):
+    """Obtiene el contenido principal de una página de Wikipedia"""
+    if not url:
+        return None
+    
+    try:
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-            if data['query']['search']:
-                title = data['query']['search'][0]['title']
-                return f"https://{lang}.wikipedia.org/wiki/{quote(title)}", lang
-                
-            # Si no hay resultados en español, intentar en inglés
-            if lang == 'es':
-                return self.search_wikipedia(artist_name, 'en')
-                
-        except Exception as e:
-            self.logger.error(f"Error buscando en Wikipedia: {str(e)}")
-        return None, None
-
-    def enrich_artists(self):
-        """Proceso principal de enriquecimiento"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+            # Extraer el contenido principal
+            main_content = soup.find('div', {'id': 'mw-content-text'})
             
-            while True:
-                # Verificar si hemos alcanzado el límite de enlaces
-                if self.max_links and self.processed_links >= self.max_links:
-                    print(f"\nSe alcanzó el límite de {self.max_links} enlaces procesados.")
-                    self.show_progress()
-                    break
+            if main_content:
+                # Eliminar elementos no deseados
+                for div in main_content.find_all(['div', 'table'], {'class': ['navbox', 'infobox', 'toc', 'metadata', 'tmbox', 'ambox']}):
+                    div.decompose()
+                
+                # Extraer sólo los párrafos principales
+                paragraphs = main_content.find_all('p')
+                content = '\n\n'.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
+                
+                return content
+            
+        return None
+    except Exception as e:
+        print(f"Error al obtener contenido de Wikipedia: {e}")
+        return None
 
-                # Obtener el siguiente artista no procesado
-                cursor.execute("""
-                    SELECT id, name, mbid 
-                    FROM artists 
-                    WHERE id NOT IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
-                    ORDER BY id
-                """, (json.dumps(list(self.processed_artists)),))
+def update_artists_wikipedia(db_path, log_file):
+    """Actualiza los enlaces y contenido de Wikipedia para artistas"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Cargar el registro
+    log_data = load_log_file(log_file)
+    last_id = log_data.get("last_artist_id", 0)
+    
+    # Obtener artistas sin enlaces a Wikipedia
+    cursor.execute("""
+        SELECT id, name, musicbrainz_url
+        FROM artists
+        WHERE id > ? AND (wikipedia_url IS NULL OR wikipedia_url = '')
+        ORDER BY id
+    """, (last_id,))
+    
+    artists = cursor.fetchall()
+    total = len(artists)
+    
+    if total == 0:
+        print("No hay artistas pendientes de actualizar enlaces a Wikipedia.")
+        return
+    
+    print(f"Procesando {total} artistas sin enlaces a Wikipedia...")
+    
+    for i, (artist_id, artist_name, mb_url) in enumerate(artists):
+        print(f"\n[{i+1}/{total}] Procesando artista: {artist_name}")
+        
+        # Primero intentamos obtener el enlace desde MusicBrainz
+        wiki_url = None
+        if mb_url:
+            print(f"  Buscando enlace en MusicBrainz...")
+            wiki_url = extract_wikipedia_url_from_musicbrainz(mb_url)
+            
+            if wiki_url:
+                print(f"  Enlace encontrado en MusicBrainz: {wiki_url}")
+        
+        # Si no encontramos el enlace en MusicBrainz, buscamos en Wikipedia
+        if not wiki_url:
+            print(f"  Buscando en Wikipedia...")
+            wiki_url = search_wikipedia(artist_name)
+            
+            if wiki_url:
+                print(f"  Enlace encontrado en Wikipedia: {wiki_url}")
+            else:
+                print("  No se encontró enlace en Wikipedia.")
+        
+        # Si tenemos una URL, abrimos el navegador y pedimos confirmación
+        content = None
+        if wiki_url:
+            webbrowser.open(wiki_url)
+            
+            user_input = input(f"  Confirmar URL para '{artist_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
+            
+            if user_input.lower() == 'n':
+                wiki_url = ""
+            elif user_input.strip():
+                wiki_url = user_input.strip()
                 
-                artist = cursor.fetchone()
-                if not artist:
-                    print("\nNo quedan más artistas por procesar.")
-                    self.show_progress()
-                    break
-
-                artist_id, name, mbid = artist
-                self.logger.info(f"Procesando artista: {name} (ID: {artist_id})")
-                
-                # Buscar en MusicBrainz/Wikidata primero
-                wikidata_id = self.get_wikidata_id(mbid)
-                wikipedia_url = None
-                lang = None
-                
-                if wikidata_id:
-                    wikipedia_url, lang = self.get_wikipedia_url(wikidata_id)
-                
-                # Si no se encuentra, buscar directamente en Wikipedia
-                if not wikipedia_url:
-                    wikipedia_url, lang = self.search_wikipedia(name)
-                
-                # Mostrar el enlace y abrirlo
-                if wikipedia_url:
-                    print(f"\nArtista: {name}")
-                    print(f"URL encontrada: {wikipedia_url}")
-                    
-                    # Abrir el enlace en segundo plano
-                    self.open_in_browser(wikipedia_url)
-                    
-                    # Preguntar si guardar el enlace
-                    response = input("¿Guardar este enlace? [S/n] / [m]anual: ").strip().lower()
-                    
-                    if response in ['', 's', 'si', 'yes', 'y']:
-                        cursor.execute("""
-                            UPDATE artists 
-                            SET wikidata_id = ?, wikipedia_url = ?, wikipedia_lang = ?
-                            WHERE id = ?
-                        """, (wikidata_id, wikipedia_url, lang, artist_id))
-                        conn.commit()
-                        print(f"Enlace guardado para {name}")
-                        self.processed_links += 1
-                    elif response == 'm':
-                        manual_url = input("Introduce el enlace de Wikipedia: ").strip()
-                        
-                        if manual_url:
-                            if manual_url.startswith('https://'):
-                                cursor.execute("""
-                                    UPDATE artists 
-                                    SET wikipedia_url = ?, wikipedia_lang = 'es'
-                                    WHERE id = ?
-                                """, (manual_url, artist_id))
-                                conn.commit()
-                                print(f"Enlace manual guardado para {name}")
-                                self.processed_links += 1
-                            else:
-                                print("Enlace no válido, no se guardó.")
-                        else:
-                            print("No se ingresó ningún enlace manual.")
-                    
+            # Si tenemos una URL final, obtenemos el contenido
+            if wiki_url:
+                print("  Obteniendo contenido de Wikipedia...")
+                content = get_wikipedia_content(wiki_url)
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    print(f"  Contenido obtenido: {content_preview}")
                 else:
-                    print(f"\nArtista: {name}")
-                    print("No se encontró enlace. Puedes ingresar uno manualmente.")
-                    manual_url = input("Introduce el enlace de Wikipedia (o Enter para saltar): ").strip()
-                    
-                    if manual_url:
-                        if manual_url.startswith('https://'):
-                            cursor.execute("""
-                                UPDATE artists 
-                                SET wikipedia_url = ?, wikipedia_lang = 'es'
-                                WHERE id = ?
-                            """, (manual_url, artist_id))
-                            conn.commit()
-                            print(f"Enlace manual guardado para {name}")
-                            self.processed_links += 1
-                        else:
-                            print("Enlace no válido, no se guardó.")
+                    print("  No se pudo obtener el contenido.")
+        else:
+            user_input = input(f"  No se encontró URL para '{artist_name}'. Introduzca URL manualmente o Enter para dejar vacío: ")
+            if user_input.strip():
+                wiki_url = user_input.strip()
                 
-                # Marcar como procesado independientemente del resultado
-                self.mark_as_processed(artist_id, name)
+                # Si se proporciona una URL manualmente, obtenemos el contenido
+                print("  Obteniendo contenido de Wikipedia...")
+                content = get_wikipedia_content(wiki_url)
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    print(f"  Contenido obtenido: {content_preview}")
+                else:
+                    print("  No se pudo obtener el contenido.")
+            else:
+                wiki_url = ""
+        
+        # Actualizamos la base de datos con URL y contenido
+        now = datetime.datetime.now()
+        if wiki_url:
+            cursor.execute("""
+                UPDATE artists
+                SET wikipedia_url = ?, wikipedia_content = ?, wikipedia_updated = ?, links_updated = ?
+                WHERE id = ?
+            """, (wiki_url, content or "", now, now, artist_id))
+        else:
+            cursor.execute("""
+                UPDATE artists
+                SET wikipedia_url = ?, wikipedia_content = ?, wikipedia_updated = ?, links_updated = ?
+                WHERE id = ?
+            """, ("", "", now, now, artist_id))
+        
+        conn.commit()
+        
+        # Actualizamos el archivo de registro
+        log_data["last_artist_id"] = artist_id
+        save_log_file(log_file, log_data)
+        
+        # Preguntamos si desea continuar después de cada 10 artistas
+        if (i + 1) % 10 == 0 and i < total - 1:
+            if input("\n¿Desea continuar con la actualización? [S/n]: ").lower() == 'n':
+                break
+    
+    conn.close()
+    print("\nActualización de artistas completada.")
+
+def update_albums_wikipedia(db_path, log_file):
+    """Actualiza los enlaces y contenido de Wikipedia para álbumes"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Cargar el registro
+    log_data = load_log_file(log_file)
+    last_id = log_data.get("last_album_id", 0)
+    
+    # Obtener álbumes sin enlaces a Wikipedia
+    cursor.execute("""
+        SELECT albums.id, albums.name, artists.name, albums.musicbrainz_url
+        FROM albums
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE albums.id > ? AND (albums.wikipedia_url IS NULL OR albums.wikipedia_url = '')
+        ORDER BY albums.id
+    """, (last_id,))
+    
+    albums = cursor.fetchall()
+    total = len(albums)
+    
+    if total == 0:
+        print("No hay álbumes pendientes de actualizar enlaces a Wikipedia.")
+        return
+    
+    print(f"Procesando {total} álbumes sin enlaces a Wikipedia...")
+    
+    for i, (album_id, album_name, artist_name, mb_url) in enumerate(albums):
+        search_query = f"{artist_name} {album_name}"
+        print(f"\n[{i+1}/{total}] Procesando álbum: {album_name} de {artist_name}")
+        
+        # Primero intentamos obtener el enlace desde MusicBrainz
+        wiki_url = None
+        if mb_url:
+            print(f"  Buscando enlace en MusicBrainz...")
+            wiki_url = extract_wikipedia_url_from_musicbrainz(mb_url)
+            
+            if wiki_url:
+                print(f"  Enlace encontrado en MusicBrainz: {wiki_url}")
+        
+        # Si no encontramos el enlace en MusicBrainz, buscamos en Wikipedia
+        if not wiki_url:
+            print(f"  Buscando en Wikipedia...")
+            wiki_url = search_wikipedia(search_query)
+            
+            if wiki_url:
+                print(f"  Enlace encontrado en Wikipedia: {wiki_url}")
+            else:
+                print("  No se encontró enlace en Wikipedia.")
+        
+        # Si tenemos una URL, abrimos el navegador y pedimos confirmación
+        content = None
+        if wiki_url:
+            webbrowser.open(wiki_url)
+            
+            user_input = input(f"  Confirmar URL para '{album_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
+            
+            if user_input.lower() == 'n':
+                wiki_url = ""
+            elif user_input.strip():
+                wiki_url = user_input.strip()
                 
-                # Mostrar progreso cada 5 artistas
-                if len(self.processed_artists) % 5 == 0:
-                    self.show_progress()
+            # Si tenemos una URL final, obtenemos el contenido
+            if wiki_url:
+                print("  Obteniendo contenido de Wikipedia...")
+                content = get_wikipedia_content(wiki_url)
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    print(f"  Contenido obtenido: {content_preview}")
+                else:
+                    print("  No se pudo obtener el contenido.")
+        else:
+            user_input = input(f"  No se encontró URL para '{album_name}'. Introduzca URL manualmente o Enter para dejar vacío: ")
+            if user_input.strip():
+                wiki_url = user_input.strip()
+                
+                # Si se proporciona una URL manualmente, obtenemos el contenido
+                print("  Obteniendo contenido de Wikipedia...")
+                content = get_wikipedia_content(wiki_url)
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    print(f"  Contenido obtenido: {content_preview}")
+                else:
+                    print("  No se pudo obtener el contenido.")
+            else:
+                wiki_url = ""
+        
+        # Actualizamos la base de datos con URL y contenido
+        now = datetime.datetime.now()
+        if wiki_url:
+            cursor.execute("""
+                UPDATE albums
+                SET wikipedia_url = ?, wikipedia_content = ?, wikipedia_updated = ?, links_updated = ?
+                WHERE id = ?
+            """, (wiki_url, content or "", now, now, album_id))
+        else:
+            cursor.execute("""
+                UPDATE albums
+                SET wikipedia_url = ?, wikipedia_content = ?, wikipedia_updated = ?, links_updated = ?
+                WHERE id = ?
+            """, ("", "", now, now, album_id))
+        
+        conn.commit()
+        
+        # Actualizamos el archivo de registro
+        log_data["last_album_id"] = album_id
+        save_log_file(log_file, log_data)
+        
+        # Preguntamos si desea continuar después de cada 10 álbumes
+        if (i + 1) % 10 == 0 and i < total - 1:
+            if input("\n¿Desea continuar con la actualización? [S/n]: ").lower() == 'n':
+                break
+    
+    conn.close()
+    print("\nActualización de álbumes completada.")
+
+def update_content_only(db_path, entity_type):
+    """Actualiza solo el contenido para entidades que ya tienen URL de Wikipedia pero no contenido"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    if entity_type == 'artists':
+        # Obtener artistas con URL pero sin contenido
+        cursor.execute("""
+            SELECT id, name, wikipedia_url
+            FROM artists
+            WHERE wikipedia_url IS NOT NULL AND wikipedia_url != '' 
+            AND (wikipedia_content IS NULL OR wikipedia_content = '')
+            ORDER BY id
+        """)
+        
+        entities = cursor.fetchall()
+        table_name = 'artists'
+    else:  # albums
+        cursor.execute("""
+            SELECT albums.id, albums.name, albums.wikipedia_url
+            FROM albums
+            WHERE albums.wikipedia_url IS NOT NULL AND albums.wikipedia_url != '' 
+            AND (albums.wikipedia_content IS NULL OR albums.wikipedia_content = '')
+            ORDER BY albums.id
+        """)
+        
+        entities = cursor.fetchall()
+        table_name = 'albums'
+    
+    total = len(entities)
+    
+    if total == 0:
+        print(f"No hay {entity_type} con URL pero sin contenido.")
+        return
+    
+    print(f"Procesando {total} {entity_type} para obtener contenido de Wikipedia...")
+    
+    for i, (entity_id, entity_name, wiki_url) in enumerate(entities):
+        print(f"\n[{i+1}/{total}] Obteniendo contenido para: {entity_name}")
+        print(f"  URL: {wiki_url}")
+        
+        # Obtener contenido
+        print("  Obteniendo contenido...")
+        content = get_wikipedia_content(wiki_url)
+        
+        if content:
+            content_preview = content[:100] + "..." if len(content) > 100 else content
+            print(f"  Contenido obtenido: {content_preview}")
+            
+            # Actualizar la base de datos
+            now = datetime.datetime.now()
+            cursor.execute(f"""
+                UPDATE {table_name}
+                SET wikipedia_content = ?, wikipedia_updated = ?
+                WHERE id = ?
+            """, (content, now, entity_id))
+            
+            conn.commit()
+        else:
+            print("  No se pudo obtener el contenido.")
+        
+        # Preguntamos si desea continuar después de cada 20 entidades
+        if (i + 1) % 20 == 0 and i < total - 1:
+            if input("\n¿Desea continuar con la actualización de contenido? [S/n]: ").lower() == 'n':
+                break
+    
+    conn.close()
+    print(f"\nActualización de contenido para {entity_type} completada.")
 
 def main():
-    parser = argparse.ArgumentParser(description='Enriquecer base de datos de artistas con enlaces de Wikipedia')
-    parser.add_argument('database', help='Ruta a la base de datos SQLite')
-    parser.add_argument('--max-links', type=int, help='Número máximo de enlaces a procesar', default=None)
-    parser.add_argument('--processed-file', help='Archivo para guardar artistas procesados', 
-                        default='processed_artists.txt')
+    # Configurar argumentos de línea de comandos
+    parser = argparse.ArgumentParser(description='Actualizar enlaces y contenido de Wikipedia en la base de datos de música')
+    parser.add_argument('log_file', help='Archivo de registro para seguimiento del progreso')
+    parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
+    parser.add_argument('type', choices=['artists', 'albums', 'artists_content', 'albums_content'], 
+                        help='Tipo de entidad a actualizar (artists, albums, artists_content, albums_content)')
     
     args = parser.parse_args()
     
-    enricher = ArtistEnricher(
-        db_path=args.database,
-        processed_file=args.processed_file,
-        max_links=args.max_links
-    )
+    # Inicializar la base de datos
+    init_database(args.db_path)
     
-    enricher.enrich_artists()
+    # Mostrar estadísticas iniciales
+    stats = get_database_stats(args.db_path)
+    print("\n=== Estadísticas de Enlaces y Contenido ===")
+    print(f"Artistas: {stats['artists_with_wiki']}/{stats['total_artists']} enlaces ({stats['artists_missing_wiki']} faltan)")
+    print(f"Artistas: {stats['artists_with_content']}/{stats['total_artists']} con contenido")
+    print(f"Álbumes: {stats['albums_with_wiki']}/{stats['total_albums']} enlaces ({stats['albums_missing_wiki']} faltan)")
+    print(f"Álbumes: {stats['albums_with_content']}/{stats['total_albums']} con contenido")
+    print("==========================================\n")
+    
+    # Ejecutar la actualización según el tipo
+    if args.type == 'artists':
+        update_artists_wikipedia(args.db_path, args.log_file)
+    elif args.type == 'albums':
+        update_albums_wikipedia(args.db_path, args.log_file)
+    elif args.type == 'artists_content':
+        update_content_only(args.db_path, 'artists')
+    elif args.type == 'albums_content':
+        update_content_only(args.db_path, 'albums')
+    
+    # Mostrar estadísticas finales
+    stats = get_database_stats(args.db_path)
+    print("\n=== Estadísticas Finales ===")
+    print(f"Artistas: {stats['artists_with_wiki']}/{stats['total_artists']} enlaces ({stats['artists_missing_wiki']} faltan)")
+    print(f"Artistas: {stats['artists_with_content']}/{stats['total_artists']} con contenido")
+    print(f"Álbumes: {stats['albums_with_wiki']}/{stats['total_albums']} enlaces ({stats['albums_missing_wiki']} faltan)")
+    print(f"Álbumes: {stats['albums_with_content']}/{stats['total_albums']} con contenido")
+    print("============================\n")
 
 if __name__ == "__main__":
     main()
