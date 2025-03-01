@@ -7,6 +7,9 @@ import datetime
 import requests
 from urllib.parse import quote
 from bs4 import BeautifulSoup
+import subprocess
+
+sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
 def init_database(db_path):
     """Inicializa la base de datos añadiendo las columnas necesarias si no existen"""
@@ -193,6 +196,23 @@ def get_wikipedia_content(url):
         print(f"Error al obtener contenido de Wikipedia: {e}")
         return None
 
+def get_artist_albums(db_path, artist_id):
+    """Obtiene los álbumes asociados a un artista"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT name, year, label 
+        FROM albums 
+        WHERE artist_id = ? 
+        ORDER BY year
+    """, (artist_id,))
+    
+    albums = cursor.fetchall()
+    conn.close()
+    
+    return albums
+
 def update_artists_wikipedia(db_path, log_file):
     """Actualiza los enlaces y contenido de Wikipedia para artistas"""
     conn = sqlite3.connect(db_path)
@@ -222,6 +242,16 @@ def update_artists_wikipedia(db_path, log_file):
     for i, (artist_id, artist_name, mb_url) in enumerate(artists):
         print(f"\n[{i+1}/{total}] Procesando artista: {artist_name}")
         
+        # Mostrar álbumes del artista
+        albums = get_artist_albums(db_path, artist_id)
+        if albums:
+            print("  Álbumes:")
+            for album_name, album_year, album_label in albums:
+                label_info = f" - {album_label}" if album_label else ""
+                print(f"   - {album_name} ({album_year}){label_info}")
+        else:
+            print("  No hay álbumes registrados para este artista.")
+        
         # Primero intentamos obtener el enlace desde MusicBrainz
         wiki_url = None
         if mb_url:
@@ -244,8 +274,8 @@ def update_artists_wikipedia(db_path, log_file):
         # Si tenemos una URL, abrimos el navegador y pedimos confirmación
         content = None
         if wiki_url:
-            webbrowser.open(wiki_url)
-            
+            subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
             user_input = input(f"  Confirmar URL para '{artist_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
             
             if user_input.lower() == 'n':
@@ -318,7 +348,7 @@ def update_albums_wikipedia(db_path, log_file):
     
     # Obtener álbumes sin enlaces a Wikipedia
     cursor.execute("""
-        SELECT albums.id, albums.name, artists.name, albums.musicbrainz_url
+        SELECT albums.id, albums.name, artists.name, albums.musicbrainz_url, albums.label, albums.year
         FROM albums
         JOIN artists ON albums.artist_id = artists.id
         WHERE albums.id > ? AND (albums.wikipedia_url IS NULL OR albums.wikipedia_url = '')
@@ -334,9 +364,12 @@ def update_albums_wikipedia(db_path, log_file):
     
     print(f"Procesando {total} álbumes sin enlaces a Wikipedia...")
     
-    for i, (album_id, album_name, artist_name, mb_url) in enumerate(albums):
+    for i, (album_id, album_name, artist_name, mb_url, album_label, album_year) in enumerate(albums):
         search_query = f"{artist_name} {album_name}"
-        print(f"\n[{i+1}/{total}] Procesando álbum: {album_name} de {artist_name}")
+        label_info = f" - Sello: {album_label}" if album_label else ""
+        year_info = f" ({album_year})" if album_year else ""
+        
+        print(f"\n[{i+1}/{total}] Procesando álbum: {album_name}{year_info} de {artist_name}{label_info}")
         
         # Primero intentamos obtener el enlace desde MusicBrainz
         wiki_url = None
@@ -360,8 +393,8 @@ def update_albums_wikipedia(db_path, log_file):
         # Si tenemos una URL, abrimos el navegador y pedimos confirmación
         content = None
         if wiki_url:
-            webbrowser.open(wiki_url)
-            
+            subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
             user_input = input(f"  Confirmar URL para '{album_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
             
             if user_input.lower() == 'n':
@@ -440,19 +473,27 @@ def update_content_only(db_path, entity_type):
         
         entities = cursor.fetchall()
         table_name = 'artists'
+        
+        # Para cada artista, conseguimos también sus álbumes
+        entities_with_info = []
+        for entity_id, entity_name, wiki_url in entities:
+            albums = get_artist_albums(db_path, entity_id)
+            entities_with_info.append((entity_id, entity_name, wiki_url, albums))
+        
     else:  # albums
         cursor.execute("""
-            SELECT albums.id, albums.name, albums.wikipedia_url
+            SELECT albums.id, albums.name, albums.wikipedia_url, albums.label, albums.year, artists.name
             FROM albums
+            JOIN artists ON albums.artist_id = artists.id
             WHERE albums.wikipedia_url IS NOT NULL AND albums.wikipedia_url != '' 
             AND (albums.wikipedia_content IS NULL OR albums.wikipedia_content = '')
             ORDER BY albums.id
         """)
         
-        entities = cursor.fetchall()
+        entities_with_info = cursor.fetchall()
         table_name = 'albums'
     
-    total = len(entities)
+    total = len(entities_with_info)
     
     if total == 0:
         print(f"No hay {entity_type} con URL pero sin contenido.")
@@ -460,34 +501,71 @@ def update_content_only(db_path, entity_type):
     
     print(f"Procesando {total} {entity_type} para obtener contenido de Wikipedia...")
     
-    for i, (entity_id, entity_name, wiki_url) in enumerate(entities):
-        print(f"\n[{i+1}/{total}] Obteniendo contenido para: {entity_name}")
-        print(f"  URL: {wiki_url}")
-        
-        # Obtener contenido
-        print("  Obteniendo contenido...")
-        content = get_wikipedia_content(wiki_url)
-        
-        if content:
-            content_preview = content[:100] + "..." if len(content) > 100 else content
-            print(f"  Contenido obtenido: {content_preview}")
+    if entity_type == 'artists':
+        for i, (entity_id, entity_name, wiki_url, albums) in enumerate(entities_with_info):
+            print(f"\n[{i+1}/{total}] Obteniendo contenido para: {entity_name}")
+            print(f"  URL: {wiki_url}")
             
-            # Actualizar la base de datos
-            now = datetime.datetime.now()
-            cursor.execute(f"""
-                UPDATE {table_name}
-                SET wikipedia_content = ?, wikipedia_updated = ?
-                WHERE id = ?
-            """, (content, now, entity_id))
+            # Mostrar álbumes del artista
+            if albums:
+                print("  Álbumes:")
+                for album_name, album_year, album_label in albums:
+                    label_info = f" - {album_label}" if album_label else ""
+                    print(f"   - {album_name} ({album_year}){label_info}")
+            else:
+                print("  No hay álbumes registrados para este artista.")
             
-            conn.commit()
-        else:
-            print("  No se pudo obtener el contenido.")
+            # Obtener contenido
+            print("  Obteniendo contenido...")
+            content = get_wikipedia_content(wiki_url)
+            
+            if content:
+                content_preview = content[:100] + "..." if len(content) > 100 else content
+                print(f"  Contenido obtenido: {content_preview}")
+                
+                # Actualizar la base de datos
+                now = datetime.datetime.now()
+                cursor.execute(f"""
+                    UPDATE {table_name}
+                    SET wikipedia_content = ?, wikipedia_updated = ?
+                    WHERE id = ?
+                """, (content, now, entity_id))
+                
+                conn.commit()
+            else:
+                print("  No se pudo obtener el contenido.")
+    else:  # albums
+        for i, (entity_id, entity_name, wiki_url, album_label, album_year, artist_name) in enumerate(entities_with_info):
+            label_info = f" - Sello: {album_label}" if album_label else ""
+            year_info = f" ({album_year})" if album_year else ""
+            
+            print(f"\n[{i+1}/{total}] Obteniendo contenido para: {entity_name}{year_info} de {artist_name}{label_info}")
+            print(f"  URL: {wiki_url}")
+            
+            # Obtener contenido
+            print("  Obteniendo contenido...")
+            content = get_wikipedia_content(wiki_url)
+            
+            if content:
+                content_preview = content[:100] + "..." if len(content) > 100 else content
+                print(f"  Contenido obtenido: {content_preview}")
+                
+                # Actualizar la base de datos
+                now = datetime.datetime.now()
+                cursor.execute(f"""
+                    UPDATE {table_name}
+                    SET wikipedia_content = ?, wikipedia_updated = ?
+                    WHERE id = ?
+                """, (content, now, entity_id))
+                
+                conn.commit()
+            else:
+                print("  No se pudo obtener el contenido.")
         
-        # Preguntamos si desea continuar después de cada 20 entidades
-        if (i + 1) % 20 == 0 and i < total - 1:
-            if input("\n¿Desea continuar con la actualización de contenido? [S/n]: ").lower() == 'n':
-                break
+            # Preguntamos si desea continuar después de cada 20 entidades
+            if (i + 1) % 20 == 0 and i < total - 1:
+                if input("\n¿Desea continuar con la actualización de contenido? [S/n]: ").lower() == 'n':
+                    break
     
     conn.close()
     print(f"\nActualización de contenido para {entity_type} completada.")
