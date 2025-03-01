@@ -126,3 +126,5 @@ moode_nuevo.sqlite
 .cache
 .cache
 .cache/*
+.cache
+menus/musica/.content/artistas_img/
