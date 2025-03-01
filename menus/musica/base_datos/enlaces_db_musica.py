@@ -239,42 +239,17 @@ class MusicLinksManager:
             
         conn.close()
         return counts
-    
-    def update_links(self, days_threshold=30, force_update=False):
-        """
-        Actualiza los enlaces externos para artistas y álbumes
-        
-        Args:
-            days_threshold: Actualizar solo registros más antiguos que estos días
-            force_update: Forzar actualización de todos los registros independientemente de su fecha
-        """
-        # Mostrar conteos antes de comenzar
-        counts = self.get_table_counts()
-        table_count_info = ", ".join([f"{k}: {v}" for k, v in counts.items()])
-        self.logger.info(f"Database contains {table_count_info}")
-        
-        # Mostrar servicios habilitados/deshabilitados
-        enabled_services = []
-        if self.spotify: enabled_services.append("Spotify")
-        if self.youtube: enabled_services.append("YouTube")
-        if not 'musicbrainz' in self.disabled_services: enabled_services.append("MusicBrainz")
-        if self.discogs: enabled_services.append("Discogs")
-        if self.rateyourmusic_enabled: enabled_services.append("RateYourMusic")
-        
-        self.logger.info(f"Enabled services: {', '.join(enabled_services)}")
-        self.logger.info(f"Disabled services: {', '.join(self.disabled_services)}")
-        
-        self.update_artist_links(days_threshold, force_update)
-        self.update_album_and_track_links(days_threshold, force_update)
-    def update_links(self, days_threshold=30, force_update=False, recent_only=True):
+  
+    def update_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """
         Actualiza los enlaces externos para artistas y álbumes
         
         Args:
             days_threshold: Si recent_only=True, actualizar solo registros más recientes que estos días
-                           Si recent_only=False, actualizar solo registros más antiguos que estos días
+                        Si recent_only=False, actualizar solo registros más antiguos que estos días
             force_update: Forzar actualización de todos los registros independientemente de su fecha
             recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+            missing_only: Si es True, actualiza solo registros con enlaces faltantes
         """
         # Mostrar conteos antes de comenzar
         counts = self.get_table_counts()
@@ -293,15 +268,20 @@ class MusicLinksManager:
         self.logger.info(f"Disabled services: {', '.join(self.disabled_services)}")
         self.logger.info(f"Rate limit: {self.rate_limit} seconds between API requests")
         
-        if recent_only:
+        if missing_only:
+            self.logger.info("Updating only records with missing links")
+        elif recent_only:
             self.logger.info(f"Updating only records added/modified in the last {days_threshold} days")
         else:
             self.logger.info(f"Updating only records with links older than {days_threshold} days")
         
-        self.update_artist_links(days_threshold, force_update, recent_only)
-        self.update_album_and_track_links(days_threshold, force_update, recent_only)
+        self.update_artist_links(days_threshold, force_update, recent_only, missing_only)
+        self.update_album_and_track_links(days_threshold, force_update, recent_only, missing_only)
+
+
     
-    def update_artist_links(self, days_threshold=30, force_update=False, recent_only=True):
+
+    def update_artist_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """
         Actualiza los enlaces externos para artistas
         
@@ -309,16 +289,36 @@ class MusicLinksManager:
             days_threshold: Umbral de días para filtrar registros
             force_update: Forzar actualización de todos los registros
             recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+            missing_only: Si es True, actualiza solo registros con enlaces faltantes
         """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
         if force_update:
             c.execute("SELECT id, name FROM artists")
+        elif missing_only:
+            # Construir consulta para encontrar artistas con enlaces faltantes
+            missing_conditions = []
+            if self.spotify:
+                missing_conditions.append("spotify_url IS NULL")
+            if self.youtube:
+                missing_conditions.append("youtube_url IS NULL")
+            if 'musicbrainz' not in self.disabled_services:
+                missing_conditions.append("musicbrainz_url IS NULL")
+            if self.discogs:
+                missing_conditions.append("discogs_url IS NULL")
+            if self.rateyourmusic_enabled:
+                missing_conditions.append("rateyourmusic_url IS NULL")
+            
+            if missing_conditions:
+                query = f"SELECT id, name FROM artists WHERE {' OR '.join(missing_conditions)}"
+                c.execute(query)
+            else:
+                # Si todos los servicios están deshabilitados, no hay nada que actualizar
+                c.execute("SELECT id, name FROM artists WHERE 0=1")  # Consulta vacía
         else:
             if recent_only:
                 # Filtrar registros recientes (creados/modificados en los últimos X días)
-                # Asumiendo que hay una columna 'updated' o similar para la fecha de modificación
                 c.execute("""
                     SELECT id, name FROM artists 
                     WHERE datetime(last_updated) > datetime('now', ?)
@@ -339,12 +339,32 @@ class MusicLinksManager:
         for idx, (artist_id, artist_name) in enumerate(artists, 1):
             self.logger.info(f"Processing artist {idx}/{total_artists}: {artist_name}")
             
+            # Obtener los enlaces actuales para no solicitar API si ya existen
+            if missing_only:
+                c.execute("""
+                    SELECT spotify_url, youtube_url, musicbrainz_url, 
+                        discogs_url, rateyourmusic_url 
+                    FROM artists WHERE id = ?
+                """, (artist_id,))
+                current_links = dict(zip(
+                    ['spotify_url', 'youtube_url', 'musicbrainz_url', 'discogs_url', 'rateyourmusic_url'], 
+                    c.fetchone()
+                ))
+            else:
+                current_links = {
+                    'spotify_url': None, 
+                    'youtube_url': None, 
+                    'musicbrainz_url': None, 
+                    'discogs_url': None, 
+                    'rateyourmusic_url': None
+                }
+            
             links = {
-                'spotify_url': self._get_spotify_artist_url(artist_name) if self.spotify else None,
-                'youtube_url': self._get_youtube_artist_url(artist_name) if self.youtube else None,
-                'musicbrainz_url': self._get_musicbrainz_artist_url(artist_name) if 'musicbrainz' not in self.disabled_services else None,
-                'discogs_url': self._get_discogs_artist_url(artist_name) if self.discogs else None,
-                'rateyourmusic_url': self._get_rateyourmusic_artist_url(artist_name) if self.rateyourmusic_enabled else None,
+                'spotify_url': (self._get_spotify_artist_url(artist_name) if self.spotify and current_links['spotify_url'] is None else current_links['spotify_url']), 
+                'youtube_url': (self._get_youtube_artist_url(artist_name) if self.youtube and current_links['youtube_url'] is None else current_links['youtube_url']),
+                'musicbrainz_url': (self._get_musicbrainz_artist_url(artist_name) if 'musicbrainz' not in self.disabled_services and current_links['musicbrainz_url'] is None else current_links['musicbrainz_url']),
+                'discogs_url': (self._get_discogs_artist_url(artist_name) if self.discogs and current_links['discogs_url'] is None else current_links['discogs_url']),
+                'rateyourmusic_url': (self._get_rateyourmusic_artist_url(artist_name) if self.rateyourmusic_enabled and current_links['rateyourmusic_url'] is None else current_links['rateyourmusic_url']),
                 'links_updated': datetime.now()
             }
             
@@ -368,8 +388,9 @@ class MusicLinksManager:
         
         conn.close()
         self.logger.info(f"Updated links for {total_artists} artists")
-    
-    def update_album_and_track_links(self, days_threshold=30, force_update=False, recent_only=True):
+        
+
+    def update_album_and_track_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """
         Actualiza los enlaces externos para álbumes y sus pistas
         
@@ -377,6 +398,7 @@ class MusicLinksManager:
             days_threshold: Umbral de días para filtrar registros
             force_update: Forzar actualización de todos los registros
             recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+            missing_only: Si es True, actualiza solo registros con enlaces faltantes
         """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -389,6 +411,30 @@ class MusicLinksManager:
                 SELECT albums.id, albums.name, artists.name 
                 FROM albums JOIN artists ON albums.artist_id = artists.id
             """)
+        elif missing_only:
+            # Construir consulta para encontrar álbumes con enlaces faltantes
+            missing_conditions = []
+            if self.spotify:
+                missing_conditions.append("albums.spotify_url IS NULL")
+            if self.youtube:
+                missing_conditions.append("albums.youtube_url IS NULL")
+            if 'musicbrainz' not in self.disabled_services:
+                missing_conditions.append("albums.musicbrainz_url IS NULL")
+            if self.discogs:
+                missing_conditions.append("albums.discogs_url IS NULL")
+            if self.rateyourmusic_enabled:
+                missing_conditions.append("albums.rateyourmusic_url IS NULL")
+            
+            if missing_conditions:
+                query = f"""
+                    SELECT albums.id, albums.name, artists.name 
+                    FROM albums JOIN artists ON albums.artist_id = artists.id
+                    WHERE {' OR '.join(missing_conditions)}
+                """
+                c.execute(query)
+            else:
+                # Si todos los servicios están deshabilitados, no hay nada que actualizar
+                c.execute("SELECT id, name, '' FROM albums WHERE 0=1")  # Consulta vacía
         else:
             if recent_only:
                 # Filtrar registros recientes (creados/modificados en los últimos X días)
@@ -414,19 +460,40 @@ class MusicLinksManager:
         for idx, (album_id, album_name, artist_name) in enumerate(albums, 1):
             self.logger.info(f"Processing album {idx}/{total_albums}: {album_name} by {artist_name}")
             
+            # Obtener los enlaces actuales para no solicitar API si ya existen
+            if missing_only:
+                c.execute("""
+                    SELECT spotify_url, spotify_id, youtube_url, musicbrainz_url, 
+                        discogs_url, rateyourmusic_url 
+                    FROM albums WHERE id = ?
+                """, (album_id,))
+                current_links = dict(zip(
+                    ['spotify_url', 'spotify_id', 'youtube_url', 'musicbrainz_url', 'discogs_url', 'rateyourmusic_url'], 
+                    c.fetchone()
+                ))
+            else:
+                current_links = {
+                    'spotify_url': None, 
+                    'spotify_id': None,
+                    'youtube_url': None, 
+                    'musicbrainz_url': None, 
+                    'discogs_url': None, 
+                    'rateyourmusic_url': None
+                }
+            
             # Obtener los enlaces del álbum
             album_links = {
-                'spotify_url': None,
-                'spotify_id': None,
-                'youtube_url': self._get_youtube_album_url(artist_name, album_name) if self.youtube else None,
-                'musicbrainz_url': self._get_musicbrainz_album_url(artist_name, album_name) if 'musicbrainz' not in self.disabled_services else None,
-                'discogs_url': self._get_discogs_album_url(artist_name, album_name) if self.discogs else None,
-                'rateyourmusic_url': self._get_rateyourmusic_album_url(artist_name, album_name) if self.rateyourmusic_enabled else None,
+                'spotify_url': current_links['spotify_url'],
+                'spotify_id': current_links['spotify_id'],
+                'youtube_url': (self._get_youtube_album_url(artist_name, album_name) if self.youtube and current_links['youtube_url'] is None else current_links['youtube_url']),
+                'musicbrainz_url': (self._get_musicbrainz_album_url(artist_name, album_name) if 'musicbrainz' not in self.disabled_services and current_links['musicbrainz_url'] is None else current_links['musicbrainz_url']),
+                'discogs_url': (self._get_discogs_album_url(artist_name, album_name) if self.discogs and current_links['discogs_url'] is None else current_links['discogs_url']),
+                'rateyourmusic_url': (self._get_rateyourmusic_album_url(artist_name, album_name) if self.rateyourmusic_enabled and current_links['rateyourmusic_url'] is None else current_links['rateyourmusic_url']),
                 'links_updated': datetime.now()
             }
             
             # Obtener información de Spotify para el álbum y sus pistas
-            if self.spotify:
+            if self.spotify and current_links['spotify_url'] is None:
                 spotify_data = self._get_spotify_album_data(artist_name, album_name)
                 if spotify_data:
                     album_links['spotify_url'] = spotify_data['album_url']
@@ -434,7 +501,7 @@ class MusicLinksManager:
                     
                     # Si existe la tabla de tracks, actualizar las pistas
                     if has_tracks_table and spotify_data['tracks']:
-                        self._update_track_links(conn, album_id, spotify_data['tracks'])
+                        self._update_track_links(conn, album_id, spotify_data['tracks'], missing_only)
             
             # Actualizar enlaces en la base de datos
             update_query = """
@@ -462,20 +529,38 @@ class MusicLinksManager:
         """Realiza una pausa según la configuración del rate limiter"""
         time.sleep(self.rate_limit)
 
-    def _update_track_links(self, conn, album_id, spotify_tracks):
-        """Actualiza los enlaces de pistas para un álbum específico"""
+    def _update_track_links(self, conn, album_id, spotify_tracks, missing_only=False):
+        """
+        Actualiza los enlaces de pistas para un álbum específico
+        
+        Args:
+            conn: Conexión a la base de datos
+            album_id: ID del álbum
+            spotify_tracks: Lista de pistas de Spotify
+            missing_only: Si es True, actualiza solo pistas con enlaces faltantes
+        """
         c = conn.cursor()
         
         # Obtener todas las pistas del álbum
-        c.execute("SELECT id, name, number FROM tracks WHERE album_id = ? ORDER BY number", (album_id,))
-        db_tracks = c.fetchall()
+        if missing_only:
+            c.execute("SELECT id, name, number, spotify_url, spotify_id FROM tracks WHERE album_id = ? ORDER BY number", (album_id,))
+            db_tracks = c.fetchall()
+        else:
+            c.execute("SELECT id, name, number FROM tracks WHERE album_id = ? ORDER BY number", (album_id,))
+            db_tracks = c.fetchall()
         
         if not db_tracks:
             return
         
         # Mapear nombres de pistas de Spotify con la base de datos
         for db_track in db_tracks:
-            track_id, track_name, track_number = db_track
+            if missing_only:
+                track_id, track_name, track_number, current_spotify_url, current_spotify_id = db_track
+                # Si ya tiene enlaces y estamos en modo missing_only, saltamos
+                if current_spotify_url is not None and current_spotify_id is not None:
+                    continue
+            else:
+                track_id, track_name, track_number = db_track
             
             # Intentar encontrar la pista correspondiente en Spotify
             spotify_track = None
@@ -722,6 +807,8 @@ if __name__ == "__main__":
     parser.add_argument('--rate-limit', type=float, default=0.5, help='Rate limit in seconds between API requests')
     parser.add_argument('--older-only', action='store_true', 
                         help='Update only older records (default is newer records)')
+    parser.add_argument('--missing-only', action='store_true',
+                        help='Update only records with missing links')
     
     args = parser.parse_args()
     
@@ -732,4 +819,9 @@ if __name__ == "__main__":
         for table, count in counts.items():
             print(f"{table.capitalize()}: {count}")
     else:
-        manager.update_links(days_threshold=args.days, force_update=args.force_update, recent_only=not args.older_only)
+        manager.update_links(
+            days_threshold=args.days, 
+            force_update=args.force_update, 
+            recent_only=not args.older_only,
+            missing_only=args.missing_only
+        )

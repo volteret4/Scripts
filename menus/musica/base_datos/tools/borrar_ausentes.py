@@ -2,9 +2,10 @@ import os
 import sqlite3
 import sys
 from datetime import datetime
+import sys
 
 # Configuración de la base de datos
-DB_PATH = "ruta_a_tu_base_de_datos.db"  # Reemplaza con la ruta real a tu base de datos
+DB_PATH = sys.argv[1]  # Reemplaza con la ruta real a tu base de datos
 
 def conectar_bd():
     """Establece conexión con la base de datos."""
