@@ -7,125 +7,16 @@ import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLineEdit, QPushButton, QListWidget,
                             QListWidgetItem, QLabel, QScrollArea, QSplitter,
-                            QAbstractItemView, QSpinBox, QComboBox)
+                            QAbstractItemView, QSpinBox, QComboBox, QSizePolicy)
 from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize, QDate
 import subprocess
 import importlib.util
 from base_module import BaseModule, THEME  # Importar la clase base
-
+import glob
+import random
 
 reproductor = 'deadbeef'
-# Tema Tokyo Night
-# THEME = {
-#     'bg': '#1a1b26',
-#     'fg': '#a9b1d6',
-#     'accent': '#7aa2f7',
-#     'secondary_bg': '#24283b',
-#     'border': '#414868',
-#     'selection': '#364A82',
-#     'button_hover': '#3d59a1'
-# }
-
-
-
-# class TabManager(QMainWindow):
-#     def __init__(self, config_path: str, font_family="Inter"):
-#         super().__init__()
-#         self.font_family = font_family
-#         self.config_path = config_path
-#         self.tabs = {}
-#         self.init_ui()
-#         self.load_modules()
-
-#     def init_ui(self):
-#         self.setWindowTitle('Music Browser')
-#         self.setMinimumSize(1200, 800)
-
-#         # Widget principal
-#         main_widget = QWidget()
-#         self.setCentralWidget(main_widget)
-#         layout = QVBoxLayout(main_widget)
-
-#         # Crear el widget de pestañas
-#         self.tab_widget = QTabWidget()
-#         layout.addWidget(self.tab_widget)
-
-#         self.apply_theme()
-
-#     def load_modules(self):
-#         """Carga los módulos desde la configuración."""
-#         try:
-#             with open(self.config_path, 'r') as f:
-#                 config = json.load(f)
-                
-#             for module_config in config['modules']:
-#                 module_path = module_config['path']
-#                 module_name = module_config.get('name', Path(module_path).stem)
-#                 module_args = module_config.get('args', {})
-                
-#                 try:
-#                     # Cargar el módulo dinámicamente
-#                     spec = importlib.util.spec_from_file_location(module_name, module_path)
-#                     if spec and spec.loader:
-#                         module = importlib.util.module_from_spec(spec)
-#                         spec.loader.exec_module(module)
-                        
-#                         # Buscar la clase principal del módulo
-#                         main_class = None
-#                         for attr_name in dir(module):
-#                             attr = getattr(module, attr_name)
-#                             if isinstance(attr, type) and issubclass(attr, QWidget) and attr != QWidget:
-#                                 main_class = attr
-#                                 break
-                        
-#                         if main_class:
-#                             # Instanciar el módulo
-#                             module_instance = main_class(**module_args)
-#                             # Añadir al gestor de pestañas
-#                             self.tab_widget.addTab(module_instance, module_name)
-#                             self.tabs[module_name] = module_instance
-                        
-#                 except Exception as e:
-#                     print(f"Error loading module {module_name}: {e}")
-                    
-#         except Exception as e:
-#             print(f"Error loading configuration: {e}")
-
-#     def apply_theme(self):
-#         """Aplica el tema a toda la aplicación."""
-#         self.setStyleSheet(f"""
-#             QMainWindow, QWidget {{
-#                 background-color: {THEME['bg']};
-#                 color: {THEME['fg']};
-#                 font-family: {self.font_family};
-#             }}
-            
-#             QTabWidget::pane {{
-#                 border: 1px solid {THEME['border']};
-#                 background-color: {THEME['bg']};
-#                 border-radius: 3px;
-#             }}
-            
-#             QTabBar::tab {{
-#                 background-color: {THEME['secondary_bg']};
-#                 color: {THEME['fg']};
-#                 border: 1px solid {THEME['border']};
-#                 padding: 5px 10px;
-#                 margin-right: 2px;
-#                 border-top-left-radius: 3px;
-#                 border-top-right-radius: 3px;
-#             }}
-            
-#             QTabBar::tab:selected {{
-#                 background-color: {THEME['bg']};
-#                 border-bottom-color: {THEME['bg']};
-#             }}
-            
-#             QTabBar::tab:hover {{
-#                 background-color: {THEME['button_hover']};
-#             }}
-#         """)
 
 
 class GroupedListItem(QListWidgetItem):
@@ -282,7 +173,9 @@ class MusicBrowser(BaseModule):
         # Extraer los argumentos específicos de MusicBrowser
         self.db_path = kwargs.pop('db_path', '')
         self.font_family = kwargs.pop('font_family', 'Inter')
-        
+        self.artist_images_dir = kwargs.pop('artist_images_dir', '')
+
+
         # Llamar al constructor de la clase padre con los argumentos restantes
         super().__init__(parent=parent, **kwargs)
         
@@ -318,7 +211,7 @@ class MusicBrowser(BaseModule):
 
         # Botones existentes
         for button in [self.play_button, self.folder_button, 
-                      self.custom_button1, self.custom_button2, self.custom_button3]:
+                    self.custom_button1, self.custom_button2, self.custom_button3]:
             button.setFixedWidth(100)
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             search_layout.addWidget(button)
@@ -392,8 +285,8 @@ class MusicBrowser(BaseModule):
 
         layout.addWidget(top_container)
 
-        # Resto de la interfaz (lista de resultados y panel de detalles)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Splitter principal: lista de resultados y panel de detalles
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Panel izquierdo (resultados)
         self.results_list = QListWidget()
@@ -402,33 +295,105 @@ class MusicBrowser(BaseModule):
         self.results_list.currentItemChanged.connect(self.handle_item_change)
         self.results_list.itemClicked.connect(self.handle_item_click)
         self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        splitter.addWidget(self.results_list)
+        main_splitter.addWidget(self.results_list)
 
         # Panel derecho (detalles)
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+        # Splitter vertical para separar imágenes y texto
+        details_splitter = QSplitter(Qt.Orientation.Vertical)
         
+        # Contenedor superior para las imágenes (colocadas horizontalmente)
+        images_container = QWidget()
+        images_layout = QHBoxLayout(images_container)
+        images_layout.setSpacing(10)
+        images_layout.setContentsMargins(5, 5, 5, 5)
+        images_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+        # Cover del álbum
         self.cover_label = QLabel()
         self.cover_label.setFixedSize(300, 300)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        details_layout.addWidget(self.cover_label)
+        self.cover_label.setStyleSheet("border: 1px solid #333;")
+        images_layout.addWidget(self.cover_label)
+        
+        # Imagen del artista
+        self.artist_image_label = QLabel()
+        self.artist_image_label.setFixedSize(300, 300)
+        self.artist_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.artist_image_label.setStyleSheet("border: 1px solid #333;")
+        images_layout.addWidget(self.artist_image_label)
+        
+        # Añadir el contenedor de imágenes al splitter vertical
+        details_splitter.addWidget(images_container)
+        
+        # Contenedor para el scroll con la información
+        info_container = QWidget()
+        info_container_layout = QVBoxLayout(info_container)
+        info_container_layout.setContentsMargins(5, 5, 5, 5)
+        info_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
 
+        
+        # ScrollArea para la información
         self.info_scroll = QScrollArea()
         self.info_scroll.setWidgetResizable(True)
+        self.info_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.info_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.info_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.info_scroll.setMinimumWidth(max(self.cover_label.width() + self.artist_image_label.width() + 20, 800))
+        
+        # Widget interior del scroll
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
+        self.info_layout.setContentsMargins(5, 5, 5, 5)
         
+
+        
+        # Labels para la información
         self.lastfm_label = QLabel()
+        self.lastfm_label.setWordWrap(True)
+        self.lastfm_label.setTextFormat(Qt.TextFormat.RichText)
+        self.lastfm_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.lastfm_label.setMinimumWidth(1600)  # Ajusta este valor según necesites
+
         self.metadata_label = QLabel()
+        self.metadata_label.setWordWrap(True)
+        self.metadata_label.setTextFormat(Qt.TextFormat.RichText)
+        self.metadata_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.metadata_label.setMinimumWidth(1600)  # Ajusta este valor según necesites
+        
+        # Agregar las etiquetas al layout
         self.info_layout.addWidget(self.lastfm_label)
         self.info_layout.addWidget(self.metadata_label)
+        self.info_layout.addStretch()
         
+        # Configurar el ScrollArea
         self.info_scroll.setWidget(self.info_widget)
-        details_layout.addWidget(self.info_scroll)
-
-        splitter.addWidget(details_widget)
-        layout.addWidget(splitter)
-
+        info_container_layout.addWidget(self.info_scroll)
+        
+        # Añadir el contenedor de información al splitter vertical
+        details_splitter.addWidget(info_container)
+        
+        # Configurar proporciones iniciales del splitter vertical (imágenes/información)
+        details_splitter.setSizes([300, 800])
+        
+        # Añadir el splitter vertical al layout de detalles
+        details_layout.addWidget(details_splitter)
+        
+        # Añadir el panel de detalles al splitter principal
+        main_splitter.addWidget(details_widget)
+        
+        # Configurar proporciones iniciales del splitter principal (lista/detalles)
+        main_splitter.setSizes([400, 800])
+        
+        # Añadir el splitter principal al layout de la ventana
+        layout.addWidget(main_splitter)
+        
+        # Aplicar el tema
         self.apply_theme()
 
 
@@ -475,10 +440,87 @@ class MusicBrowser(BaseModule):
             return
             
         if current.is_header:
+            self.clear_details()
             self.show_album_info(current)
         else:
+            self.clear_details()
             self.show_details(current, previous)
 
+
+    def find_cover_image(self, file_path: str) -> Optional[str]:
+        """Busca la carátula en la carpeta del archivo."""
+        dir_path = Path(file_path).parent
+        cover_names = ['cover', 'folder', 'front', 'album']
+        image_extensions = ['.jpg', '.jpeg', '.png']
+
+        # Primero buscar nombres específicos
+        for name in cover_names:
+            for ext in image_extensions:
+                cover_path = dir_path / f"{name}{ext}"
+                if cover_path.exists():
+                    return str(cover_path)
+
+        # Si no se encuentra, buscar cualquier imagen
+        for file in dir_path.glob('*'):
+            if file.suffix.lower() in image_extensions:
+                return str(file)
+
+        return None
+
+    def find_artist_image(self, artist_name: str) -> Optional[str]:
+        """Busca la imagen del artista en el directorio especificado y retorna una aleatoria si hay varias."""
+        if not self.artist_images_dir or not artist_name:
+            return None
+        
+        # Importar random para selección aleatoria
+        import random
+        
+        # Normalizar el nombre del artista (quitar acentos, convertir a minúsculas)
+        import unicodedata
+        artist_name_norm = unicodedata.normalize('NFKD', artist_name.lower()) \
+            .encode('ASCII', 'ignore').decode('utf-8')
+        
+        # Probar diferentes formatos de nombre
+        name_formats = [
+            artist_name,  # Original
+            artist_name.replace(' ', '_'),  # Con guiones bajos
+            artist_name.replace(' ', '-'),  # Con guiones
+            artist_name_norm,  # Normalizado
+            artist_name_norm.replace(' ', '_'),
+            artist_name_norm.replace(' ', '-')
+        ]
+        
+        # Extensiones comunes de imagen
+        extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+        
+        # Lista para almacenar todas las imágenes encontradas
+        all_matching_files = []
+        
+        # Probar todas las combinaciones
+        for name in name_formats:
+            # Búsqueda exacta con diferentes extensiones
+            for ext in extensions:
+                path = os.path.join(self.artist_images_dir, f"{name}.{ext}")
+                if os.path.exists(path):
+                    all_matching_files.append(path)
+            
+            # Búsqueda con patrón glob (para archivos que empiezan con el nombre)
+            pattern = os.path.join(self.artist_images_dir, f"{name}*")
+            matching_files = glob.glob(pattern)
+            # Filtrar por extensiones válidas
+            for file in matching_files:
+                ext = file.lower().split('.')[-1]
+                if ext in extensions:
+                    all_matching_files.append(file)
+        
+        # Eliminar duplicados
+        all_matching_files = list(set(all_matching_files))
+        
+        # Si se encontraron imágenes, devolver una aleatoria
+        if all_matching_files:
+            return random.choice(all_matching_files)
+        
+        return None
 
     # Modificar la función show_album_info para mostrar los enlaces del álbum
     def show_album_info(self, header_item):
@@ -525,7 +567,10 @@ class MusicBrowser(BaseModule):
         seconds = int(total_duration % 60)
         
         # Buscar la carátula usando la ruta del primer track
+        self.clear_details()  # Limpiar imágenes primero
+        
         if first_track_data and len(first_track_data) > 1:
+            # Mostrar la carátula del álbum
             cover_path = self.find_cover_image(first_track_data[1])
             if cover_path:
                 pixmap = QPixmap(cover_path)
@@ -533,12 +578,34 @@ class MusicBrowser(BaseModule):
                 self.cover_label.setPixmap(pixmap)
             else:
                 self.cover_label.setText("No imagen")
+                
+            # Nuevo: Mostrar la imagen del artista
+            artist_image_path = self.find_artist_image(artist)
+            if artist_image_path:
+                artist_pixmap = QPixmap(artist_image_path)
+                artist_pixmap = artist_pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                self.artist_image_label.setPixmap(artist_pixmap)
+            else:
+                self.artist_image_label.setText("No imagen de artista")
         
         # Mostrar la información en el panel de detalles
         if first_track_data:
+            # Crear el contenido para el panel de información (LastFM + Wikipedia)
+            info_text = ""
+            
             # Mostrar info de LastFM si está disponible
             artist_bio = first_track_data[15] if len(first_track_data) > 15 and first_track_data[15] else "No hay información del artista disponible"
-            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{artist_bio}")
+            info_text += f"<h3>Información del Artista (LastFM):</h3>{artist_bio}<br><br>"
+            
+            # Mostrar info de Wikipedia del artista (índice 27)
+            if len(first_track_data) > 27 and first_track_data[27]:
+                info_text += f"<h3>Wikipedia - Artista:</h3>{first_track_data[27]}<br><br>"
+            
+            # Mostrar info de Wikipedia del álbum (índice 29)
+            if len(first_track_data) > 29 and first_track_data[29]:
+                info_text += f"<h3>Wikipedia - Álbum:</h3>{first_track_data[29]}<br><br>"
+                
+            self.lastfm_label.setText(info_text)
             
             # Construir la metadata básica del álbum
             metadata = f"""
@@ -567,6 +634,8 @@ class MusicBrowser(BaseModule):
                     album_links.append(f"<a href='{first_track_data[24]}'>Discogs</a>")
                 if first_track_data[25]:  # album_rateyourmusic
                     album_links.append(f"<a href='{first_track_data[25]}'>RateYourMusic</a>")
+                if first_track_data[28]:  # album_wikipedia_url (nuevo campo)
+                    album_links.append(f"<a href='{first_track_data[28]}'>Wikipedia</a>")
                 
                 if album_links:
                     metadata += " | ".join(album_links)
@@ -588,6 +657,8 @@ class MusicBrowser(BaseModule):
                     artist_links.append(f"<a href='{first_track_data[19]}'>Discogs</a>")
                 if first_track_data[20]:  # artist_rateyourmusic
                     artist_links.append(f"<a href='{first_track_data[20]}'>RateYourMusic</a>")
+                if first_track_data[26]:  # artist_wikipedia_url (nuevo campo)
+                    artist_links.append(f"<a href='{first_track_data[26]}'>Wikipedia</a>")
                 
                 if artist_links:
                     metadata += " | ".join(artist_links)
@@ -616,6 +687,7 @@ class MusicBrowser(BaseModule):
         self.setStyleSheet(f"""
             QLabel {{
                 font-size: 12px;
+                max-width: 100%;
             }}
             QLineEdit {{
                 font-size: 13px;
@@ -626,115 +698,20 @@ class MusicBrowser(BaseModule):
             QListWidget {{
                 font-size: 12px;
             }}
+            #lastfm_label, #metadata_label {{
+                padding: 5px;
+                min-width: 750px;
+            }}
+            QScrollArea {{
+                border: none;
+            }}
         """)
-    def search(self):
-        query = self.search_box.text()
-        parsed = self.search_parser.parse_query(query)
         
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        
-        # Base SQL query con join a tabla artists y albums para obtener los enlaces
-        sql = """
-            SELECT DISTINCT 
-                s.id,
-                s.file_path,
-                s.title,
-                s.artist,
-                s.album_artist,
-                s.album,
-                s.date,
-                s.genre,
-                s.label,
-                s.mbid,
-                s.bitrate,
-                s.bit_depth,
-                s.sample_rate,
-                s.last_modified,
-                s.track_number,
-                art.bio,
-                art.spotify_url AS artist_spotify,
-                art.youtube_url AS artist_youtube,
-                art.musicbrainz_url AS artist_musicbrainz,
-                art.discogs_url AS artist_discogs,
-                art.rateyourmusic_url AS artist_rateyourmusic,
-                alb.spotify_url AS album_spotify,
-                alb.youtube_url AS album_youtube,
-                alb.musicbrainz_url AS album_musicbrainz,
-                alb.discogs_url AS album_discogs,
-                alb.rateyourmusic_url AS album_rateyourmusic
-            FROM songs s
-            LEFT JOIN artists art ON s.artist = art.name
-            LEFT JOIN albums alb ON s.album = alb.name AND s.artist = alb.artist
-        """
-        
-        # Use build_sql_conditions from SearchParser
-        conditions, params = self.search_parser.build_sql_conditions(parsed)
-        
-        # Add WHERE clause if there are conditions
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
-        
-        # Ordering
-        sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
-        
-        try:
-            c.execute(sql, params)
-            results = c.fetchall()
-            
-            self.results_list.clear()
-            current_album = None
-            
-            for row in results:
-                artist = row[3] if row[3] else "Sin artista"
-                album = row[5] if row[5] else "Sin álbum"
-                title = row[2] if row[2] else "Sin título"
-                track_number = row[15] if row[15] else "0"
-                
-                # Si cambiamos de álbum, añadir header
-                album_key = f"{artist} - {album}"
-                if album_key != current_album:
-                    header_item = GroupedListItem(f"📀 {album_key}", is_header=True)
-                    self.results_list.addItem(header_item)
-                    current_album = album_key
-                
-                # Añadir la canción con su número de pista
-                try:
-                    track_num = int(track_number)
-                    display_text = f"    {track_num:02d}. {title}"
-                except (ValueError, TypeError):
-                    display_text = f"    --. {title}"
-                
-                item = GroupedListItem(display_text, paths=[row[1]])
-                item.setData(Qt.ItemDataRole.UserRole, row)
-                self.results_list.addItem(item)
-                
-        except Exception as e:
-            print(f"Error en la búsqueda: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            conn.close()
+        # Set object names for the labels so the CSS can target them
+        self.lastfm_label.setObjectName("lastfm_label")
+        self.metadata_label.setObjectName("metadata_label")
 
-    def find_cover_image(self, file_path: str) -> Optional[str]:
-        """Busca la carátula en la carpeta del archivo."""
-        dir_path = Path(file_path).parent
-        cover_names = ['cover', 'folder', 'front', 'album']
-        image_extensions = ['.jpg', '.jpeg', '.png']
-
-        # Primero buscar nombres específicos
-        for name in cover_names:
-            for ext in image_extensions:
-                cover_path = dir_path / f"{name}{ext}"
-                if cover_path.exists():
-                    return str(cover_path)
-
-        # Si no se encuentra, buscar cualquier imagen
-        for file in dir_path.glob('*'):
-            if file.suffix.lower() in image_extensions:
-                return str(file)
-
-        return None
+        
     def show_details(self, current, previous):
         """Muestra los detalles del ítem seleccionado."""
         if not current:
@@ -747,6 +724,12 @@ class MusicBrowser(BaseModule):
             return
 
         try:
+            # Limpiar detalles anteriores
+            self.clear_details()
+            
+            # Extraer el nombre del artista de los datos (índice 3)
+            artist = data[3] if len(data) > 3 and data[3] else ""
+            
             # Mostrar carátula
             if len(data) > 1:
                 cover_path = self.find_cover_image(data[1])
@@ -756,13 +739,36 @@ class MusicBrowser(BaseModule):
                     self.cover_label.setPixmap(pixmap)
                 else:
                     self.cover_label.setText("No imagen")
+                    
+                # Mostrar imagen del artista usando el nombre extraído
+                if artist:
+                    artist_image_path = self.find_artist_image(artist)
+                    if artist_image_path:
+                        artist_pixmap = QPixmap(artist_image_path)
+                        artist_pixmap = artist_pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                        self.artist_image_label.setPixmap(artist_pixmap)
+                    else:
+                        self.artist_image_label.setText("No imagen de artista")
+                else:
+                    self.artist_image_label.setText("No imagen de artista")
             else:
                 self.cover_label.setText("No imagen")
+                self.artist_image_label.setText("No imagen de artista")
+
+            # Mostrar información en el widget scrollable
+            info_text = ""
 
             # Mostrar info de LastFM (bio del artista)
-            # El campo bio está ahora en el índice 15
             artist_bio = data[15] if len(data) > 15 and data[15] else "No hay información del artista disponible"
-            self.lastfm_label.setText(f"<b>Información del Artista:</b><br>{artist_bio}")
+            info_text += f"<h3>Información del Artista (LastFM):</h3>{artist_bio}<br><br>"
+
+            # Mostrar info de Wikipedia del artista (nuevos campos)
+            if len(data) > 27:  # Verificar que los nuevos campos existen
+                artist_wiki_content = data[27] if data[27] else "No hay información de Wikipedia disponible para este artista"
+                info_text += f"<h3>Wikipedia - Artista:</h3>{artist_wiki_content}<br><br>"
+
+            # Asignar el contenido actualizado
+            self.lastfm_label.setText(info_text)
 
             # Mostrar metadata
             if len(data) >= 15:  # Aseguramos que tengamos todos los campos necesarios
@@ -771,7 +777,7 @@ class MusicBrowser(BaseModule):
                 # Construir la sección de metadata básica
                 metadata = f"""
                     <b>Título:</b> {data[2] or 'N/A'}<br>
-                    <b>Artista:</b> {data[3] or 'N/A'}<br>
+                    <b>Artista:</b> {artist or 'N/A'}<br>
                     <b>Album Artist:</b> {data[4] or 'N/A'}<br>
                     <b>Álbum:</b> {data[5] or 'N/A'}<br>
                     <b>Fecha:</b> {data[6] or 'N/A'}<br>
@@ -799,6 +805,8 @@ class MusicBrowser(BaseModule):
                         artist_links.append(f"<a href='{data[19]}'>Discogs</a>")
                     if data[20]:  # rateyourmusic_url
                         artist_links.append(f"<a href='{data[20]}'>RateYourMusic</a>")
+                    if data[26]:  # artist_wikipedia_url (nuevo campo)
+                        artist_links.append(f"<a href='{data[26]}'>Wikipedia</a>")
                     
                     if artist_links:
                         metadata += " | ".join(artist_links)
@@ -814,11 +822,115 @@ class MusicBrowser(BaseModule):
             print(f"Error al mostrar detalles: {e}")
             self.clear_details()
 
+    def search(self):
+        query = self.search_box.text()
+        parsed = self.search_parser.parse_query(query)
+        
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        # Base SQL query con join a tabla artists y albums para obtener los enlaces y contenido de Wikipedia
+        sql = """
+            SELECT DISTINCT 
+                s.id,
+                s.file_path,
+                s.title,
+                s.artist,
+                s.album_artist,
+                s.album,
+                s.date,
+                s.genre,
+                s.label,
+                s.mbid,
+                s.bitrate,
+                s.bit_depth,
+                s.sample_rate,
+                s.last_modified,
+                s.track_number,
+                art.bio,
+                art.spotify_url AS artist_spotify,
+                art.youtube_url AS artist_youtube,
+                art.musicbrainz_url AS artist_musicbrainz,
+                art.discogs_url AS artist_discogs,
+                art.rateyourmusic_url AS artist_rateyourmusic,
+                alb.spotify_url AS album_spotify,
+                alb.youtube_url AS album_youtube,
+                alb.musicbrainz_url AS album_musicbrainz,
+                alb.discogs_url AS album_discogs,
+                alb.rateyourmusic_url AS album_rateyourmusic,
+                art.wikipedia_url AS artist_wikipedia_url,
+                art.wikipedia_content AS artist_wikipedia_content,
+                alb.wikipedia_url AS album_wikipedia_url,
+                alb.wikipedia_content AS album_wikipedia_content
+            FROM songs s
+            LEFT JOIN artists art ON s.artist = art.name
+            LEFT JOIN albums alb ON s.album = alb.name 
+            LEFT JOIN artists album_artist ON alb.artist_id = album_artist.id AND s.artist = album_artist.name
+        """
+        
+        # Use build_sql_conditions from SearchParser
+        conditions, params = self.search_parser.build_sql_conditions(parsed)
+        
+        # Add WHERE clause if there are conditions
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        
+        # Ordering
+        sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
+        
+        try:
+            c.execute(sql, params)
+            results = c.fetchall()
+            
+            self.results_list.clear()
+            current_album = None
+            
+            for row in results:
+                artist = row[3] if row[3] else "Sin artista"
+                album = row[5] if row[5] else "Sin álbum"
+                title = row[2] if row[2] else "Sin título"
+                track_number = row[14] if row[14] else "0"  # Cambié el índice de 15 a 14 que es el correcto para track_number
+                
+                # Si cambiamos de álbum, añadir header
+                album_key = f"{artist} - {album}"
+                if album_key != current_album:
+                    header_item = GroupedListItem(f"📀 {album_key}", is_header=True)
+                    self.results_list.addItem(header_item)
+                    current_album = album_key
+                
+                # Añadir la canción con su número de pista
+                try:
+                    track_num = int(track_number)
+                    display_text = f"    {track_num:02d}. {title}"
+                except (ValueError, TypeError):
+                    display_text = f"    --. {title}"
+                
+                item = GroupedListItem(display_text, paths=[row[1]])
+                item.setData(Qt.ItemDataRole.UserRole, row)
+                self.results_list.addItem(item)
+                
+        except Exception as e:
+            print(f"Error en la búsqueda: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            conn.close()
+
+
     def clear_details(self):
         """Limpia todos los campos de detalles."""
+        self.cover_label.clear()
         self.cover_label.setText("No imagen")
+
         self.lastfm_label.setText("")
         self.metadata_label.setText("")
+        
+        self.artist_image_label.clear()
+        self.artist_image_label.setText("No imagen")
+
+            # Forzar actualización visual
+        self.cover_label.update()
+        self.artist_image_label.update()
 
     def play_item(self):
         """Reproduce el ítem seleccionado con verificaciones de seguridad."""
@@ -1029,10 +1141,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Navegador de música')
     parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
     parser.add_argument('--font', default='Inter', help='Fuente a usar en la interfaz')
-    
+    parser.add_argument('--artist-images-dir', help='Carpeta donde buscar las imágenes de los artistas')
+
     args = parser.parse_args()
     
     app = QApplication(sys.argv)
-    browser = MusicBrowser(args.db_path, font_family=args.font)
+    browser = MusicBrowser(
+        args.db_path,
+        font_family=args.font,
+        artist_images_dir=args.artist_images_dir
+    )
     browser.show()
     sys.exit(app.exec())
