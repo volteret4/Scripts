@@ -757,7 +757,15 @@ class MusicBrowser(BaseModule):
 
             # Mostrar información en el widget scrollable
             info_text = ""
-
+            
+            # Mostrar letra de la canción si está disponible (nuevos campos añadidos)
+            lyrics = data[30] if len(data) > 30 and data[30] else None
+            lyrics_source = data[31] if len(data) > 31 and data[31] else "Desconocida"
+            
+            if lyrics:
+                info_text += f"<h3>Letra</h3><div style='white-space: pre-wrap;'>{lyrics}</div>"
+                info_text += f"<p><i>Fuente: {lyrics_source}</i></p><hr>"
+            
             # Mostrar info de LastFM (bio del artista)
             artist_bio = data[15] if len(data) > 15 and data[15] else "No hay información del artista disponible"
             info_text += f"<h3>Información del Artista (LastFM):</h3>{artist_bio}<br><br>"
@@ -829,7 +837,7 @@ class MusicBrowser(BaseModule):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Base SQL query con join a tabla artists y albums para obtener los enlaces y contenido de Wikipedia
+        # Base SQL query con join a tabla artists, albums y lyrics para obtener letras y otra información
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -861,11 +869,14 @@ class MusicBrowser(BaseModule):
                 art.wikipedia_url AS artist_wikipedia_url,
                 art.wikipedia_content AS artist_wikipedia_content,
                 alb.wikipedia_url AS album_wikipedia_url,
-                alb.wikipedia_content AS album_wikipedia_content
+                alb.wikipedia_content AS album_wikipedia_content,
+                lyr.lyrics,
+                lyr.source AS lyrics_source
             FROM songs s
             LEFT JOIN artists art ON s.artist = art.name
             LEFT JOIN albums alb ON s.album = alb.name 
             LEFT JOIN artists album_artist ON alb.artist_id = album_artist.id AND s.artist = album_artist.name
+            LEFT JOIN lyrics lyr ON s.id = lyr.track_id
         """
         
         # Use build_sql_conditions from SearchParser
@@ -889,7 +900,7 @@ class MusicBrowser(BaseModule):
                 artist = row[3] if row[3] else "Sin artista"
                 album = row[5] if row[5] else "Sin álbum"
                 title = row[2] if row[2] else "Sin título"
-                track_number = row[14] if row[14] else "0"  # Cambié el índice de 15 a 14 que es el correcto para track_number
+                track_number = row[14] if row[14] else "0"
                 
                 # Si cambiamos de álbum, añadir header
                 album_key = f"{artist} - {album}"
