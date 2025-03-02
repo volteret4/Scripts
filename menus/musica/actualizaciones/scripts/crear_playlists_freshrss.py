@@ -6,7 +6,6 @@
 #
 # Notes:
 #   Dependencies:  - python3, PyQt6
-#                  - mpv
 #                  - yt-dlp
 #                  - servidor freshrss y categoria blog creada en el.
 #
@@ -24,6 +23,7 @@ import subprocess
 import sys
 import argparse
 import traceback
+import glob
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, 
@@ -223,7 +223,7 @@ class PlaylistManager:
                 urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
             titles = []
-            for url in urls:
+            for i, url in enumerate(urls):
                 logger.info(f"Extrayendo título de: {url}")
                 try:
                     # Usar yt-dlp para obtener el título
@@ -238,9 +238,14 @@ class PlaylistManager:
                     if title:
                         titles.append(title)
                         logger.info(f"Título encontrado: {title}")
+                    else:
+                        # Si no se encuentra título, agregar "Sin título"
+                        titles.append(f"Sin título ({i+1})")
+                        logger.warning(f"No se pudo extraer el título para {url}, usando 'Sin título ({i+1})'")
                 except Exception as e:
+                    # En caso de error, agregar "Sin título"
+                    titles.append(f"Sin título ({i+1})")
                     logger.error(f"Error extrayendo título de {url}: {str(e)}")
-                    continue
 
             # Escribir títulos en un archivo .txt
             txt_path = playlist_path.with_suffix('.txt')
@@ -248,10 +253,30 @@ class PlaylistManager:
                 for title in titles:
                     f.write(f"{title}\n")
 
+            # Asegurarse de que haya un título para cada URL
+            if len(titles) < len(urls):
+                logger.warning(f"Faltan títulos: {len(titles)} títulos para {len(urls)} URLs")
+                with open(txt_path, 'a', encoding='utf-8') as f:
+                    for i in range(len(titles), len(urls)):
+                        f.write(f"Sin título ({i+1})\n")
+
             logger.info(f"Archivo de títulos creado: {txt_path}")
             
         except Exception as e:
             logger.error(f"Error durante la extracción de títulos: {str(e)}")
+            # Crear un archivo de títulos con valores por defecto en caso de error total
+            try:
+                txt_path = playlist_path.with_suffix('.txt')
+                with open(playlist_path, 'r', encoding='utf-8') as f:
+                    urls_count = sum(1 for line in f if line.strip() and not line.startswith('#'))
+                
+                with open(txt_path, 'w', encoding='utf-8') as f:
+                    for i in range(urls_count):
+                        f.write(f"Sin título ({i+1})\n")
+                
+                logger.info(f"Archivo de títulos de respaldo creado: {txt_path}")
+            except Exception as backup_error:
+                logger.error(f"Error al crear archivo de títulos de respaldo: {str(backup_error)}")
     
     def process_posts(self, posts: List[Dict[str, str]]):
         """Procesa los posts y crea playlists organizadas por feed y mes"""
@@ -288,6 +313,38 @@ class PlaylistManager:
         
         return created_playlists
 
+    def process_local_playlists(self, local_playlists_dir: str):
+        """Procesa playlists locales existentes y genera archivos de títulos"""
+        if not local_playlists_dir:
+            logger.info("No se proporcionó directorio de playlists locales, saltando...")
+            return []
+
+        local_dir = Path(local_playlists_dir)
+        if not local_dir.exists():
+            logger.warning(f"El directorio de playlists locales no existe: {local_dir}")
+            return []
+            
+        logger.info(f"Procesando playlists locales en: {local_dir}")
+        
+        # Encontrar todos los archivos .m3u en el directorio y subdirectorios
+        m3u_files = list(local_dir.glob('**/*.m3u'))
+        logger.info(f"Encontradas {len(m3u_files)} playlists locales")
+        
+        processed_files = []
+        for m3u_file in m3u_files:
+            # Comprobar si ya existe un archivo .txt correspondiente
+            txt_file = m3u_file.with_suffix('.txt')
+            
+            # Si el archivo .txt no existe o está vacío, procesarlo
+            if not txt_file.exists() or txt_file.stat().st_size == 0:
+                logger.info(f"Procesando playlist local: {m3u_file}")
+                self.extract_titles_for_playlist(m3u_file)
+                processed_files.append(str(m3u_file))
+            else:
+                logger.info(f"Saltando playlist ya procesada: {m3u_file}")
+                
+        return processed_files
+
 def main():
     # Parsear argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Genera playlists de música desde feeds de blogs en FreshRSS')
@@ -295,6 +352,7 @@ def main():
     parser.add_argument('--username', required=True, help='Nombre de usuario de FreshRSS')
     parser.add_argument('--auth_token', required=True, help='Token de API de FreshRSS')
     parser.add_argument('--output_dir', required=True, help='Directorio para guardar las playlists')
+    parser.add_argument('--playlists_locales', help='Directorio con playlists locales existentes para procesar', default='')
     
     args = parser.parse_args()
     
@@ -332,6 +390,12 @@ def main():
         # Crear playlists
         print("Creando playlists...")
         created_playlists = playlist_manager.process_posts(all_posts)
+        
+        # Procesar playlists locales si se proporcionó un directorio
+        if args.playlists_locales:
+            print(f"Procesando playlists locales en: {args.playlists_locales}")
+            processed_local = playlist_manager.process_local_playlists(args.playlists_locales)
+            print(f"Playlists locales procesadas: {len(processed_local)}")
         
         # Mostrar resultados
         print(f"Proceso completado. Posts totales procesados: {len(all_posts)}")
