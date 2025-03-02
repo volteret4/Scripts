@@ -4,12 +4,14 @@ import logging
 import sqlite3
 import argparse
 import json
+import time
+import requests
 from datetime import datetime
 import lyricsgenius
 from dotenv import load_dotenv
 load_dotenv()
 
-class LyricsManager:
+class MultiLyricsManager:
     def __init__(self, db_path, batch_size=1000):
         self.db_path = db_path
         self.batch_size = batch_size
@@ -21,17 +23,21 @@ class LyricsManager:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Genius API initialization
+        # Genius API initialization (como backup)
         genius_token = os.getenv("GENIUS_ACCESS_TOKEN")
-        if not genius_token:
-            self.logger.error("GENIUS_ACCESS_TOKEN not found in .env file")
-            sys.exit(1)
-        
-        self.genius = lyricsgenius.Genius(genius_token, timeout=10, sleep_time=0.5)
-        self.genius.verbose = False  # No mostrar mensajes de Genius
+        if genius_token:
+            self.genius = lyricsgenius.Genius(genius_token, timeout=10, sleep_time=1.0)
+            self.genius.verbose = False
+        else:
+            self.genius = None
+            self.logger.warning("GENIUS_ACCESS_TOKEN no encontrado. Genius no estará disponible como fuente de respaldo.")
         
         # Archivo de estado para pausar/continuar
         self.state_file = "lyrics_update_state.json"
+        
+        # Retry y backoff settings
+        self.max_retries = 3
+        self.retry_delay = 2  # segundos
         
         # Initialize database
         self.init_database()
@@ -50,7 +56,7 @@ class LyricsManager:
                     id INTEGER PRIMARY KEY,
                     track_id INTEGER UNIQUE,
                     lyrics TEXT,
-                    source TEXT DEFAULT 'Genius',
+                    source TEXT,
                     last_updated TIMESTAMP,
                     FOREIGN KEY(track_id) REFERENCES songs(id)
                 )
@@ -67,16 +73,148 @@ class LyricsManager:
         conn.commit()
         conn.close()
     
-    def get_song_lyrics(self, artist, title):
-        """Busca la letra de una canción en Genius."""
+    def get_lyrics_from_ovh(self, artist, title):
+        """Intenta obtener letras de lyrics.ovh API."""
+        base_url = "https://api.lyrics.ovh/v1"
+        
+        for retry in range(self.max_retries):
+            try:
+                url = f"{base_url}/{artist.replace('/', '')}/{title.replace('/', '')}"
+                response = requests.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'lyrics' in data and data['lyrics']:
+                        return data['lyrics'], "lyrics.ovh"
+                elif response.status_code == 429:  # Rate limit
+                    wait_time = retry * self.retry_delay
+                    self.logger.warning(f"Rate limit en lyrics.ovh. Esperando {wait_time}s antes de reintentar.")
+                    time.sleep(wait_time)
+                    continue
+                
+                # Si llegamos aquí, no se encontró pero no hay error
+                break
+                
+            except Exception as e:
+                self.logger.error(f"Error accediendo a lyrics.ovh: {str(e)}")
+                time.sleep(retry * self.retry_delay)
+        
+        return None, None
+    
+    def get_lyrics_from_lyricsgenius(self, artist, title):
+        """Intenta obtener letras usando Genius API."""
+        if not self.genius:
+            return None, None
+            
         try:
             song = self.genius.search_song(title, artist)
             if song:
-                return song.lyrics
-            return None
+                return song.lyrics, "Genius"
         except Exception as e:
-            self.logger.error(f"Error al buscar letra para {artist} - {title}: {str(e)}")
-            return None
+            self.logger.error(f"Error al buscar letra en Genius para {artist} - {title}: {str(e)}")
+        
+        return None, None
+    
+    def get_lyrics_from_happi(self, artist, title):
+        """Intenta obtener letras usando Happi API."""
+        happi_key = os.getenv("HAPPI_API_KEY")
+        if not happi_key:
+            return None, None
+            
+        base_url = "https://api.happi.dev/v1/music"
+        
+        try:
+            # Primero buscamos la canción
+            search_url = f"{base_url}/search/{title}"
+            headers = {"x-happi-key": happi_key}
+            params = {"q_artist": artist, "limit": 1}
+            
+            response = requests.get(search_url, headers=headers, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success') and data.get('result') and len(data['result']) > 0:
+                    track_id = data['result'][0].get('id_track')
+                    if track_id:
+                        # Ahora buscamos la letra con el ID de la canción
+                        lyrics_url = f"{base_url}/artists/{data['result'][0]['id_artist']}/albums/{data['result'][0]['id_album']}/tracks/{track_id}/lyrics"
+                        lyrics_response = requests.get(lyrics_url, headers=headers, timeout=10)
+                        
+                        if lyrics_response.status_code == 200:
+                            lyrics_data = lyrics_response.json()
+                            if lyrics_data.get('success') and lyrics_data.get('result') and lyrics_data['result'].get('lyrics'):
+                                return lyrics_data['result']['lyrics'], "Happi"
+        except Exception as e:
+            self.logger.error(f"Error accediendo a Happi API: {str(e)}")
+        
+        return None, None
+    
+    def get_lyrics_from_musixmatch(self, artist, title):
+        """Intenta obtener letras usando Musixmatch API."""
+        musixmatch_key = os.getenv("MUSIXMATCH_API_KEY")
+        if not musixmatch_key:
+            return None, None
+            
+        base_url = "https://api.musixmatch.com/ws/1.1"
+        
+        try:
+            # Buscar la canción
+            search_url = f"{base_url}/matcher.lyrics.get"
+            params = {
+                "apikey": musixmatch_key,
+                "q_track": title,
+                "q_artist": artist,
+                "format": "json"
+            }
+            
+            response = requests.get(search_url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                message = data.get('message', {})
+                body = message.get('body', {})
+                lyrics = body.get('lyrics', {})
+                lyrics_text = lyrics.get('lyrics_body')
+                
+                if lyrics_text:
+                    # Musixmatch API free incluye un mensaje promocional al final
+                    disclaimer_idx = lyrics_text.find("******* This Lyrics is NOT")
+                    if disclaimer_idx > 0:
+                        lyrics_text = lyrics_text[:disclaimer_idx].strip()
+                    
+                    return lyrics_text, "Musixmatch"
+        except Exception as e:
+            self.logger.error(f"Error accediendo a Musixmatch API: {str(e)}")
+        
+        return None, None
+    
+    def get_song_lyrics(self, artist, title):
+        """Busca la letra de una canción en múltiples fuentes."""
+        # Limpiar el título y artista para evitar problemas con caracteres especiales
+        artist = artist.strip()
+        title = title.strip()
+        
+        # Intentar con lyrics.ovh primero (sin API key, gratuito)
+        lyrics, source = self.get_lyrics_from_ovh(artist, title)
+        if lyrics:
+            return lyrics, source
+            
+        # Intentar con Happi (necesita API key)
+        lyrics, source = self.get_lyrics_from_happi(artist, title)
+        if lyrics:
+            return lyrics, source
+            
+        # Intentar con Musixmatch (necesita API key)
+        lyrics, source = self.get_lyrics_from_musixmatch(artist, title)
+        if lyrics:
+            return lyrics, source
+            
+        # Intentar con Genius como último recurso (debido al rate limit)
+        lyrics, source = self.get_lyrics_from_lyricsgenius(artist, title)
+        if lyrics:
+            return lyrics, source
+        
+        return None, None
     
     def save_state(self, song_ids, current_index, processed, success):
         """Guarda el estado actual del proceso para continuar más tarde."""
@@ -154,6 +292,9 @@ class LyricsManager:
         total_songs = len(song_ids)
         self.logger.info(f"Total de canciones para procesar: {total_songs}")
         
+        # Estadísticas de fuentes
+        sources_stats = {}
+        
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
@@ -185,13 +326,16 @@ class LyricsManager:
                         error_logger.error(f"Falta información para song_id {song_id}: artist={artist}, title={title}")
                         continue
                     
-                    lyrics = self.get_song_lyrics(artist, title)
+                    lyrics, source = self.get_song_lyrics(artist, title)
                     if lyrics:
+                        # Actualizar estadísticas
+                        sources_stats[source] = sources_stats.get(source, 0) + 1
+                        
                         # Insertar o actualizar letra usando track_id
                         c.execute("""
-                            INSERT OR REPLACE INTO lyrics (track_id, lyrics, last_updated) 
-                            VALUES (?, ?, ?)
-                        """, (song_id, lyrics, datetime.now()))
+                            INSERT OR REPLACE INTO lyrics (track_id, lyrics, source, last_updated) 
+                            VALUES (?, ?, ?, ?)
+                        """, (song_id, lyrics, source, datetime.now()))
                         
                         # Actualizar referencia en songs
                         c.execute("""
@@ -211,6 +355,9 @@ class LyricsManager:
                 # Mostrar progreso y guardar estado cada cierto número de canciones
                 if processed % 10 == 0 or (i - batch_start) == self.batch_size:
                     self.logger.info(f"Progreso: {processed}/{total_songs} canciones procesadas ({success} actualizadas)")
+                    if sources_stats:
+                        sources_log = ", ".join([f"{src}: {count}" for src, count in sources_stats.items()])
+                        self.logger.info(f"Fuentes utilizadas: {sources_log}")
                 
                 # Guardar estado y salir después de cada lote
                 if (i - batch_start + 1) >= self.batch_size:
@@ -228,13 +375,16 @@ class LyricsManager:
                 if os.path.exists(self.state_file):
                     os.remove(self.state_file)
                 self.logger.info(f"Proceso completo: {processed} canciones procesadas, {success} actualizadas correctamente")
+                if sources_stats:
+                    sources_log = ", ".join([f"{src}: {count}" for src, count in sources_stats.items()])
+                    self.logger.info(f"Resumen de fuentes utilizadas: {sources_log}")
             
             error_logger.removeHandler(error_handler)
             error_handler.close()
             conn.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Actualizador de letras para biblioteca musical')
+    parser = argparse.ArgumentParser(description='Actualizador de letras para biblioteca musical con múltiples APIs')
     parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
     parser.add_argument('--force-update', action='store_true', help='Forzar actualización de todas las letras')
     parser.add_argument('--batch-size', type=int, default=1000, help='Número de canciones a procesar por lote')
@@ -242,5 +392,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    manager = LyricsManager(args.db_path, batch_size=args.batch_size)
+    manager = MultiLyricsManager(args.db_path, batch_size=args.batch_size)
     manager.update_lyrics(force_update=args.force_update, resume=not args.no_resume)

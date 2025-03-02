@@ -192,13 +192,28 @@ class ScriptRunnerModule(BaseModule):
             script_widget = ScriptWidget(script_name, script_info, self)
             self.scripts_layout.addWidget(script_widget)
 
+# Modificaciones para ScriptRunnerModule.run_script
     def run_script(self, script_info, additional_args=None):
         try:
             script_path = Path(script_info.get('path', ''))
+            self.log_message(f"Script original path: {script_path}")
+            
+            # Si la ruta es relativa, hacerla absoluta respecto al directorio del config
             if not script_path.is_absolute():
                 config_dir = Path(self.config_file).parent
                 script_path = config_dir / script_path
             
+            self.log_message(f"Script resolved path: {script_path}")
+            
+            # Verificar que el archivo existe
+            if not script_path.exists():
+                error_msg = f"Error: Script file does not exist: {script_path}"
+                self.log_message(error_msg, error=True)
+                
+                # Mostrar el mensaje en rojo y más prominente
+                self.log_text.append(f'<p style="color: red; font-weight: bold; background-color: {THEME["bg"]}; padding: 5px; border: 1px solid red; border-radius: 3px;">⚠️ PATH ERROR: El archivo no existe en la ruta especificada: {script_path}</p>')
+                return
+                
             process = QProcess(self)
             process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
             process.readyRead.connect(lambda p=process: self.handle_process_output(p))
@@ -208,17 +223,28 @@ class ScriptRunnerModule(BaseModule):
             if additional_args:
                 cmd.extend(additional_args)
             
+            self.log_message(f"Running command: {' '.join(cmd)}")
+            
             self.processes[process] = script_path.name
-            self.log_message(f"Running {script_path.name}...")
             process.start(cmd[0], cmd[1:])
             
         except Exception as e:
             self.log_message(f"Error running script: {str(e)}", error=True)
+            import traceback
+            self.log_message(traceback.format_exc(), error=True)
+            
+            # Mostrar el error de manera más visible
+            self.log_text.append(f'<p style="color: red; font-weight: bold; background-color: {THEME["bg"]}; padding: 5px; border: 1px solid red; border-radius: 3px;">⚠️ ERROR AL EJECUTAR: {str(e)}</p>')
 
     def handle_process_output(self, process):
-        output = process.readAll().data().decode()
-        script_name = self.processes.get(process, "Unknown script")
-        self.log_message(f"[{script_name}] {output.strip()}")
+        try:
+            data = process.readAll()
+            if data:
+                output = data.data().decode('utf-8', errors='replace')
+                script_name = self.processes.get(process, "Unknown script")
+                self.log_message(f"[{script_name}] {output.strip()}")
+        except Exception as e:
+            self.log_message(f"Error reading process output: {str(e)}", error=True)
 
     def handle_process_finished(self, process, exit_code, exit_status):
         script_name = self.processes.get(process, "Unknown script")
@@ -229,8 +255,15 @@ class ScriptRunnerModule(BaseModule):
         self.processes.pop(process, None)
 
     def log_message(self, message, error=False):
-        color = "red" if error else "white"
-        self.log_text.append(f'<span style="color: {color};">{message}</span>')
+        if error:
+            # Para errores, usar formato más visible
+            self.log_text.append(f'<span style="color: red; font-weight: bold;">{message}</span>')
+        else:
+            # Para mensajes normales
+            self.log_text.append(f'<span style="color: white;">{message}</span>')
+        
+        # Asegurarse de que el mensaje más reciente sea visible
+        self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
 
     def apply_theme(self):
         self.setStyleSheet(f"""

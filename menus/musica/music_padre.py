@@ -182,6 +182,19 @@ class TabManager(QMainWindow):
             self.tab_widget.setCurrentIndex(current_index)
 
 
+    def cleanup_threads():
+        """Ensure all threads are properly stopped before application exit"""
+        for thread in QThread.allThreads():
+            if thread != QThread.currentThread():
+                try:
+                    # If it's our worker, call stop method
+                    if hasattr(thread, 'stop'):
+                        thread.stop()
+                    # Wait for thread to finish
+                    thread.wait(5000)  # 5 second timeout
+                except Exception as e:
+                    print(f"Error cleaning up thread: {e}")
+
 
 def main():
     import argparse

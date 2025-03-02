@@ -13,7 +13,7 @@
       "name": "Obtener enlaces",
       "path": "blogs_pte/blogs_pte_module.py",
       "args": {
-        "output_dir": "/home/huan/M\u00fasica/blogs_playlists",
+        "output_dir": "/home/huan/M\u00fasica/blogs_playlists/PENDIENTE",
         "freshrss_url": "https://freshrss.pollete.duckdns.org",
         "username": "pollo",
         "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu"
@@ -25,7 +25,7 @@
       "args": {
         "pending_dir": "/home/huan/M\u00fasica/blogs_playlists/PENDIENTE",
         "listened_dir": "/home/huan/M\u00fasica/blogs_playlists/ESCUCHADO",
-        "local_dir": "/home/huan/M\u00fasica/blogs_playlists/LISTAS_LOCALES",
+        "local_dir": "/home/huan/M\u00fasica/blogs_playlists/locales",
         "output_dir": "/home/huan/M\u00fasica/blogs_playlists",
         "freshrss_url": "https://freshrss.pollete.duckdns.org",
         "username": "pollo",

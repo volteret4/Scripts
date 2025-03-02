@@ -1,11 +1,20 @@
 {
-    "available_scripts": {
-      "Base de datos": {
-        "path": "base_datos/db_musica.py",
-        "args": {
-            "db_path": "/home/huan/Música/moode.sqlite",
-            "path": "/mnt/NFS/moode/moode"
-        }
+  "available_scripts": {
+    "Base de datos": {
+      "path": "base_datos/db_musica.py",
+      "args": {
+        "db_path": "/home/huan/Música/moode.sqlite",
+        "path": "/mnt/NFS/moode/moode"
+      }
+    },
+    "Playlists de Blogs": {
+      "path": "/home/huan/Scripts/menus/musica/actualizaciones/scripts/crear_playlists_freshrss.py",
+      "args": {
+        "url": "https://freshrss.pollete.duckdns.org",
+        "username": "pollo",
+        "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu",
+        "output_dir": "/home/huan/Música/blogs_playlists/PENDIENTE"
       }
     }
+  }
 }

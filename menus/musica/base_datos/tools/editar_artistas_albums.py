@@ -27,17 +27,7 @@
 # Corregir nombre de un álbum:
 # python music_db_corrector.py --db tu_base_de_datos.db album --old "Abby Road" --new "Abbey Road" --artist "The Beatles"
 
-# Encontrar artistas similares:
-# python music_db_corrector.py --db tu_base_de_datos.db find-similar
 
-# Fusionar dos artistas (manteniendo el primero):
-# python music_db_corrector.py --db tu_base_de_datos.db merge --keep "The Beatles" --merge "The Beattles"
-
-# Listar todos los artistas para buscar duplicados manualmente:
-# python music_db_corrector.py --db tu_base_de_datos.db list-artists
-
-# Buscar artistas con un patrón específico:
-# python music_db_corrector.py --db tu_base_de_datos.db list-artists --pattern "Beat"
 
 import sqlite3
 import argparse

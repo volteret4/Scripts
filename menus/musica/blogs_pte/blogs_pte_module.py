@@ -32,6 +32,7 @@ from typing import List, Dict
 from urllib.parse import quote
 from dotenv import load_dotenv
 import asyncio
+import subprocess
 
 load_dotenv()
 
@@ -103,6 +104,11 @@ class TitleExtractorWorker(QThread):
     def __init__(self, playlist_path):
         super().__init__()
         self.playlist_path = playlist_path
+        self.running = True
+
+    def stop(self):
+        """Safely stop the thread"""
+        self.running = False
 
     def run(self):
         try:
@@ -112,6 +118,9 @@ class TitleExtractorWorker(QThread):
 
             titles = []
             for url in urls:
+                if not self.running:
+                    break
+                    
                 self.progress_signal.emit(f"Extracting title from: {url}")
                 try:
                     # Use yt-dlp to get video title
@@ -119,7 +128,8 @@ class TitleExtractorWorker(QThread):
                         ['yt-dlp', '--get-title', url],
                         capture_output=True,
                         text=True,
-                        check=True
+                        check=True,
+                        timeout=60  # Add a timeout to prevent hanging
                     )
                     title = result.stdout.strip()
                     if title:
@@ -127,18 +137,23 @@ class TitleExtractorWorker(QThread):
                 except subprocess.CalledProcessError as e:
                     self.error_signal.emit(f"Error extracting title from {url}: {str(e)}")
                     continue
+                except subprocess.TimeoutExpired:
+                    self.error_signal.emit(f"Timeout extracting title from {url}")
+                    continue
 
-            # Write titles to .titles file
-            titles_path = self.playlist_path.with_suffix('.titles')
-            with open(titles_path, 'w', encoding='utf-8') as f:
-                for title in titles:
-                    f.write(f"{title}\n")
+            # Only write the file if we have titles and the thread is still running
+            if titles and self.running:
+                # Write titles to .txt file with the same base name
+                txt_path = self.playlist_path.with_suffix('.txt')
+                with open(txt_path, 'w', encoding='utf-8') as f:
+                    for title in titles:
+                        f.write(f"{title}\n")
 
-            self.progress_signal.emit(f"Created titles file: {titles_path}")
-            self.finished_signal.emit()
+                self.progress_signal.emit(f"Created titles file: {txt_path}")
 
         except Exception as e:
             self.error_signal.emit(f"Error: {str(e)}")
+        finally:
             self.finished_signal.emit()
 
 
@@ -412,6 +427,7 @@ class PlaylistManager:
     def __init__(self, output_dir: str):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.title_workers = []  # Keep track of all workers
         
     def create_m3u_playlist(self, urls: List[str], feed_dir: Path, filename: str):
         """Crea un archivo .m3u con las URLs proporcionadas"""
@@ -427,6 +443,49 @@ class PlaylistManager:
                 
         logger.info(f"Playlist creada: {playlist_path}")
         
+        # Extract titles synchronously for immediate feedback
+        self.extract_titles_for_playlist_sync(playlist_path)
+    
+    def extract_titles_for_playlist_sync(self, playlist_path: Path):
+        """Extracts titles synchronously for immediate results"""
+        logger.info(f"Extracting titles for: {playlist_path}")
+        
+        try:
+            # Read URLs from playlist
+            with open(playlist_path, 'r', encoding='utf-8') as f:
+                urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
+            titles = []
+            for url in urls:
+                logger.info(f"Extracting title from: {url}")
+                try:
+                    # Use yt-dlp to get video title
+                    result = subprocess.run(
+                        ['yt-dlp', '--get-title', url],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=30  # Add timeout to prevent hanging
+                    )
+                    title = result.stdout.strip()
+                    if title:
+                        titles.append(title)
+                        logger.info(f"Found title: {title}")
+                except Exception as e:
+                    logger.error(f"Error extracting title from {url}: {str(e)}")
+                    continue
+
+            # Write titles to .txt file
+            txt_path = playlist_path.with_suffix('.txt')
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                for title in titles:
+                    f.write(f"{title}\n")
+
+            logger.info(f"Created titles file: {txt_path}")
+            
+        except Exception as e:
+            logger.error(f"Error during title extraction: {str(e)}")
+    
     def process_posts(self, posts: List[Dict[str, str]]):
         """Procesa los posts y crea playlists organizadas por feed y mes"""
         # Organizar posts por feed y luego por mes
@@ -721,17 +780,29 @@ class PlaylistManagerModule(QWidget):
             QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
 
     def extract_titles(self, playlist_path):
-            """Extract titles from playlist URLs using yt-dlp"""
-            self.title_worker = TitleExtractorWorker(playlist_path)
-            self.title_worker.progress_signal.connect(lambda msg: print(f"Title extraction: {msg}"))
-            self.title_worker.error_signal.connect(lambda err: print(f"Title extraction error: {err}"))
-            self.title_worker.start()
+        """Extract titles from playlist URLs using yt-dlp"""
+        # Check if a txt file already exists
+        txt_path = playlist_path.with_suffix('.txt')
+        if txt_path.exists():
+            print(f"Title file already exists: {txt_path}")
+            return
+            
+        self.title_worker = TitleExtractorWorker(playlist_path)
+        self.title_worker.progress_signal.connect(lambda msg: print(f"Title extraction: {msg}"))
+        self.title_worker.error_signal.connect(lambda err: print(f"Title extraction error: {err}"))
+        self.title_worker.finished_signal.connect(lambda: print(f"Title extraction complete for {playlist_path}"))
+        self.title_worker.start()
 
 if __name__ == "__main__":
     from PyQt6.QtWidgets import QApplication
     import sys
+    import atexit
+
 
     app = QApplication(sys.argv)
+    
+    # Register cleanup function
+    atexit.register(cleanup_threads)
     
     # Create the main container
     container = ScrollableModuleContainer()

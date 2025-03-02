@@ -7,7 +7,7 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
-# TODO: 
+# TODO:     
 # Notes:
 #   Dependencies:  - python3, 
 #
@@ -134,6 +134,8 @@ class MusicManagerModule(BaseModule):
         self.playlist_list.itemSelectionChanged.connect(self.on_playlist_select)
         self.play_button.clicked.connect(self.play_selected)
         self.playlist_list.itemDoubleClicked.connect(self.play_selected)
+        self.content_list.itemDoubleClicked.connect(self.play_selected_track)  # Añadir esta línea
+
         
         # Initial refresh
         self.refresh_lists()
@@ -249,53 +251,52 @@ class MusicManagerModule(BaseModule):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 return info.get('title', url)
+
         except:
             return url
 
     def on_playlist_select(self):
-            """Handle playlist selection event."""
-            self.content_list.clear()
+        """Handle playlist selection event."""
+        self.content_list.clear()
+        
+        selected_items = self.playlist_list.selectedItems()
+        if not selected_items:
+            return
             
-            selected_items = self.playlist_list.selectedItems()
-            if not selected_items:
-                return
+        playlist_item = selected_items[0]
+        playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
+        
+        if not playlist_data:
+            return
+            
+        if playlist_data['type'] == 'blog':
+            playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
+            txt_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.txt"
+        else:
+            playlist_path = self.local_dir / playlist_data['name']
+            txt_path = self.local_dir / f"{playlist_path.stem}.txt"
+        
+        if playlist_path.exists():
+            # Cargar los títulos desde el archivo .txt si existe
+            titles_by_line = []
+            if txt_path.exists():
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    titles_by_line = [line.strip() for line in f.readlines()]
+            
+            # Leer la playlist
+            with open(playlist_path, 'r', encoding='utf-8') as f:
+                playlist_lines = [line.strip() for line in f if line.strip() and not line.startswith('#')]
                 
-            playlist_item = selected_items[0]
-            playlist_data = playlist_item.data(Qt.ItemDataRole.UserRole)
-            
-            if not playlist_data:
-                return
-                
-            if playlist_data['type'] == 'blog':
-                playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
-                titles_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.titles"
-            else:
-                playlist_path = self.local_dir / playlist_data['name']
-                titles_path = self.local_dir / f"{playlist_path.stem}.titles"
-            
-            if playlist_path.exists():
-                # Cargar los títulos si existe el archivo
-                titles = {}
-                if titles_path.exists():
-                    with open(titles_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            try:
-                                url, title = line.strip().split(' | ', 1)
-                                titles[url] = title
-                            except ValueError:
-                                continue
-
-                # Leer la playlist y mostrar los títulos
-                with open(playlist_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#'):
-                            # Usar el título del archivo .titles si existe, si no usar la URL
-                            title = titles.get(line, line)
-                            item = QListWidgetItem(title)
-                            item.setData(Qt.ItemDataRole.UserRole, {'url': line})
-                            self.content_list.addItem(item)
-
+                for i, line in enumerate(playlist_lines):
+                    # Usar título del archivo .txt si disponible para esta línea
+                    if i < len(titles_by_line) and titles_by_line[i]:
+                        title = titles_by_line[i]
+                    else:
+                        title = line
+                        
+                    item = QListWidgetItem(title)
+                    item.setData(Qt.ItemDataRole.UserRole, {'url': line, 'index': i})
+                    self.content_list.addItem(item)
     
     def on_local_select(self):
         """Handle local playlist selection event."""
@@ -372,7 +373,7 @@ class MusicManagerModule(BaseModule):
         
         if not playlist_items or not track_items:
             return
-            
+                
         reply = QMessageBox.question(
             self,
             "Confirmar Eliminación",
@@ -386,40 +387,46 @@ class MusicManagerModule(BaseModule):
             
             if playlist_data['type'] == 'blog':
                 playlist_path = self.pending_dir / playlist_data['blog'] / playlist_data['name']
-                titles_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.titles"
+                txt_path = self.pending_dir / playlist_data['blog'] / f"{playlist_path.stem}.txt"
             else:
                 playlist_path = self.local_dir / playlist_data['name']
-                titles_path = self.local_dir / f"{playlist_path.stem}.titles"
+                txt_path = self.local_dir / f"{playlist_path.stem}.txt"
             
             try:
-                # Read all lines from playlist
+                # Obtener el índice de la pista seleccionada
+                track_index = self.content_list.row(track_items[0])
+                track_url = track_items[0].data(Qt.ItemDataRole.UserRole)['url']
+                
+                # Leer todas las líneas de la playlist
                 with open(playlist_path, 'r', encoding='utf-8') as f:
                     playlist_lines = f.readlines()
                 
-                # Read all lines from titles if it exists
-                titles_lines = []
-                if titles_path.exists():
-                    with open(titles_path, 'r', encoding='utf-8') as f:
-                        titles_lines = f.readlines()
+                # Contar las líneas que no son comentarios para encontrar la posición real
+                non_comment_lines = [i for i, line in enumerate(playlist_lines) 
+                                if line.strip() and not line.strip().startswith('#')]
                 
-                # Remove the selected track
-                track_url = track_items[0].data(Qt.ItemDataRole.UserRole)['url']
+                # Encontrar la línea real en el archivo que corresponde al índice
+                if track_index < len(non_comment_lines):
+                    line_to_remove = non_comment_lines[track_index]
+                    playlist_lines.pop(line_to_remove)
                 
-                # Filter out the track from playlist
-                playlist_lines = [line for line in playlist_lines if track_url not in line]
+                # Si existe el archivo de títulos, actualizarlo eliminando la línea correspondiente
+                if txt_path.exists():
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        txt_lines = f.readlines()
+                    
+                    # Solo eliminar si estamos dentro de los límites
+                    if track_index < len(txt_lines):
+                        txt_lines.pop(track_index)
+                    
+                    with open(txt_path, 'w', encoding='utf-8') as f:
+                        f.writelines(txt_lines)
                 
-                # Filter out the track from titles
-                titles_lines = [line for line in titles_lines if not line.startswith(track_url + ' | ')]
-                
-                # Write back the files
+                # Escribir de nuevo el archivo de playlist
                 with open(playlist_path, 'w', encoding='utf-8') as f:
                     f.writelines(playlist_lines)
-                    
-                if titles_path.exists():
-                    with open(titles_path, 'w', encoding='utf-8') as f:
-                        f.writelines(titles_lines)
                 
-                # Refresh the content list
+                # Actualizar la lista de contenido
                 self.on_playlist_select()
                 
             except Exception as e:
@@ -499,6 +506,32 @@ class MusicManagerModule(BaseModule):
             if process.returncode == 0 and playlist_data['type'] == 'blog':
                 self.show_move_dialog(playlist_data['blog'], playlist_data['name'])
             
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
+
+
+    def play_selected_track(self):
+        """Reproduce el track seleccionado."""
+        selected_tracks = self.content_list.selectedItems()
+        if not selected_tracks:
+            return
+            
+        track_item = selected_tracks[0]
+        track_data = track_item.data(Qt.ItemDataRole.UserRole)
+        
+        if not track_data or 'url' not in track_data:
+            return
+        
+        url = track_data['url']
+        
+        try:
+            # Ejecuta mpv con solo el URL seleccionado
+            process = subprocess.run(
+                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm_starter.sh", 
+                "--player-operation-mode=pseudo-gui", 
+                "--force-window=yes", 
+                url]
+            )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
 
