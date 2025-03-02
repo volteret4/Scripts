@@ -167,7 +167,7 @@ def search_wikipedia(query):
         return None
 
 def get_wikipedia_content(url):
-    """Obtiene el contenido principal de una página de Wikipedia"""
+    """Obtiene el contenido principal de una página de Wikipedia preservando los saltos de línea"""
     if not url:
         return None
     
@@ -185,11 +185,17 @@ def get_wikipedia_content(url):
                 for div in main_content.find_all(['div', 'table'], {'class': ['navbox', 'infobox', 'toc', 'metadata', 'tmbox', 'ambox']}):
                     div.decompose()
                 
-                # Extraer sólo los párrafos principales
+                # Extraer los párrafos principales preservando los saltos de línea
                 paragraphs = main_content.find_all('p')
-                content = '\n\n'.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
                 
-                return content
+                # Preservamos la estructura original conservando los párrafos vacíos
+                content = ""
+                for p in paragraphs:
+                    text = p.get_text().strip()
+                    if text:  # Solo añadimos párrafos con contenido
+                        content += text + "\n\n"
+                
+                return content.strip()
             
         return None
     except Exception as e:
@@ -254,12 +260,14 @@ def update_artists_wikipedia(db_path, log_file):
         
         # Primero intentamos obtener el enlace desde MusicBrainz
         wiki_url = None
+        from_musicbrainz = False
         if mb_url:
             print(f"  Buscando enlace en MusicBrainz...")
             wiki_url = extract_wikipedia_url_from_musicbrainz(mb_url)
             
             if wiki_url:
                 print(f"  Enlace encontrado en MusicBrainz: {wiki_url}")
+                from_musicbrainz = True
         
         # Si no encontramos el enlace en MusicBrainz, buscamos en Wikipedia
         if not wiki_url:
@@ -271,27 +279,59 @@ def update_artists_wikipedia(db_path, log_file):
             else:
                 print("  No se encontró enlace en Wikipedia.")
         
-        # Si tenemos una URL, abrimos el navegador y pedimos confirmación
+        # Si tenemos una URL, procesamos diferente según la fuente
         content = None
         if wiki_url:
-            subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            user_input = input(f"  Confirmar URL para '{artist_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
-            
-            if user_input.lower() == 'n':
-                wiki_url = ""
-            elif user_input.strip():
-                wiki_url = user_input.strip()
-                
-            # Si tenemos una URL final, obtenemos el contenido
-            if wiki_url:
+            # Si proviene de MusicBrainz, añadimos automáticamente
+            if from_musicbrainz:
+                print(f"  Añadiendo automáticamente enlace de MusicBrainz: {wiki_url}")
                 print("  Obteniendo contenido de Wikipedia...")
                 content = get_wikipedia_content(wiki_url)
+                
                 if content:
                     content_preview = content[:100] + "..." if len(content) > 100 else content
                     print(f"  Contenido obtenido: {content_preview}")
                 else:
                     print("  No se pudo obtener el contenido.")
+                
+                # Abrimos el navegador para que el usuario pueda verificar
+                subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                # Damos opción a rechazar o modificar el enlace automático
+                user_input = input(f"  URL de MusicBrainz añadida automáticamente. ¿Desea modificar o rechazar? [Enter para aceptar, nueva URL o 'n' para rechazar]: ")
+                
+                if user_input.lower() == 'n':
+                    wiki_url = ""
+                    content = None
+                elif user_input.strip():
+                    wiki_url = user_input.strip()
+                    print("  Obteniendo contenido de la nueva URL...")
+                    content = get_wikipedia_content(wiki_url)
+                    if content:
+                        content_preview = content[:100] + "..." if len(content) > 100 else content
+                        print(f"  Contenido obtenido: {content_preview}")
+                    else:
+                        print("  No se pudo obtener el contenido.")
+            
+            # Si viene de búsqueda en Wikipedia, mostramos para confirmación
+            else:
+                subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                user_input = input(f"  Confirmar URL para '{artist_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
+                
+                if user_input.lower() == 'n':
+                    wiki_url = ""
+                elif user_input.strip():
+                    wiki_url = user_input.strip()
+                    
+                # Si tenemos una URL final, obtenemos el contenido
+                if wiki_url:
+                    print("  Obteniendo contenido de Wikipedia...")
+                    content = get_wikipedia_content(wiki_url)
+                    if content:
+                        content_preview = content[:100] + "..." if len(content) > 100 else content
+                        print(f"  Contenido obtenido: {content_preview}")
+                    else:
+                        print("  No se pudo obtener el contenido.")
         else:
             user_input = input(f"  No se encontró URL para '{artist_name}'. Introduzca URL manualmente o Enter para dejar vacío: ")
             if user_input.strip():
@@ -373,12 +413,14 @@ def update_albums_wikipedia(db_path, log_file):
         
         # Primero intentamos obtener el enlace desde MusicBrainz
         wiki_url = None
+        from_musicbrainz = False
         if mb_url:
             print(f"  Buscando enlace en MusicBrainz...")
             wiki_url = extract_wikipedia_url_from_musicbrainz(mb_url)
             
             if wiki_url:
                 print(f"  Enlace encontrado en MusicBrainz: {wiki_url}")
+                from_musicbrainz = True
         
         # Si no encontramos el enlace en MusicBrainz, buscamos en Wikipedia
         if not wiki_url:
@@ -390,27 +432,59 @@ def update_albums_wikipedia(db_path, log_file):
             else:
                 print("  No se encontró enlace en Wikipedia.")
         
-        # Si tenemos una URL, abrimos el navegador y pedimos confirmación
+        # Si tenemos una URL, procesamos diferente según la fuente
         content = None
         if wiki_url:
-            subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            user_input = input(f"  Confirmar URL para '{album_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
-            
-            if user_input.lower() == 'n':
-                wiki_url = ""
-            elif user_input.strip():
-                wiki_url = user_input.strip()
-                
-            # Si tenemos una URL final, obtenemos el contenido
-            if wiki_url:
+            # Si proviene de MusicBrainz, añadimos automáticamente
+            if from_musicbrainz:
+                print(f"  Añadiendo automáticamente enlace de MusicBrainz: {wiki_url}")
                 print("  Obteniendo contenido de Wikipedia...")
                 content = get_wikipedia_content(wiki_url)
+                
                 if content:
                     content_preview = content[:100] + "..." if len(content) > 100 else content
                     print(f"  Contenido obtenido: {content_preview}")
                 else:
                     print("  No se pudo obtener el contenido.")
+                
+                # Abrimos el navegador para que el usuario pueda verificar
+                subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                # Damos opción a rechazar o modificar el enlace automático
+                user_input = input(f"  URL de MusicBrainz añadida automáticamente. ¿Desea modificar o rechazar? [Enter para aceptar, nueva URL o 'n' para rechazar]: ")
+                
+                if user_input.lower() == 'n':
+                    wiki_url = ""
+                    content = None
+                elif user_input.strip():
+                    wiki_url = user_input.strip()
+                    print("  Obteniendo contenido de la nueva URL...")
+                    content = get_wikipedia_content(wiki_url)
+                    if content:
+                        content_preview = content[:100] + "..." if len(content) > 100 else content
+                        print(f"  Contenido obtenido: {content_preview}")
+                    else:
+                        print("  No se pudo obtener el contenido.")
+            
+            # Si viene de búsqueda en Wikipedia, mostramos para confirmación
+            else:
+                subprocess.Popen(["xdg-open", wiki_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                user_input = input(f"  Confirmar URL para '{album_name}' [Enter para confirmar '{wiki_url}', URL nueva, o 'n' para dejar vacío]: ")
+                
+                if user_input.lower() == 'n':
+                    wiki_url = ""
+                elif user_input.strip():
+                    wiki_url = user_input.strip()
+                    
+                # Si tenemos una URL final, obtenemos el contenido
+                if wiki_url:
+                    print("  Obteniendo contenido de Wikipedia...")
+                    content = get_wikipedia_content(wiki_url)
+                    if content:
+                        content_preview = content[:100] + "..." if len(content) > 100 else content
+                        print(f"  Contenido obtenido: {content_preview}")
+                    else:
+                        print("  No se pudo obtener el contenido.")
         else:
             user_input = input(f"  No se encontró URL para '{album_name}'. Introduzca URL manualmente o Enter para dejar vacío: ")
             if user_input.strip():
@@ -569,6 +643,7 @@ def update_content_only(db_path, entity_type):
     
     conn.close()
     print(f"\nActualización de contenido para {entity_type} completada.")
+
 
 def main():
     # Configurar argumentos de línea de comandos

@@ -541,7 +541,7 @@ def main():
     print(f"Total de artistas: {stats['total_artists']}")
     print(f"Artistas procesados: {stats['processed']}")
     print(f"Artistas con 0 imágenes: {stats['with_0_images']}")
-    print(f"Artistas con 1 imagen: {stats['with_1_image']}")
+    print(f"Artistas con 1 imagen: {stats['with_1_images']}")
     print(f"Artistas con 2 imágenes: {stats['with_2_images']}")
     print(f"Artistas con {args.max_images} imágenes completas: {stats['with_max_images']}")
     print(f"Artistas con imágenes incompletas: {stats['with_missing_images']}")
