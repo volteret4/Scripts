@@ -15,6 +15,7 @@ import importlib.util
 from base_module import BaseModule, THEME  # Importar la clase base
 import glob
 import random
+import urllib.parse
 
 reproductor = 'deadbeef'
 
@@ -205,7 +206,7 @@ class MusicBrowser(BaseModule):
         # Barra de búsqueda
         search_layout = QHBoxLayout()
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('Buscar...')
+        self.search_box.setPlaceholderText('Buscar en base de datos...')
         self.search_box.textChanged.connect(self.search)
         search_layout.addWidget(self.search_box)
 
@@ -327,6 +328,33 @@ class MusicBrowser(BaseModule):
         self.artist_image_label.setStyleSheet("border: 1px solid #333;")
         images_layout.addWidget(self.artist_image_label)
         
+
+        # Añadir contenedor de botones verticales a la derecha
+        buttons_container = QWidget()
+        buttons_layout = QVBoxLayout(buttons_container)
+        buttons_layout.setSpacing(10)
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Botón para enviar a Spotify
+        self.spotify_button = QPushButton("Enviar a Spotify")
+        self.spotify_button.setFixedWidth(120)
+        self.spotify_button.clicked.connect(self.handle_spotify_button)
+        buttons_layout.addWidget(self.spotify_button)
+        
+        # Espacio para futuros botones
+        # Puedes añadir más botones aquí siguiendo el mismo patrón
+        # self.otro_boton = QPushButton("Otra acción")
+        # self.otro_boton.setFixedWidth(120)
+        # self.otro_boton.clicked.connect(self.otra_funcion)
+        # buttons_layout.addWidget(self.otro_boton)
+        
+        # Añadir espacio en blanco para empujar los botones hacia arriba
+
+
+        buttons_layout.addStretch()
+        
+        # Añadir el contenedor de botones al layout de imágenes
+        images_layout.addWidget(buttons_container)
         # Añadir el contenedor de imágenes al splitter vertical
         details_splitter.addWidget(images_container)
         
@@ -954,6 +982,81 @@ class MusicBrowser(BaseModule):
             # Forzar actualización visual
         self.cover_label.update()
         self.artist_image_label.update()
+
+    def handle_spotify_button(self):
+        """Manejador para el botón de Spotify que decide qué argumento pasar a enviar_spoti"""
+        if not self.results_list.currentItem():
+            return
+            
+        data = self.results_list.currentItem().data(Qt.ItemDataRole.UserRole)
+        if not data:
+            return
+            
+        # Buscar el enlace de Spotify - Índice 16 en los enlaces originales mostrados en show_details
+        spotify_url = None
+        
+        # Primero verificamos si tenemos el ID de la canción para buscar en song_links
+        if len(data) > 0 and data[0]:
+            song_id = data[0]
+            spotify_url = self.get_spotify_url_from_db(song_id)
+        
+        if spotify_url:
+            # Si tenemos una URL de Spotify, la pasamos como argumento
+            self.enviar_spoti(spotify_url)
+        else:
+            # Si no hay URL, creamos un string con "artista - título"
+            artist = data[3] if len(data) > 3 and data[3] else ""
+            title = data[2] if len(data) > 2 and data[2] else ""
+            
+            if artist and title:
+                query = f"{artist} - {title}"
+                self.enviar_spoti(query)
+            else:
+                # Mostrar mensaje si no hay suficiente información
+                print("No hay suficiente información para buscar en Spotify")
+
+
+    def enviar_spoti(self, arg):
+        """Envía a Spotify basado en el argumento proporcionado
+        
+        Args:
+            arg: Puede ser una URL de Spotify o una cadena con 'artista - título'
+        """
+        try:
+            # Verificar si el argumento es una URL de Spotify
+            if arg.startswith("https://open.spotify.com/") or arg.startswith("spotify:"):
+                # Aquí la lógica para manejar URLs de Spotify directamente
+                print(f"Enviando URL de Spotify al creador de listas: {arg}")
+                self.switch_to_tab("Spotify Playlists", "add_track_by_url", arg)
+            else:
+                self.switch_tab("Spotify Playlists", "search_track_by_query", arg)
+                print(f"Buscando en Spotify: {arg}")
+                
+        except Exception as e:
+            print(f"Error al enviar a Spotify: {e}")
+
+
+    def get_spotify_url_from_db(self, song_id):
+        """Obtiene la URL de Spotify desde la base de datos para una canción específica"""
+        try:
+            # Conectar a la base de datos
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Consultar la URL de Spotify para el song_id proporcionado
+            cursor.execute("SELECT spotify_url FROM song_links WHERE song_id = ?", (song_id,))
+            result = cursor.fetchone()
+            
+            conn.close()
+            
+            # Devolver la URL si existe
+            if result and result[0]:
+                return result[0]
+            return None
+        except Exception as e:
+            print(f"Error al obtener la URL de Spotify: {e}")
+            return None
+
 
     def play_item(self):
         """Reproduce el ítem seleccionado con verificaciones de seguridad."""

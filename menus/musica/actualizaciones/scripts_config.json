@@ -1,32 +1,32 @@
 {
-  "available_scripts": {
-    "Base de datos": {
-      "path": "base_datos/db_musica.py",
-      "args": {
-        "db_path": "/home/huan/Música/moode.sqlite",
-        "path": "/mnt/NFS/moode/moode"
-      }
-    },
-    "Playlists de Blogs": {
-      "path": "/home/huan/Scripts/menus/musica/actualizaciones/scripts/crear_playlists_freshrss.py",
-      "args": {
-        "url": "https://freshrss.pollete.duckdns.org",
-        "username": "pollo",
-        "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu",
-        "output_dir": "/home/huan/Música/blogs_playlists/PENDIENTE",
-        "playlists_locales": "/home/huan/Música/blogs_playlists/locales"
-      }
-    },
-    "Fotos de artistas": {
-      "path": "/home/huan/Scripts/menus/musica/actualizaciones/scripts/foto_artistas.py",
-      "args": {
-        "db": "/home/huan/Música/moode.sqlite",
-        "output": "/home/huan/Scripts/menus/musica/.content/artistas_img",
-        "max-images": 1,
-        "spotify-client-id": "31f8f25e58cc4c7b8ec2ce40ebd773a4",
-        "spotify-client-secret": "3463936083af4cef9b64ccab0bdebe96",
-        "lastfm-apikey": "968fac20f18b6d12759848bb123ce824"
-      }
+    "available_scripts": {
+        "Base de datos": {
+            "path": "base_datos/db_musica.py",
+            "args": {
+                "db_path": "/home/huan/Música/moode.sqlite",
+                "path": "/mnt/NFS/moode/moode"
+            }
+        },
+        "Playlists de Blogs": {
+            "path": "/home/huan/Scripts/menus/musica/actualizaciones/scripts/crear_playlists_freshrss.py",
+            "args": {
+                "url": "https://freshrss.pollete.duckdns.org",
+                "username": "pollo",
+                "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu",
+                "output_dir": "/home/huan/Música/blogs_playlists/PENDIENTE",
+                "playlists_locales": "/home/huan/Música/blogs_playlists/locales"
+            }
+        },
+        "Fotos de artistas": {
+            "path": "/home/huan/Scripts/menus/musica/actualizaciones/scripts/foto_artistas.py",
+            "args": {
+                "db": "/home/huan/Música/moode_a.sqlite",
+                "output": "/home/huan/Scripts/menus/musica/.content/artistas_img",
+                "max-images": "1",
+                "spotify-client-id": ["31f8f25e58cc4c7b8ec2ce40ebd773a4", "asdgvq34rygh"],
+                "spotify-client-secret": ["3463936083af4cef9b64ccab0bdebe96"],
+                "lastfm-apikey": "968fac20f18b6d12759848bb123ce824"
+            }
+        }
     }
-  }
 }
