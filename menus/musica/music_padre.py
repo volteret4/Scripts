@@ -79,7 +79,12 @@ class TabManager(QMainWindow):
                         if main_class:
                             # Instanciar el módulo
                             module_instance = main_class(**module_args)
-                            
+
+                    
+                            # Pasar referencia al TabManager
+                            if hasattr(module_instance, 'set_tab_manager'):
+                                module_instance.set_tab_manager(self)                           
+
                             # Si es el editor de configuración, conectar la señal
                             if module_name == "Config Editor":
                                 module_instance.config_updated.connect(self.reload_application)
@@ -197,6 +202,42 @@ class TabManager(QMainWindow):
                     thread.wait(5000)  # 5 second timeout
                 except Exception as e:
                     print(f"Error cleaning up thread: {e}")
+
+
+    def switch_to_tab(self, tab_name, method_to_call=None, *args, **kwargs):
+        """
+        Cambia a la pestaña especificada y opcionalmente llama a un método en ese módulo.
+        
+        Args:
+            tab_name (str): Nombre de la pestaña a la que cambiar
+            method_to_call (str, optional): Nombre del método a llamar en el módulo destino
+            *args, **kwargs: Argumentos a pasar al método
+        
+        Returns:
+            bool: True si se pudo cambiar y llamar al método, False en caso contrario
+        """
+        # Buscar el índice de la pestaña por nombre
+        for i in range(self.tab_widget.count()):
+            if self.tab_widget.tabText(i) == tab_name:
+                # Cambiar a esa pestaña
+                self.tab_widget.setCurrentIndex(i)
+                
+                # Si hay un método que llamar
+                if method_to_call and tab_name in self.tabs:
+                    tab_module = self.tabs[tab_name]
+                    if hasattr(tab_module, method_to_call):
+                        method = getattr(tab_module, method_to_call)
+                        if callable(method):
+                            method(*args, **kwargs)
+                            return True
+                        else:
+                            print(f"El atributo '{method_to_call}' no es una función en el módulo '{tab_name}'")
+                    else:
+                        print(f"El módulo '{tab_name}' no tiene un método llamado '{method_to_call}'")
+                return True
+        
+        print(f"No se encontró la pestaña '{tab_name}'")
+        return False
 
 
 def main():

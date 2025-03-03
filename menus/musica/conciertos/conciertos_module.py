@@ -597,7 +597,7 @@ class ConciertosModule(BaseModule):
         # Lista de conciertos en la parte superior del splitter
         self.concerts_list = QListWidget()
         self.concerts_list.setMinimumHeight(200)
-        self.concerts_list.itemDoubleClicked.connect(self.open_url)
+        self.concerts_list.itemDoubleClicked.connect(self.switch_tab_db)
         splitter.addWidget(self.concerts_list)
         
         # Área de log en la parte inferior
@@ -612,6 +612,33 @@ class ConciertosModule(BaseModule):
         # Inicialización
         self.log("Módulo inicializado. Configure los parámetros y haga clic en 'Buscar en Todos los Servicios'.")
     
+    def switch_tab_db(self):
+        # Obtener el elemento seleccionado
+        selected_item = self.concerts_list.currentItem()
+        if selected_item:
+            # Obtener el widget personalizado asociado al elemento
+            item_widget = self.concerts_list.itemWidget(selected_item)
+            if item_widget:
+                # Obtener la etiqueta que contiene la información del concierto
+                label = item_widget.layout().itemAt(0).widget()
+                if label and isinstance(label, QLabel):
+                    # Extraer el nombre del artista del texto de la etiqueta
+                    # El formato es "[source] artist - date @ venue (city, country)"
+                    text = label.text()
+                    parts = text.split(" - ", 1)
+                    if len(parts) > 1:
+                        # Extraer solo el nombre del artista
+                        source_artist = parts[0]  # "[source] artist"
+                        artist = source_artist.split("] ", 1)[1] if "]" in source_artist else source_artist
+                        
+                        # Cambiar a la pestaña Music Browser y llamar al método search_artist
+                        self.switch_tab("Music Browser", "set_search_text", artist)
+                        return
+        
+        # Si no se pudo obtener el artista, simplemente cambiar de pestaña
+        self.switch_tab("Music Browser")
+
+
     def add_to_calendar(self, event: ConcertEvent):
         """Añade el evento de concierto al servidor de calendario Radicale"""
         try:
@@ -1008,6 +1035,7 @@ class ConciertosModule(BaseModule):
         for event in events:
             # Crear un widget contenedor para cada elemento
             item_widget = QWidget()
+            item_widget.artist = event.artist  # Almacenar el artista directamente en el widget
             item_layout = QHBoxLayout(item_widget)
             item_layout.setContentsMargins(2, 2, 2, 2)
             
