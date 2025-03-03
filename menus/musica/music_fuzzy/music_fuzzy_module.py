@@ -398,6 +398,18 @@ class MusicBrowser(BaseModule):
 
 
 
+    def set_search_text(self, query):
+        """
+        Establece el texto en el cuadro de búsqueda y ejecuta la búsqueda.
+        
+        Args:
+            query (str): El texto de búsqueda a establecer
+        """
+        self.search_box.setText(query)
+        self.search()  # Ejecuta la búsqueda con el texto establecido
+
+
+
     def apply_temporal_filter(self):
         """Aplica el filtro de últimas X unidades de tiempo."""
         value = self.time_value.value()
