@@ -9,6 +9,15 @@ import requests
 from datetime import datetime
 import lyricsgenius
 from dotenv import load_dotenv
+
+
+# Adaptador personalizado para datetime
+def adapt_datetime(dt):
+    return dt.isoformat()
+
+# Registrar el adaptador
+sqlite3.register_adapter(datetime, adapt_datetime)
+
 load_dotenv()
 
 class MultiLyricsManager:

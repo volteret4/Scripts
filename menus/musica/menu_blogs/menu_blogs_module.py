@@ -41,7 +41,7 @@ class MusicManagerModule(BaseModule):
     def __init__(self, **kwargs):
         self.pending_dir = Path(kwargs.get('pending_dir', 'playlists/PENDIENTE'))
         self.listened_dir = Path(kwargs.get('listened_dir', 'playlists/ESCUCHADO'))
-        self.local_dir = Path(kwargs.get('local_dir', 'playlists/LISTAS_LOCALES'))
+        self.local_dir = Path(kwargs.get('local_dir', 'playlists/locales'))
         self.output_dir = kwargs.get('output_dir', str(self.pending_dir))
         self.selected_blog = None
         self.worker = None
@@ -240,20 +240,20 @@ class MusicManagerModule(BaseModule):
                 self.local_list.addItem(item)
 
 
-    def get_track_info(self, url):
-        """Get track information using yt-dlp."""
-        try:
-            ydl_opts = {
-                'quiet': True,
-                'extract_flat': True,
-                'force_generic_extractor': False
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                return info.get('title', url)
+    # def get_track_info(self, url):
+    #     """Get track information using yt-dlp."""
+    #     try:
+    #         ydl_opts = {
+    #             'quiet': True,
+    #             'extract_flat': True,
+    #             'force_generic_extractor': False
+    #         }
+    #         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    #             info = ydl.extract_info(url, download=False)
+    #             return info.get('title', url)
 
-        except:
-            return url
+    #     except:
+    #         return url
 
     def on_playlist_select(self):
         """Handle playlist selection event."""

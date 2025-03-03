@@ -1,4 +1,8 @@
 {
+  "appearance": {
+    "theme": "tokyo_night"
+  },
+  "theme_options": ["tokyo_night", "catppuccin", "dracula"],
   "modules": [
     {
       "name": "Music Browser",
@@ -7,6 +11,13 @@
         "db_path": "/home/huan/Scripts/moode_a.sqlite",
         "font_family": "Fira Code",
         "artist_images_dir": "/home/huan/Scripts/menus/musica/.content/artistas_img"
+      }
+    },
+    {
+      "path": "base_datos/editor_module.py",
+      "name": "Database Editor",
+      "args": {
+        "db_path": "/home/huan/Scripts/moode_a.sqlite"
       }
     },
     {

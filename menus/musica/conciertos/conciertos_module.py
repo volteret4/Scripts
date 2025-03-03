@@ -8,7 +8,7 @@ import requests
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTextEdit,
                             QLabel, QLineEdit, QFileDialog, QMessageBox,
                             QHBoxLayout, QListWidget, QListWidgetItem, QTabWidget,
-                            QFormLayout, QGroupBox, QScrollArea, QFrame, QSplitter)
+                            QFormLayout, QGroupBox, QScrollArea, QFrame, QSplitter, QDialog)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
 from PyQt6.QtGui import QDesktopServices, QColor, QFont
 from base_module import BaseModule
@@ -28,6 +28,43 @@ class ConcertEvent:
         self.url = url
         self.source = source  # Nombre del servicio (Ticketmaster, Songkick, etc.)
         self.image_url = image_url
+
+
+    # Nueva función para generar evento iCalendar
+    def to_icalendar(self) -> str:
+        """Convierte el evento de concierto a formato iCalendar"""
+        from datetime import datetime
+        import uuid
+        
+        # Convertir la fecha a formato datetime (asumiendo que no hay hora específica)
+        try:
+            event_date = datetime.strptime(self.date, "%Y-%m-%d")
+            start_time = event_date.strftime("%Y%m%dT190000Z")  # Asumimos 19:00 UTC como hora por defecto
+            end_time = event_date.strftime("%Y%m%dT230000Z")    # Asumimos duración de 4 horas
+        except ValueError:
+            # Si hay algún problema con el formato de fecha, usamos la actual
+            now = datetime.now()
+            start_time = now.strftime("%Y%m%dT190000Z")
+            end_time = now.strftime("%Y%m%dT230000Z")
+        
+        # Crear UUID único para el evento
+        uid = str(uuid.uuid4())
+        
+        # Crear el evento en formato iCalendar
+        ical = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//ConcertApp//EN
+BEGIN:VEVENT
+UID:{uid}
+SUMMARY:{self.artist} en concierto
+DESCRIPTION:{self.name} - Proporcionado por {self.source}\\n{self.url}
+LOCATION:{self.venue}, {self.city}, {self.country}
+DTSTART:{start_time}
+DTEND:{end_time}
+END:VEVENT
+END:VCALENDAR
+"""
+        return ical
 
 
 class BaseAPIFetcher(QThread):
@@ -560,7 +597,7 @@ class ConciertosModule(BaseModule):
         # Lista de conciertos en la parte superior del splitter
         self.concerts_list = QListWidget()
         self.concerts_list.setMinimumHeight(200)
-        self.concerts_list.itemDoubleClicked.connect(self.open_concert_url)
+        self.concerts_list.itemDoubleClicked.connect(self.open_url)
         splitter.addWidget(self.concerts_list)
         
         # Área de log en la parte inferior
@@ -575,6 +612,71 @@ class ConciertosModule(BaseModule):
         # Inicialización
         self.log("Módulo inicializado. Configure los parámetros y haga clic en 'Buscar en Todos los Servicios'.")
     
+    def add_to_calendar(self, event: ConcertEvent):
+        """Añade el evento de concierto al servidor de calendario Radicale"""
+        try:
+            # Configuración del servidor Radicale
+            config_dialog = RadicaleConfigDialog(self)
+            if config_dialog.exec():
+                # Obtener configuración del diálogo
+                radicale_url = config_dialog.get_url()
+                radicale_username = config_dialog.get_username()
+                radicale_password = config_dialog.get_password()
+                calendar_name = config_dialog.get_calendar()
+                
+                # Generar el contenido iCalendar
+                ical_content = event.to_icalendar()
+                
+                # Enviar al servidor Radicale
+                self.send_to_radicale(radicale_url, radicale_username, radicale_password, 
+                                    calendar_name, ical_content, event)
+        except Exception as e:
+            self.log(f"Error al añadir evento al calendario: {str(e)}")
+            QMessageBox.warning(self, "Error", f"No se pudo añadir al calendario: {str(e)}")
+
+
+    # Nueva función para enviar datos al servidor Radicale
+    def send_to_radicale(self, base_url: str, username: str, password: str,
+                        calendar: str, ical_content: str, event: ConcertEvent):
+        """Envía el evento al servidor Radicale utilizando el protocolo CalDAV"""
+        try:
+            import uuid
+            import requests
+            from urllib.parse import urljoin
+            
+            # Generar un UID único para el evento
+            event_uid = str(uuid.uuid4())
+            
+            # Construir la URL completa con el formato correcto: baseurl/usuario/calendario/uid.ics
+            url = urljoin(base_url, f"{username}/{calendar}/{event_uid}.ics")
+            
+            # Realizar la solicitud PUT para crear el evento
+            response = requests.put(
+                url,
+                data=ical_content,
+                auth=(username, password),
+                headers={"Content-Type": "text/calendar; charset=utf-8"}
+            )
+            
+            if response.status_code in (201, 204):
+                self.log(f"Evento añadido al calendario: {event.artist} - {event.date}")
+                QMessageBox.information(
+                    self,
+                    "Evento añadido",
+                    f"El concierto de {event.artist} ha sido añadido al calendario."
+                )
+            else:
+                self.log(f"Error al añadir evento: Código {response.status_code} - {response.text}")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"No se pudo añadir al calendario. Error {response.status_code}"
+                )
+        except Exception as e:
+            self.log(f"Error en la comunicación con Radicale: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Error de comunicación con el servidor: {str(e)}")
+
+
     def create_ticketmaster_tab(self):
         tab = QWidget()
         layout = QFormLayout(tab)
@@ -902,34 +1004,54 @@ class ConciertosModule(BaseModule):
 
 
     def display_events(self, events: List[ConcertEvent]):
-        """Muestra los eventos en la lista de conciertos"""
+        """Muestra los eventos en la lista de conciertos con botones personalizados"""
         for event in events:
-            item = QListWidgetItem()
+            # Crear un widget contenedor para cada elemento
+            item_widget = QWidget()
+            item_layout = QHBoxLayout(item_widget)
+            item_layout.setContentsMargins(2, 2, 2, 2)
             
-            # Formato: "[SERVICIO] ARTISTA - FECHA @ LUGAR (CIUDAD, PAÍS) 🔗"
-            display_text = f"[{event.source}] {event.artist} - {event.date} @ {event.venue} ({event.city}, {event.country}) 🔗"
-            item.setText(display_text)
+            # Etiqueta con la información del concierto
+            display_text = f"[{event.source}] {event.artist} - {event.date} @ {event.venue} ({event.city}, {event.country})"
+            label = QLabel(display_text)
             
             # Color según la fuente
             if event.source == "Ticketmaster":
-                item.setForeground(QColor(0, 120, 215))
+                label.setStyleSheet("color: rgb(0, 120, 215);")
             elif event.source == "Songkick":
-                item.setForeground(QColor(240, 55, 165))
+                label.setStyleSheet("color: rgb(240, 55, 165);")
             elif event.source == "Concerts-Metal":
-                item.setForeground(QColor(128, 0, 0))
+                label.setStyleSheet("color: rgb(128, 0, 0);")
             elif event.source == "RapidAPI":
-                item.setForeground(QColor(0, 140, 140))
+                label.setStyleSheet("color: rgb(0, 140, 140);")
             elif event.source == "Bandsintown":
-                item.setForeground(QColor(55, 100, 240))
+                label.setStyleSheet("color: rgb(55, 100, 240);")
             
-            # Guardar la URL en los datos del item para abrirla luego
-            item.setData(Qt.ItemDataRole.UserRole, event.url)
+            # Botón para abrir URL
+            url_btn = QPushButton("🔗")
+            url_btn.setToolTip("Abrir página del concierto")
+            url_btn.setMaximumWidth(30)
+            url_btn.clicked.connect(lambda checked, url=event.url: self.open_url(url))
             
+            # Botón para añadir al calendario
+            cal_btn = QPushButton("📅")
+            cal_btn.setToolTip("Añadir al calendario")
+            cal_btn.setMaximumWidth(30)
+            cal_btn.clicked.connect(lambda checked, evt=event: self.add_to_calendar(evt))
+            
+            # Añadir widgets al layout
+            item_layout.addWidget(label, 1)  # 1 stretch factor para que ocupe espacio disponible
+            item_layout.addWidget(url_btn)
+            item_layout.addWidget(cal_btn)
+            
+            # Añadir el widget personalizado a la lista
+            item = QListWidgetItem()
+            item.setSizeHint(item_widget.sizeHint())  # Asegurar que tiene el tamaño correcto
             self.concerts_list.addItem(item)
+            self.concerts_list.setItemWidget(item, item_widget)
     
-    def open_concert_url(self, item: QListWidgetItem):
-        """Abre la URL del concierto al hacer doble clic"""
-        url = item.data(Qt.ItemDataRole.UserRole)
+    def open_url(self, url: str):
+        """Abre la URL proporcionada en el navegador predeterminado"""
         if url:
             QDesktopServices.openUrl(QUrl(url))
         else:
@@ -941,3 +1063,88 @@ class ConciertosModule(BaseModule):
         # No podemos llamar directamente a QTextEdit desde un hilo
         # Usamos la señal de error para mostrar mensajes informativos también
         #self.error.emit(f"[INFO] {message}")
+
+
+# Nueva clase para el diálogo de configuración de Radicale
+class RadicaleConfigDialog(QDialog):
+    """Diálogo para configurar la conexión con el servidor Radicale"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Configuración de Calendario")
+        self.resize(400, 200)
+        
+        layout = QVBoxLayout(self)
+        
+        form = QFormLayout()
+        
+        # Campos para la configuración
+        self.url_input = QLineEdit("http://localhost:5232/")
+        self.username_input = QLineEdit()
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.calendar_input = QLineEdit("default")
+        
+        form.addRow("URL del servidor:", self.url_input)
+        form.addRow("Usuario:", self.username_input)
+        form.addRow("Contraseña:", self.password_input)
+        form.addRow("Calendario:", self.calendar_input)
+        
+        layout.addLayout(form)
+        
+        # Botones
+        button_box = QHBoxLayout()
+        save_button = QPushButton("Guardar")
+        save_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancelar")
+        cancel_button.clicked.connect(self.reject)
+        
+        button_box.addWidget(save_button)
+        button_box.addWidget(cancel_button)
+        
+        layout.addLayout(button_box)
+    
+    def get_url(self) -> str:
+        return self.url_input.text().strip()
+    
+    def get_username(self) -> str:
+        return self.username_input.text().strip()
+    
+    def get_password(self) -> str:
+        return self.password_input.text()
+    
+    def get_calendar(self) -> str:
+        return self.calendar_input.text().strip()
+
+
+# Opcional: Añadir un método para guardar y cargar la configuración de Radicale
+    def save_radicale_config(self, url: str, username: str, calendar: str):
+        """Guarda la configuración de Radicale (sin guardar la contraseña)"""
+        config_file = os.path.join(os.path.dirname(self.config["artists_file"]), "radicale_config.json")
+        
+        try:
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "url": url,
+                    "username": username,
+                    "calendar": calendar
+                }, f, indent=2)
+            self.log("Configuración de Radicale guardada")
+        except Exception as e:
+            self.log(f"Error al guardar configuración: {str(e)}")
+
+
+    def load_radicale_config(self) -> Dict[str, str]:
+        """Carga la configuración de Radicale"""
+        config_file = os.path.join(os.path.dirname(self.config["artists_file"]), "radicale_config.json")
+        
+        if not os.path.exists(config_file):
+            return {"url": "http://localhost:5232/", "username": "", "calendar": "default"}
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            self.log(f"Error al cargar configuración: {str(e)}")
+            return {"url": "http://localhost:5232/", "username": "", "calendar": "default"}
+
+

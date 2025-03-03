@@ -315,14 +315,14 @@ class MusicBrowser(BaseModule):
 
         # Cover del álbum
         self.cover_label = QLabel()
-        self.cover_label.setFixedSize(300, 300)
+        self.cover_label.setFixedSize(200, 200)
         self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.cover_label.setStyleSheet("border: 1px solid #333;")
         images_layout.addWidget(self.cover_label)
         
         # Imagen del artista
         self.artist_image_label = QLabel()
-        self.artist_image_label.setFixedSize(300, 300)
+        self.artist_image_label.setFixedSize(200, 200)
         self.artist_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.artist_image_label.setStyleSheet("border: 1px solid #333;")
         images_layout.addWidget(self.artist_image_label)
@@ -379,7 +379,7 @@ class MusicBrowser(BaseModule):
         details_splitter.addWidget(info_container)
         
         # Configurar proporciones iniciales del splitter vertical (imágenes/información)
-        details_splitter.setSizes([300, 800])
+        details_splitter.setSizes([200, 800])
         
         # Añadir el splitter vertical al layout de detalles
         details_layout.addWidget(details_splitter)
@@ -574,7 +574,7 @@ class MusicBrowser(BaseModule):
             cover_path = self.find_cover_image(first_track_data[1])
             if cover_path:
                 pixmap = QPixmap(cover_path)
-                pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                pixmap = pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
                 self.cover_label.setPixmap(pixmap)
             else:
                 self.cover_label.setText("No imagen")
@@ -583,7 +583,7 @@ class MusicBrowser(BaseModule):
             artist_image_path = self.find_artist_image(artist)
             if artist_image_path:
                 artist_pixmap = QPixmap(artist_image_path)
-                artist_pixmap = artist_pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                artist_pixmap = artist_pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
                 self.artist_image_label.setPixmap(artist_pixmap)
             else:
                 self.artist_image_label.setText("No imagen de artista")
@@ -595,15 +595,15 @@ class MusicBrowser(BaseModule):
             
             # Mostrar info de LastFM si está disponible
             artist_bio = first_track_data[15] if len(first_track_data) > 15 and first_track_data[15] else "No hay información del artista disponible"
-            info_text += f"<h3>Información del Artista (LastFM):</h3>{artist_bio}<br><br>"
+            info_text += f"<h3>Información del Artista (LastFM):</h3><div style='white-space: pre-wrap;'>{artist_bio}</div><br><br>"
             
             # Mostrar info de Wikipedia del artista (índice 27)
             if len(first_track_data) > 27 and first_track_data[27]:
-                info_text += f"<h3>Wikipedia - Artista:</h3>{first_track_data[27]}<br><br>"
+                info_text += f"<h3>Wikipedia - Artista:</h3><div style='white-space: pre-wrap;'>{first_track_data[27]}</div><br><br>"
             
             # Mostrar info de Wikipedia del álbum (índice 29)
             if len(first_track_data) > 29 and first_track_data[29]:
-                info_text += f"<h3>Wikipedia - Álbum:</h3>{first_track_data[29]}<br><br>"
+                info_text += f"<h3>Wikipedia - Álbum:</h3><div style='white-space: pre-wrap;'>{first_track_data[29]}</div><br><br>"
                 
             self.lastfm_label.setText(info_text)
             
@@ -735,7 +735,7 @@ class MusicBrowser(BaseModule):
                 cover_path = self.find_cover_image(data[1])
                 if cover_path:
                     pixmap = QPixmap(cover_path)
-                    pixmap = pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                    pixmap = pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
                     self.cover_label.setPixmap(pixmap)
                 else:
                     self.cover_label.setText("No imagen")
@@ -745,7 +745,7 @@ class MusicBrowser(BaseModule):
                     artist_image_path = self.find_artist_image(artist)
                     if artist_image_path:
                         artist_pixmap = QPixmap(artist_image_path)
-                        artist_pixmap = artist_pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+                        artist_pixmap = artist_pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
                         self.artist_image_label.setPixmap(artist_pixmap)
                     else:
                         self.artist_image_label.setText("No imagen de artista")
@@ -768,12 +768,12 @@ class MusicBrowser(BaseModule):
             
             # Mostrar info de LastFM (bio del artista)
             artist_bio = data[15] if len(data) > 15 and data[15] else "No hay información del artista disponible"
-            info_text += f"<h3>Información del Artista (LastFM):</h3>{artist_bio}<br><br>"
+            info_text += f"<h3>Información del Artista (LastFM):</h3><div style='white-space: pre-wrap;'>{artist_bio}</div><br><br>"
 
             # Mostrar info de Wikipedia del artista (nuevos campos)
             if len(data) > 27:  # Verificar que los nuevos campos existen
                 artist_wiki_content = data[27] if data[27] else "No hay información de Wikipedia disponible para este artista"
-                info_text += f"<h3>Wikipedia - Artista:</h3>{artist_wiki_content}<br><br>"
+                info_text += f"<h3>Wikipedia - Artista:</h3><div style='white-space: pre-wrap;'>{artist_wiki_content}</div><br><br>"
 
             # Asignar el contenido actualizado
             self.lastfm_label.setText(info_text)
@@ -825,10 +825,10 @@ class MusicBrowser(BaseModule):
                 self.metadata_label.setOpenExternalLinks(True)
             else:
                 self.metadata_label.setText("No hay suficientes datos de metadata")
-                
+        
         except Exception as e:
-            print(f"Error al mostrar detalles: {e}")
-            self.clear_details()
+            # manejar la excepción
+            print(f"Error: {e}")
 
     def search(self):
         query = self.search_box.text()
