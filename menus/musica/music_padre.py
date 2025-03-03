@@ -23,9 +23,10 @@ THEME = {
 }
 
 class TabManager(QMainWindow):
-    def __init__(self, config_path: str, font_family="Inter"):
+    def __init__(self, config_path: str, font_family="Inter", font_size="14px"):
         super().__init__()
         self.font_family = font_family
+        self.font_size = font_size
         self.config_path = config_path
         self.tabs: Dict[str, QWidget] = {}
         self.init_ui()
@@ -45,7 +46,7 @@ class TabManager(QMainWindow):
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
 
-        self.apply_theme()
+        self.apply_theme(self.font_size)
 
     def load_modules(self):
         """Carga los módulos desde la configuración."""
@@ -97,13 +98,15 @@ class TabManager(QMainWindow):
             print(f"Error loading configuration: {e}")
             traceback.print_exc()
 
-    def apply_theme(self):
+    def apply_theme(self, font_size="14px"):
         """Aplica el tema a toda la aplicación."""
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{
                 background-color: {THEME['bg']};
                 color: {THEME['fg']};
                 font-family: {self.font_family};
+                font-size: {self.font_size};
+
             }}
             
             QTabWidget::pane {{
@@ -202,6 +205,7 @@ def main():
     parser = argparse.ArgumentParser(description='Multi-Module Manager')
     parser.add_argument('config_path', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--font', default='Inter', help='Fuente a usar en la interfaz')
+    parser.add_argument('--font_size', default='12px', help='Tamaño de la Fuente a usar en la interfaz')
     
     args = parser.parse_args()
     
