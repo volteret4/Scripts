@@ -630,6 +630,7 @@ class ConciertosModule(BaseModule):
                         # Extraer solo el nombre del artista
                         source_artist = parts[0]  # "[source] artist"
                         artist = source_artist.split("] ", 1)[1] if "]" in source_artist else source_artist
+                        artist = f"a:{artist}"
                         
                         # Cambiar a la pestaña Music Browser y llamar al método search_artist
                         self.switch_tab("Music Browser", "set_search_text", artist)

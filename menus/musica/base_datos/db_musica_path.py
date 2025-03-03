@@ -1,20 +1,3 @@
-#!/usr/bin/env python
-#
-# Script Name:      db_musica.py
-# Description:      Lee una ruta, extrae información de canciones y las guarda en una base de datos.
-# Author:           volteret4
-# Repository:       https://github.com/volteret4/
-# License:
-# TODO: 
-# Notes: Es el primero de una colección de scripts para gestionar una base de datos de canciones:
-#                   - db_musica.py: Lee una ruta, extrae información de canciones y las guarda en una base de datos.
-#                   - letras_genius_db_musica.py: Lee la base de datos creada por db_musica.py y busca las letras de las canciones en Genius,añadiéndolas a la base de datos.
-#                   - enlaces_db_musica.py: Lee la base de datos creada por db_musica.py y busca enlaces a servicios externos (Spotify, YouTube, MusicBrainz, Discogs, RateYourMusic) para artistas y álbumes en la base de datos.
-#                   - wikilinks_desde_mb.py: Lee la base de datos creada por db_musica.py y busca info de wikipedia para base de datos de la biblioteca de musica y añade los confirmados.
-#
-#   Dependencies:   - python3, mutagen, pylast, dotenv, sqlite3
-#                   - carpeta con musica en flac o mp3
-
 import os
 import json
 import logging
@@ -35,7 +18,7 @@ class MusicLibraryManager:
     def __init__(self, root_path: str, db_path: str):
         self.root_path = Path(root_path).resolve()
         self.db_path = Path(db_path).resolve()
-        self.supported_formats = ('.mp3', '.flac')
+        self.supported_formats = ('.mp3', '.flac', '.m4a')
         
         # Logging configuration
         logging.basicConfig(
@@ -84,7 +67,8 @@ class MusicLibraryManager:
                     added_week INTEGER,
                     added_month INTEGER,
                     added_year INTEGER,
-                    duration REAL
+                    duration REAL,
+                    lyrics_id INTEGER
                 )
             ''')
         
@@ -118,7 +102,16 @@ class MusicLibraryManager:
                     last_updated TIMESTAMP,
                     origin TEXT,
                     formed_year INTEGER,
-                    total_albums INTEGER
+                    total_albums INTEGER,
+                    spotify_url TEXT,
+                    youtube_url TEXT,
+                    musicbrainz_url TEXT,
+                    discogs_url TEXT,
+                    rateyourmusic_url TEXT,
+                    links_updated TIMESTAMP,
+                    wikipedia_url TEXT,
+                    wikipedia_content TEXT,
+                    wikipedia_updated TIMESTAMP
                 )
             ''')
         
@@ -134,7 +127,10 @@ class MusicLibraryManager:
                 'musicbrainz_url': 'TEXT',
                 'discogs_url': 'TEXT',
                 'rateyourmusic_url': 'TEXT',
-                'links_updated': 'TIMESTAMP'
+                'links_updated': 'TIMESTAMP',
+                'wikipedia_url': 'TEXT',
+                'wikipedia_content': 'TEXT',
+                'wikipedia_updated': 'TIMESTAMP'
             }
             
             for col_name, col_type in new_artist_columns.items():
@@ -154,6 +150,16 @@ class MusicLibraryManager:
                     total_tracks INTEGER,
                     album_art_path TEXT,
                     last_updated TIMESTAMP,
+                    spotify_url TEXT,
+                    spotify_id TEXT,
+                    youtube_url TEXT,
+                    musicbrainz_url TEXT,
+                    discogs_url TEXT,
+                    rateyourmusic_url TEXT,
+                    links_updated TIMESTAMP,
+                    wikipedia_url TEXT,
+                    wikipedia_content TEXT,
+                    wikipedia_updated TIMESTAMP,
                     FOREIGN KEY(artist_id) REFERENCES artists(id),
                     UNIQUE(artist_id, name)
                 )
@@ -172,7 +178,10 @@ class MusicLibraryManager:
                 'musicbrainz_url': 'TEXT',
                 'discogs_url': 'TEXT',
                 'rateyourmusic_url': 'TEXT',
-                'links_updated': 'TIMESTAMP'
+                'links_updated': 'TIMESTAMP',
+                'wikipedia_url': 'TEXT',
+                'wikipedia_content': 'TEXT',
+                'wikipedia_updated': 'TIMESTAMP'
             }
             
             for col_name, col_type in new_album_columns.items():
@@ -203,10 +212,30 @@ class MusicLibraryManager:
                     FOREIGN KEY(track_id) REFERENCES songs(id)
                 )
             ''')
+            
+        # Song Links table - NUEVA TABLA para almacenar los enlaces a servicios de música
+        if 'song_links' not in existing_tables:
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS song_links (
+                    id INTEGER PRIMARY KEY,
+                    song_id INTEGER,
+                    spotify_url TEXT,
+                    spotify_id TEXT,
+                    lastfm_url TEXT,
+                    youtube_url TEXT,
+                    deezer_url TEXT,
+                    apple_music_url TEXT,
+                    tidal_url TEXT,
+                    bandcamp_url TEXT,
+                    soundcloud_url TEXT,
+                    links_updated TIMESTAMP,
+                    FOREIGN KEY(song_id) REFERENCES songs(id)
+                )
+            ''')
 
         conn.commit()
         conn.close()
-
+        
     def get_audio_metadata(self, file_path: Path) -> Optional[Dict]:
         """Extract comprehensive audio metadata."""
         try:
@@ -369,6 +398,10 @@ class MusicLibraryManager:
                                         metadata.get('duration'), metadata['added_timestamp'],
                                         metadata['added_week'], metadata['added_month'], metadata['added_year']
                                     ))
+                                    
+                                    # Asegurarse de que la canción también tenga entrada en song_links
+                                    self._ensure_song_links_entry(c, metadata['file_path'])
+                                    
                                     processed_files += 1
                                     
                                     # Update/insert artist information (using album artist for album relationship)
@@ -403,6 +436,10 @@ class MusicLibraryManager:
                                         metadata.get('duration'), metadata['added_timestamp'],
                                         metadata['added_week'], metadata['added_month'], metadata['added_year']
                                     ))
+                                    
+                                    # Asegurarse de que la canción también tenga entrada en song_links
+                                    self._ensure_song_links_entry(c, metadata['file_path'])
+                                    
                                     processed_files += 1
                                     
                                     # Update remaining tables
@@ -431,6 +468,24 @@ class MusicLibraryManager:
             self.logger.info("Library scan completed")
             self.logger.info(f"Files processed: {processed_files}")
             self.logger.info(f"Files with errors: {error_files}")
+
+    def _ensure_song_links_entry(self, cursor, file_path):
+        """Asegurarse de que existe una entrada en song_links para esta canción"""
+        # Primero obtener el ID de la canción
+        cursor.execute("SELECT id FROM songs WHERE file_path = ?", (file_path,))
+        result = cursor.fetchone()
+        if result:
+            song_id = result[0]
+            
+            # Verificar si ya existe una entrada en song_links
+            cursor.execute("SELECT id FROM song_links WHERE song_id = ?", (song_id,))
+            if not cursor.fetchone():
+                # Si no existe, crear una entrada vacía
+                cursor.execute('''
+                    INSERT INTO song_links 
+                    (song_id, links_updated)
+                    VALUES (?, ?)
+                ''', (song_id, datetime.now()))
 
     def _update_artist_info(self, cursor, artist_name):
         """Update artist information selectively."""

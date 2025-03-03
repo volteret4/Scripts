@@ -788,3 +788,53 @@ class SpotifyPlaylistManager(BaseModule):
             return True
             
         return False
+
+    # Métodos para integración con otros módulos
+    def add_track_by_url(self, spotify_url):
+        """
+        Añade una canción directamente al creador de playlist usando una URL de Spotify
+        Args:
+            spotify_url (str): URL de Spotify a una canción (ej: https://open.spotify.com/track/...)
+        Returns:
+            bool: True si se añadió correctamente, False en caso contrario
+        """
+        try:
+            # Extraer el ID de la canción de la URL
+            if 'spotify.com/track/' in spotify_url:
+                track_id = spotify_url.split('track/')[1].split('?')[0]
+                
+                # Obtener información de la canción
+                track_info = self.api_call_with_retry(self.sp.track, track_id)
+                
+                # Formato para mostrar
+                artist_names = ", ".join(artist['name'] for artist in track_info['artists'])
+                display_text = f"{track_info['name']} - {artist_names}"
+                
+                # Añadir al creador de playlists
+                self.add_to_temp_playlist(track_id, display_text, track_info['external_urls']['spotify'])
+                
+                return True
+            else:
+                print(f"URL no válida: {spotify_url}")
+                return False
+        except Exception as e:
+            print(f"Error añadiendo canción por URL: {str(e)}")
+            return False
+
+    def search_track_by_query(self, query):
+        """
+        Busca una canción por texto y muestra los resultados en el panel de búsqueda
+        Args:
+            query (str): Texto a buscar (artista+canción)
+        Returns:
+            bool: True si la búsqueda se realizó correctamente
+        """
+        try:
+            # Establecer el texto en el campo de búsqueda
+            self.search_input.setText(query)
+            # Ejecutar la búsqueda
+            self.search_tracks()
+            return True
+        except Exception as e:
+            print(f"Error buscando canción: {str(e)}")
+            return False
