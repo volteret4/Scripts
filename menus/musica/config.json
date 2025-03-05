@@ -1,23 +1,23 @@
 {
-  "appearance": {
-    "theme": "tokyo_night"
-  },
-  "theme_options": ["tokyo_night", "catppuccin", "dracula"],
+  "temas": ["Tokyo Night", "Solarized Dark", "Monokai"],
+  "tema_seleccionado": "Tokyo Night",
   "modules": [
     {
       "name": "Music Browser",
       "path": "music_fuzzy/music_fuzzy_module.py",
       "args": {
-        "db_path": "/home/huan/Scripts/moode_a.sqlite",
+        "db_path": "/home/huan/Scripts/MOODE.sqlite",
         "font_family": "Fira Code",
-        "artist_images_dir": "/home/huan/Scripts/menus/musica/.content/artistas_img"
+        "artist_images_dir": "/home/huan/Scripts/menus/musica/.content/artistas_img",
+        "theme": "Tokyo Night"
       }
     },
     {
       "path": "base_datos/editor_module.py",
       "name": "Database Editor",
       "args": {
-        "db_path": "/home/huan/Scripts/moode_a.sqlite"
+        "db_path": "/home/huan/Scripts/moode_a.sqlite",
+        "theme": "Tokyo Night"
       }
     },
     {
@@ -30,7 +30,8 @@
         "output_dir": "/home/huan/M\u00fasica/blogs_playlists",
         "freshrss_url": "https://freshrss.pollete.duckdns.org",
         "username": "pollo",
-        "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu"
+        "auth_token": "VnZsFcHDs3RXykEJVgr72cqykTUnVbrMorw9dy37ZQ5K44bhsu",
+        "theme": "Tokyo Night"
       }
     },
     {
@@ -40,13 +41,15 @@
         "client_id": "31f8f25e58cc4c7b8ec2ce40ebd773a4",
         "client_secret": "3463936083af4cef9b64ccab0bdebe96",
         "cache_path": "/home/huan/Scripts/menus/musica/spotify/token.txt",
-        "force_update": false
+        "force_update": false,
+        "theme": "Tokyo Night"
       }
     },
     {
       "name": "Conciertos",
       "path": "conciertos/conciertos_module.py",
       "args": {
+        "theme": "Tokyo Night",
         "config": {
           "country_code": "ES",
           "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
@@ -75,18 +78,40 @@
       }
     },
     {
+      "name": "Calendario Radicale",
+      "path": "calendario/calendar_module.py",
+      "args": {
+        "radicale_url": "https://radicale.pollete.duckdns.org",
+        "username": "pollo",
+        "password": "iT4wZKIZ4TXU3qtI0Nzy",
+        "theme": "Tokyo Night"
+      }
+    },
+    {
+      "name": "Muspy",
+      "path": "disco_nuevo/muspy_releases_module.py",
+      "args": {
+        "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
+        "muspy_username": "pollo",
+        "muspy_api_key": "UtVVzmeeoNWkshuhbbeNt9zHy9QdXi",
+        "theme": "Tokyo Night"
+      }
+    },
+    {
       "path": "actualizaciones/scripts_module.py",
       "name": "Script Runner",
       "args": {
         "config_file": "/home/huan/Scripts/menus/musica/actualizaciones/scripts_config.json",
-        "scripts_section": "available_scripts"
+        "scripts_section": "available_scripts",
+        "theme": "Tokyo Night"
       }
     },
     {
       "name": "Config Editor",
       "path": "config_editor/config_editor_module.py",
       "args": {
-        "config_path": "/home/huan/Scripts/menus/musica/config.json"
+        "config_path": "/home/huan/Scripts/menus/musica/config.json",
+        "theme": "Tokyo Night"
       }
     }
   ]

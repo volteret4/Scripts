@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QInputDialog, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from base_module import BaseModule, THEME
+from base_module import BaseModule, THEMES
 import yt_dlp
 import logging
 import os
@@ -45,7 +45,13 @@ class MusicManagerModule(BaseModule):
         self.output_dir = kwargs.get('output_dir', str(self.pending_dir))
         self.selected_blog = None
         self.worker = None
-        super().__init__()
+        parent = None
+        theme = 'Tokyo Night'
+        super().__init__(parent, theme)
+
+
+    def apply_theme(self, theme_name=None):
+        super().apply_theme(theme_name)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -59,14 +65,15 @@ class MusicManagerModule(BaseModule):
         
         # Blogs section
         blog_label = QLabel("Blogs:")
-        blog_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
-        
+        #blog_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
+        blog_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
         self.blog_list = QListWidget()
         self.blog_list.setStyleSheet(self._get_list_style())
         
         # Local playlists section
         local_label = QLabel("Listas Locales:")
-        local_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        #local_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
+        local_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
         
         self.local_list = QListWidget()
         self.local_list.setStyleSheet(self._get_list_style())
@@ -81,7 +88,7 @@ class MusicManagerModule(BaseModule):
         middle_layout = QVBoxLayout(middle_panel)
         
         playlist_label = QLabel("Playlists:")
-        playlist_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        playlist_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
         
         self.playlist_list = QListWidget()
         self.playlist_list.setStyleSheet(self._get_list_style())
@@ -100,7 +107,7 @@ class MusicManagerModule(BaseModule):
         right_layout = QVBoxLayout(right_panel)
         
         content_label = QLabel("Contenido:")
-        content_label.setStyleSheet(f"color: {THEME['fg']}; font-weight: bold; font-size: 14px;")
+        content_label.setStyleSheet(f"font-weight: bold; font-size: 14px;")
         
         self.content_list = QListWidget()
         self.content_list.setStyleSheet(self._get_list_style())
@@ -143,30 +150,23 @@ class MusicManagerModule(BaseModule):
     def _get_list_style(self):
         return f"""
             QListWidget {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
                 border-radius: 4px;
             }}
             QListWidget::item {{
-                color: {THEME['fg']};
                 padding: 5px;
             }}
             QListWidget::item:selected {{
-                background-color: {THEME['selection']};
             }}
         """
 
     def _get_button_style(self):
         return f"""
             QPushButton {{
-                background-color: {THEME['accent']};
-                color: {THEME['bg']};
                 border: none;
                 padding: 8px;
                 border-radius: 4px;
             }}
             QPushButton:hover {{
-                background-color: {THEME['button_hover']};
             }}
         """
 

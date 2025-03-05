@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
                             QVBoxLayout, QTabWidget)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
-from base_module import BaseModule
+from base_module import BaseModule, THEMES
 import traceback
 
 # Tema Tokyo Night (puedes personalizarlo o cargar desde config)
@@ -29,6 +29,14 @@ class TabManager(QMainWindow):
         self.font_size = font_size
         self.config_path = config_path
         self.tabs: Dict[str, QWidget] = {}
+        
+        # Load initial theme from config
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        self.available_themes = config.get('temas', ['Tokyo Night', 'Solarized Dark', 'Monokai'])
+        self.current_theme = config.get('tema_seleccionado', 'Tokyo Night')
+        
         self.init_ui()
         self.load_modules()
 
@@ -63,6 +71,7 @@ class TabManager(QMainWindow):
                 
                 try:
                     # Cargar el módulo dinámicamente
+                    print(f"Intentando cargar módulo desde {module_path}\n")
                     spec = importlib.util.spec_from_file_location(module_name, module_path)
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
@@ -103,27 +112,31 @@ class TabManager(QMainWindow):
             print(f"Error loading configuration: {e}")
             traceback.print_exc()
 
+
+
+
     def apply_theme(self, font_size="14px"):
         """Aplica el tema a toda la aplicación."""
+        theme = THEMES.get(self.current_theme, THEMES['Tokyo Night'])
+        
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
+                background-color: {theme['bg']};
+                color: {theme['fg']};
                 font-family: {self.font_family};
                 font-size: {self.font_size};
-
             }}
             
             QTabWidget::pane {{
-                border: 1px solid {THEME['border']};
-                background-color: {THEME['bg']};
+                border: 1px solid {theme['border']};
+                background-color: {theme['bg']};
                 border-radius: 3px;
             }}
             
             QTabBar::tab {{
-                background-color: {THEME['secondary_bg']};
-                color: {THEME['fg']};
-                border: 1px solid {THEME['border']};
+                background-color: {theme['secondary_bg']};
+                color: {theme['fg']};
+                border: 1px solid {theme['border']};
                 padding: 5px 10px;
                 margin-right: 2px;
                 border-top-left-radius: 3px;
@@ -131,41 +144,41 @@ class TabManager(QMainWindow):
             }}
             
             QTabBar::tab:selected {{
-                background-color: {THEME['bg']};
-                border-bottom-color: {THEME['bg']};
+                background-color: {theme['bg']};
+                border-bottom-color: {theme['bg']};
             }}
             
             QTabBar::tab:hover {{
-                background-color: {THEME['button_hover']};
+                background-color: {theme['button_hover']};
             }}
             
             QLineEdit {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
+                background-color: {theme['secondary_bg']};
+                border: 1px solid {theme['border']};
                 padding: 5px;
                 border-radius: 3px;
             }}
             
             QPushButton {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
+                background-color: {theme['secondary_bg']};
+                border: 1px solid {theme['border']};
                 padding: 5px 10px;
                 border-radius: 3px;
             }}
             
             QPushButton:hover {{
-                background-color: {THEME['button_hover']};
+                background-color: {theme['button_hover']};
             }}
             
             QListWidget {{
-                background-color: {THEME['secondary_bg']};
-                border: 1px solid {THEME['border']};
+                background-color: {theme['secondary_bg']};
+                border: 1px solid {theme['border']};
                 border-radius: 3px;
                 padding: 5px;
             }}
             
             QListWidget::item:selected {{
-                background-color: {THEME['selection']};
+                background-color: {theme['selection']};
             }}
         """)
 
@@ -202,6 +215,28 @@ class TabManager(QMainWindow):
                     thread.wait(5000)  # 5 second timeout
                 except Exception as e:
                     print(f"Error cleaning up thread: {e}")
+
+
+    def change_theme(self, new_theme):
+        """Cambia el tema de toda la aplicación."""
+        if new_theme in self.available_themes:
+            self.current_theme = new_theme
+            
+            # Reapply theme to TabManager
+            self.apply_theme()
+            
+            # Reapply theme to all modules
+            for module in self.tabs.values():
+                module.apply_theme(new_theme)
+            
+            # Update config file
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+            
+            config['tema_seleccionado'] = new_theme
+            
+            with open(self.config_path, 'w') as f:
+                json.dump(config, f, indent=4)
 
 
     def switch_to_tab(self, tab_name, method_to_call=None, *args, **kwargs):

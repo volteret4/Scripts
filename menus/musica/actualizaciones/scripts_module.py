@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
 from PyQt6.QtCore import Qt, QProcess
 import json
 import sys
-from base_module import BaseModule, THEME
+from base_module import BaseModule, THEMES
 from pathlib import Path
 import os
 
@@ -12,258 +12,21 @@ from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                            QScrollArea, QWidget, QGridLayout, QLineEdit,
                            QTextEdit, QSplitter, QMessageBox, QComboBox)
 
-class ScriptWidget(QWidget):
-    def __init__(self, script_name, script_info, module=None, parent=None):
-        super().__init__(parent)
-        self.script_name = script_name
-        self.script_info = script_info
-        self.module = module
-        self.arg_inputs = {}
-        self.init_ui()
-
-    def init_ui(self):
-        # Un único layout horizontal para todo
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(10)
-        
-        # Contenedor para el nombre del script
-        name_container = QWidget()
-        name_container.setStyleSheet(f"background-color: {THEME['secondary_bg']};")
-        name_layout = QHBoxLayout(name_container)
-        name_layout.setContentsMargins(10, 5, 10, 5)
-        
-        title = QLabel(self.script_name)
-        title.setStyleSheet(f"""
-            color: {THEME['fg']};
-            font-weight: bold;
-        """)
-        name_layout.addWidget(title)
-        layout.addWidget(name_container)
-        
-        # Contenedor para los argumentos
-        args_container = QWidget()
-        args_container.setStyleSheet(f"background-color: {THEME['secondary_bg']};")
-        args_layout = QHBoxLayout(args_container)
-        args_layout.setContentsMargins(10, 5, 10, 5)
-        
-        # Grid para los argumentos
-        args_grid = QGridLayout()
-        args_grid.setSpacing(10)
-        
-        # Procesar argumentos
-        args = self.script_info.get('args', {})
-        if isinstance(args, list):
-            args_dict = {}
-            for arg in args:
-                if arg.startswith('--'):
-                    key = arg[2:]
-                    args_dict[key] = ''
-                elif arg.startswith('-'):
-                    key = arg[1:]
-                    args_dict[key] = ''
-            args = args_dict
-
-        # Crear inputs para cada argumento
-        row = 0
-        col = 0
-        max_cols = 2  # Dos pares de label+input por fila
-        for key, value in args.items():
-            # Label
-            label = QLabel(key)
-            label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            
-            # Contenedor para el input y posible botón de añadir
-            input_container = QWidget()
-            input_layout = QHBoxLayout(input_container)
-            input_layout.setContentsMargins(0, 0, 0, 0)
-            input_layout.setSpacing(3)
-            
-            # Determinar si el valor es una lista para crear un dropdown
-            if isinstance(value, list):
-                # Crear un combobox
-                input_field = QComboBox()
-                for item in value:
-                    input_field.addItem(str(item))
-                input_field.setEditable(True)  # Permitir editar el texto directamente
-                input_field.setStyleSheet(f"""
-                    QComboBox {{
-                        background-color: {THEME['bg']};
-                        color: {THEME['fg']};
-                        border: 1px solid {THEME['border']};
-                        border-radius: 3px;
-                        padding: 5px;
-                    }}
-                    QComboBox::drop-down {{
-                        border: none;
-                    }}
-                    QComboBox QAbstractItemView {{
-                        background-color: {THEME['bg']};
-                        color: {THEME['fg']};
-                        selection-background-color: {THEME['button_hover']};
-                    }}
-                """)
-                
-                # Botón para añadir una nueva opción
-                add_button = QPushButton("+")
-                add_button.setFixedSize(25, 25)
-                add_button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {THEME['bg']};
-                        color: {THEME['fg']};
-                        border: 1px solid {THEME['border']};
-                        border-radius: 3px;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {THEME['button_hover']};
-                    }}
-                """)
-                add_button.clicked.connect(lambda checked=False, cb=input_field: self.add_new_option(cb))
-                
-                input_layout.addWidget(input_field)
-                input_layout.addWidget(add_button)
-            else:
-                # Input normal para valores no-lista
-                input_field = QLineEdit()
-                input_field.setText(str(value) if value is not None else '')
-                input_field.setStyleSheet(f"""
-                    QLineEdit {{
-                        background-color: {THEME['bg']};
-                        color: {THEME['fg']};
-                        border: 1px solid {THEME['border']};
-                        border-radius: 3px;
-                        padding: 5px;
-                    }}
-                """)
-                input_layout.addWidget(input_field)
-            
-            self.arg_inputs[key] = input_field
-            
-            # Añadir al grid
-            args_grid.addWidget(label, row, col * 2)
-            args_grid.addWidget(input_container, row, col * 2 + 1)
-            
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
-
-        args_layout.addLayout(args_grid)
-        layout.addWidget(args_container, stretch=1)
-        
-        # Contenedor para los botones
-        button_container = QWidget()
-        button_container.setStyleSheet(f"background-color: {THEME['secondary_bg']};")
-        button_layout = QVBoxLayout(button_container)
-        button_layout.setContentsMargins(10, 5, 10, 5)
-        button_layout.setSpacing(5)  # Espacio entre botones
-        
-        # Botón de guardar
-        save_button = QPushButton("Save")
-        save_button.setFixedSize(60, 30)
-        save_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
-                border: 1px solid {THEME['border']};
-                border-radius: 3px;
-            }}
-            QPushButton:hover {{
-                background-color: {THEME['button_hover']};
-            }}
-        """)
-        save_button.clicked.connect(self.save_args)
-        button_layout.addWidget(save_button)
-        
-        # Botón de ejecución
-        run_button = QPushButton("Run")
-        run_button.setFixedSize(60, 30)
-        run_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
-                border: 1px solid {THEME['border']};
-                border-radius: 3px;
-            }}
-            QPushButton:hover {{
-                background-color: {THEME['button_hover']};
-            }}
-        """)
-        run_button.clicked.connect(self.get_command)
-        button_layout.addWidget(run_button)
-        layout.addWidget(button_container)
-
-    def add_new_option(self, combobox):
-        """Añade el valor actual del combobox como nueva opción si no existe ya"""
-        current_text = combobox.currentText().strip()
-        if not current_text:
-            return
-            
-        # Comprobar si ya existe para evitar duplicados
-        exists = False
-        for i in range(combobox.count()):
-            if combobox.itemText(i) == current_text:
-                exists = True
-                break
-                
-        # Si no existe, añadirlo
-        if not exists:
-            combobox.addItem(current_text)
-            self.module.log_message(f"Añadida nueva opción: {current_text}", success=True)
-
-    def save_args(self):
-        """Guarda los valores actuales de los argumentos en el archivo de configuración."""
-        if self.module is None or not isinstance(self.module, ScriptRunnerModule) or not self.module.config_file:
-            self.module.log_message("No se puede guardar: no hay un archivo de configuración válido", error=True)
-            return
-            
-        # Recopilar los valores actuales
-        updated_args = {}
-        for key, input_field in self.arg_inputs.items():
-            if isinstance(input_field, QComboBox):
-                # Para combobox, guardar todos los elementos como una lista
-                values = [input_field.itemText(i) for i in range(input_field.count())]
-                updated_args[key] = values
-            else:
-                # Para inputs normales, guardar el valor actual
-                updated_args[key] = input_field.text().strip()
-        
-        # Actualizar los argumentos en el script_info
-        self.script_info['args'] = updated_args
-        
-        # Llamar al método del módulo para guardar en el archivo
-        self.module.save_scripts_config(self.script_name, self.script_info)
-
-    def get_command(self):
-        cmd = []
-        for key, input_field in self.arg_inputs.items():
-            # Obtener el valor dependiendo del tipo de widget
-            if isinstance(input_field, QComboBox):
-                value = input_field.currentText().strip()
-            else:
-                value = input_field.text().strip()
-                
-            if len(key) == 1:
-                cmd.append(f"-{key}")
-            else:
-                cmd.append(f"--{key}")
-            if value:
-                cmd.append(value)
-        
-        # Usar la referencia directa al módulo en lugar de depender de parent()
-        if self.module is not None and isinstance(self.module, ScriptRunnerModule):
-            self.module.run_script(self.script_name, self.script_info, cmd)
-        else:
-            print(f"Error: Module reference is not valid or not a ScriptRunnerModule")
 
 class ScriptRunnerModule(BaseModule):
-    def __init__(self, config_file=None, scripts_section="scripts", **kwargs):
+    def __init__(self, config_file=None, scripts_section="scripts", parent=None, theme='Tokyo Night', **kwargs,):
+        self.theme = theme
         self.config_file = config_file
         self.scripts_section = scripts_section
         self.scripts = {}
         self.processes = {}
-        super().__init__()
-        
+        super().__init__(parent, theme)
+
+    def apply_theme(self, theme_name=None):
+        # Optional: Override if you need custom theming beyond base theme
+        super().apply_theme(theme_name)
+
+
     def init_ui(self):
         """Inicializa la interfaz del módulo."""
         # Layout principal
@@ -275,10 +38,8 @@ class ScriptRunnerModule(BaseModule):
         # Área de scripts
         scripts_scroll = QScrollArea()
         scripts_scroll.setWidgetResizable(True)
-        scripts_scroll.setStyleSheet(f"background-color: {THEME['bg']}; border: none;")
         
         scripts_container = QWidget()
-        scripts_container.setStyleSheet(f"background-color: {THEME['bg']};")
         self.scripts_layout = QVBoxLayout(scripts_container)
         self.scripts_layout.setSpacing(5)
         self.scripts_layout.setContentsMargins(0, 0, 0, 0)
@@ -298,9 +59,7 @@ class ScriptRunnerModule(BaseModule):
         self.log_text.setMaximumHeight(150)
         self.log_text.setStyleSheet(f"""
             QTextEdit {{
-                background-color: {THEME['secondary_bg']};
-                color: {THEME['fg']};
-                border: 1px solid {THEME['border']};
+                border: 1px solid;
                 border-radius: 3px;
                 padding: 5px;
             }}
@@ -421,7 +180,7 @@ class ScriptRunnerModule(BaseModule):
                                f"El script '{script_name}' encontró un error:\n{error}")
 
          
-    def log_message(self, message, error=False, success=False):
+    def log_message(self, message, error=False, success=False, theme='Tokyo Night'):
         # Replace newlines with HTML breaks to preserve formatting
         formatted_message = message.replace('\n', '<br>')
         
@@ -430,7 +189,7 @@ class ScriptRunnerModule(BaseModule):
         elif success:
             self.log_text.append(f'<span style="color: #50fa7b; font-weight: bold;">{formatted_message}</span>')
         else:
-            self.log_text.append(f'<span style="color: {THEME["fg"]};">{formatted_message}</span>')
+            self.log_text.append(f'<span style="color: {THEMES:{theme:["fg"]}};">{formatted_message}</span>')
         
         # Asegurarse de que el mensaje más reciente sea visible
         self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
@@ -441,30 +200,14 @@ class ScriptRunnerModule(BaseModule):
         error_dialog.setText(message)
         error_dialog.setIcon(QMessageBox.Icon.Critical)
         error_dialog.setStyleSheet(f"""
-            QMessageBox {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
-            }}
             QPushButton {{
-                background-color: {THEME['secondary_bg']};
-                color: {THEME['fg']};
-                border: 1px solid {THEME['border']};
+                border: 1px solid;
                 padding: 5px 10px;
                 border-radius: 3px;
-            }}
-            QPushButton:hover {{
-                background-color: {THEME['button_hover']};
             }}
         """)
         error_dialog.exec()
 
-    def apply_theme(self):
-        self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {THEME['bg']};
-                color: {THEME['fg']};
-            }}
-        """)
 
   
     def save_scripts_config(self, script_name, script_info):
@@ -506,3 +249,222 @@ class ScriptRunnerModule(BaseModule):
             import traceback
             self.log_message(traceback.format_exc(), error=True)
             return False
+
+
+
+class ScriptWidget(QWidget):
+    def __init__(self, script_name, script_info, module=None, theme='Tokyo Night'):
+        super().__init__()
+        self.script_name = script_name
+        self.script_info = script_info
+        self.module = module
+        self.arg_inputs = {}
+        self.init_ui()
+
+    def init_ui(self):
+        # Un único layout horizontal para todo
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(10)
+        
+        # Contenedor para el nombre del script
+        name_container = QWidget()
+        name_layout = QHBoxLayout(name_container)
+        name_layout.setContentsMargins(10, 5, 10, 5)
+        
+        title = QLabel(self.script_name)
+        title.setStyleSheet(f"""
+            font-weight: bold;
+        """)
+        name_layout.addWidget(title)
+        layout.addWidget(name_container)
+        
+        # Contenedor para los argumentos
+        args_container = QWidget()
+        args_layout = QHBoxLayout(args_container)
+        args_layout.setContentsMargins(10, 5, 10, 5)
+        
+        # Grid para los argumentos
+        args_grid = QGridLayout()
+        args_grid.setSpacing(10)
+        
+        # Procesar argumentos
+        args = self.script_info.get('args', {})
+        if isinstance(args, list):
+            args_dict = {}
+            for arg in args:
+                if arg.startswith('--'):
+                    key = arg[2:]
+                    args_dict[key] = ''
+                elif arg.startswith('-'):
+                    key = arg[1:]
+                    args_dict[key] = ''
+            args = args_dict
+
+        # Crear inputs para cada argumento
+        row = 0
+        col = 0
+        max_cols = 2  # Dos pares de label+input por fila
+        for key, value in args.items():
+            # Label
+            label = QLabel(key)
+            label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            
+            # Contenedor para el input y posible botón de añadir
+            input_container = QWidget()
+            input_layout = QHBoxLayout(input_container)
+            input_layout.setContentsMargins(0, 0, 0, 0)
+            input_layout.setSpacing(3)
+            
+            # Determinar si el valor es una lista para crear un dropdown
+            if isinstance(value, list):
+                # Crear un combobox
+                input_field = QComboBox()
+                for item in value:
+                    input_field.addItem(str(item))
+                input_field.setEditable(True)  # Permitir editar el texto directamente
+                input_field.setStyleSheet(f"""
+                    QComboBox {{
+                        border: 1px solid;
+                        border-radius: 3px;
+                        padding: 5px;
+                    }}
+                    QComboBox::drop-down {{
+                        border: none;
+                    }}
+                """)
+                
+                # Botón para añadir una nueva opción
+                add_button = QPushButton("+")
+                add_button.setFixedSize(25, 25)
+                add_button.setStyleSheet(f"""
+                    QPushButton {{
+                        border: 1px solid;
+                    }}
+                """)
+                add_button.clicked.connect(lambda checked=False, cb=input_field: self.add_new_option(cb))
+                
+                input_layout.addWidget(input_field)
+                input_layout.addWidget(add_button)
+            else:
+                # Input normal para valores no-lista
+                input_field = QLineEdit()
+                input_field.setText(str(value) if value is not None else '')
+                input_field.setStyleSheet(f"""
+                    QLineEdit {{
+                        border: 1px solid;
+                        border-radius: 3px;
+                        padding: 5px;
+                    }}
+                """)
+                input_layout.addWidget(input_field)
+            
+            self.arg_inputs[key] = input_field
+            
+            # Añadir al grid
+            args_grid.addWidget(label, row, col * 2)
+            args_grid.addWidget(input_container, row, col * 2 + 1)
+            
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
+
+        args_layout.addLayout(args_grid)
+        layout.addWidget(args_container, stretch=1)
+        
+        # Contenedor para los botones
+        button_container = QWidget()
+        #button_container.setStyleSheet(f"background-color: {THEMES:{theme:['secondary_bg']}};")
+        button_layout = QVBoxLayout(button_container)
+        button_layout.setContentsMargins(10, 5, 10, 5)
+        button_layout.setSpacing(5)  # Espacio entre botones
+        
+        # Botón de guardar
+        save_button = QPushButton("Save")
+        save_button.setFixedSize(60, 30)
+        save_button.setStyleSheet(f"""
+            QPushButton {{
+                border: 1px solid;
+                border-radius: 3px;
+            }}
+        """)
+        save_button.clicked.connect(self.save_args)
+        button_layout.addWidget(save_button)
+        
+        # Botón de ejecución
+        run_button = QPushButton("Run")
+        run_button.setFixedSize(60, 30)
+        run_button.setStyleSheet(f"""
+            QPushButton {{
+                border: 1px solid;
+                border-radius: 3px;
+            }}
+        """)
+        run_button.clicked.connect(self.get_command)
+        button_layout.addWidget(run_button)
+        layout.addWidget(button_container)
+
+    def add_new_option(self, combobox):
+        """Añade el valor actual del combobox como nueva opción si no existe ya"""
+        current_text = combobox.currentText().strip()
+        if not current_text:
+            return
+            
+        # Comprobar si ya existe para evitar duplicados
+        exists = False
+        for i in range(combobox.count()):
+            if combobox.itemText(i) == current_text:
+                exists = True
+                break
+                
+        # Si no existe, añadirlo
+        if not exists:
+            combobox.addItem(current_text)
+            self.module.log_message(f"Añadida nueva opción: {current_text}", success=True)
+
+    def save_args(self):
+        """Guarda los valores actuales de los argumentos en el archivo de configuración."""
+        if self.module is None or not isinstance(self.module, ScriptRunnerModule) or not self.module.config_file:
+            self.module.log_message("No se puede guardar: no hay un archivo de configuración válido", error=True)
+            return
+            
+        # Recopilar los valores actuales
+        updated_args = {}
+        for key, input_field in self.arg_inputs.items():
+            if isinstance(input_field, QComboBox):
+                # Para combobox, guardar todos los elementos como una lista
+                values = [input_field.itemText(i) for i in range(input_field.count())]
+                updated_args[key] = values
+            else:
+                # Para inputs normales, guardar el valor actual
+                updated_args[key] = input_field.text().strip()
+        
+        # Actualizar los argumentos en el script_info
+        self.script_info['args'] = updated_args
+        
+        # Llamar al método del módulo para guardar en el archivo
+        self.module.save_scripts_config(self.script_name, self.script_info)
+
+    def get_command(self):
+        cmd = []
+        for key, input_field in self.arg_inputs.items():
+            # Obtener el valor dependiendo del tipo de widget
+            if isinstance(input_field, QComboBox):
+                value = input_field.currentText().strip()
+            else:
+                value = input_field.text().strip()
+                
+            if len(key) == 1:
+                cmd.append(f"-{key}")
+            else:
+                cmd.append(f"--{key}")
+            if value:
+                cmd.append(value)
+        
+        # Usar la referencia directa al módulo en lugar de depender de parent()
+        if self.module is not None and isinstance(self.module, ScriptRunnerModule):
+            self.module.run_script(self.script_name, self.script_info, cmd)
+        else:
+            print(f"Error: Module reference is not valid or not a ScriptRunnerModule")
+

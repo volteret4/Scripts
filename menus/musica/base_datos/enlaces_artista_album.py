@@ -149,64 +149,41 @@ class MusicLinksManager:
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Verificar si las columnas existen en la tabla artists
+        # Añadir columna MBID a artistas si no existe
         c.execute("PRAGMA table_info(artists)")
         artist_columns = {col[1] for col in c.fetchall()}
         
-        # Añadir columnas para enlaces de artistas si no existen
-        artist_links_columns = {
-            'spotify_url': 'TEXT',
-            'youtube_url': 'TEXT',
-            'musicbrainz_url': 'TEXT',
-            'discogs_url': 'TEXT',
-            'rateyourmusic_url': 'TEXT',
-            'links_updated': 'TIMESTAMP'
-        }
+        if 'mbid' not in artist_columns:
+            c.execute("ALTER TABLE artists ADD COLUMN mbid TEXT")
         
-        for col_name, col_type in artist_links_columns.items():
-            if col_name not in artist_columns:
-                c.execute(f"ALTER TABLE artists ADD COLUMN {col_name} {col_type}")
-        
-        # Verificar si las columnas existen en la tabla albums
+        # Añadir columna MBID a álbumes si no existe
         c.execute("PRAGMA table_info(albums)")
         album_columns = {col[1] for col in c.fetchall()}
         
-        # Añadir columnas para enlaces de álbumes si no existen
-        album_links_columns = {
-            'spotify_url': 'TEXT',
-            'spotify_id': 'TEXT',  # Nueva columna para el ID de Spotify
-            'youtube_url': 'TEXT',
-            'musicbrainz_url': 'TEXT',
-            'discogs_url': 'TEXT',
-            'rateyourmusic_url': 'TEXT',
-            'links_updated': 'TIMESTAMP'
-        }
+        if 'mbid' not in album_columns:
+            c.execute("ALTER TABLE albums ADD COLUMN mbid TEXT")
         
-        for col_name, col_type in album_links_columns.items():
-            if col_name not in album_columns:
-                c.execute(f"ALTER TABLE albums ADD COLUMN {col_name} {col_type}")
-        
-        # Verificar si las columnas existen en la tabla tracks
-        try:
-            c.execute("PRAGMA table_info(tracks)")
-            track_columns = {col[1] for col in c.fetchall()}
-            
-            # Añadir columnas para enlaces de pistas si no existen
-            track_links_columns = {
-                'spotify_url': 'TEXT',
-                'spotify_id': 'TEXT',  # Nueva columna para el ID de Spotify
-                'youtube_url': 'TEXT'
-            }
-            
-            for col_name, col_type in track_links_columns.items():
-                if col_name not in track_columns:
-                    c.execute(f"ALTER TABLE tracks ADD COLUMN {col_name} {col_type}")
-        except sqlite3.OperationalError:
-            self.logger.warning("Tracks table doesn't exist. Skipping track columns.")
+        # Verificar la existencia de la tabla song_links
+        c.execute("PRAGMA table_info(song_links)")
+        if not c.fetchall():
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS song_links (
+                    id INTEGER PRIMARY KEY,
+                    song_id INTEGER,
+                    spotify_url TEXT,
+                    spotify_id TEXT,
+                    youtube_url TEXT,
+                    musicbrainz_url TEXT,
+                    musicbrainz_recording_id TEXT,
+                    lastfm_url TEXT,
+                    links_updated TIMESTAMP,
+                    FOREIGN KEY(song_id) REFERENCES songs(id)
+                )
+            """)
         
         conn.commit()
         conn.close()
-        self.logger.info("Database schema updated with external links columns")
+        self.logger.info("Database schema updated with new link columns")
 
     def _check_tables_exist(self):
         """Verifica qué tablas existen en la base de datos"""
@@ -242,41 +219,116 @@ class MusicLinksManager:
   
     def update_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """
-        Actualiza los enlaces externos para artistas y álbumes
-        
-        Args:
-            days_threshold: Si recent_only=True, actualizar solo registros más recientes que estos días
-                        Si recent_only=False, actualizar solo registros más antiguos que estos días
-            force_update: Forzar actualización de todos los registros independientemente de su fecha
-            recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
-            missing_only: Si es True, actualiza solo registros con enlaces faltantes
+        Actualiza los enlaces externos para artistas, álbumes y canciones.
+        Prioriza la búsqueda de MBID antes que otros enlaces.
         """
-        # Mostrar conteos antes de comenzar
-        counts = self.get_table_counts()
-        table_count_info = ", ".join([f"{k}: {v}" for k, v in counts.items()])
-        self.logger.info(f"Database contains {table_count_info}")
+        # Primero actualizar los MBID
+        self.update_missing_mbids()
         
-        # Mostrar servicios habilitados/deshabilitados y configuración de rate limit
-        enabled_services = []
-        if self.spotify: enabled_services.append("Spotify")
-        if self.youtube: enabled_services.append("YouTube")
-        if not 'musicbrainz' in self.disabled_services: enabled_services.append("MusicBrainz")
-        if self.discogs: enabled_services.append("Discogs")
-        if self.rateyourmusic_enabled: enabled_services.append("RateYourMusic")
+        # Resto de la lógica de actualización de enlaces
+        conn = sqlite3.connect(self.db_path)
+        try:
+            self.update_artist_links(days_threshold, force_update, recent_only, missing_only)
+            self.update_album_and_track_links(days_threshold, force_update, recent_only, missing_only)
+            self.update_song_links(days_threshold, force_update, recent_only, missing_only)
+        finally:
+            conn.close()
+
+            
+    def update_song_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
+        """
+        Actualiza los enlaces externos para canciones
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
         
-        self.logger.info(f"Enabled services: {', '.join(enabled_services)}")
-        self.logger.info(f"Disabled services: {', '.join(self.disabled_services)}")
-        self.logger.info(f"Rate limit: {self.rate_limit} seconds between API requests")
-        
-        if missing_only:
-            self.logger.info("Updating only records with missing links")
-        elif recent_only:
-            self.logger.info(f"Updating only records added/modified in the last {days_threshold} days")
+        # Construir consulta base para seleccionar canciones
+        if force_update:
+            c.execute("SELECT id, title, artist, album FROM songs")
+        elif missing_only:
+            # Buscar canciones sin enlaces en song_links
+            c.execute("""
+                SELECT songs.id, songs.title, songs.artist, songs.album 
+                FROM songs 
+                LEFT JOIN song_links ON songs.id = song_links.song_id 
+                WHERE song_links.id IS NULL
+            """)
         else:
-            self.logger.info(f"Updating only records with links older than {days_threshold} days")
+            # Lógica para seleccionar canciones basada en fecha
+            if recent_only:
+                c.execute("""
+                    SELECT id, title, artist, album 
+                    FROM songs 
+                    WHERE last_modified > datetime('now', ?)
+                """, (f'-{days_threshold} days',))
+            else:
+                c.execute("""
+                    SELECT songs.id, songs.title, songs.artist, songs.album 
+                    FROM songs
+                    LEFT JOIN song_links ON songs.id = song_links.song_id
+                    WHERE song_links.links_updated IS NULL 
+                    OR datetime(song_links.links_updated) < datetime('now', ?)
+                """, (f'-{days_threshold} days',))
         
-        self.update_artist_links(days_threshold, force_update, recent_only, missing_only)
-        self.update_album_and_track_links(days_threshold, force_update, recent_only, missing_only)
+        songs = c.fetchall()
+        total_songs = len(songs)
+        self.logger.info(f"Found {total_songs} songs to update links")
+        
+        for idx, (song_id, title, artist, album) in enumerate(songs, 1):
+            self.logger.info(f"Processing song {idx}/{total_songs}: {title} by {artist}")
+            
+            # Obtener o crear registro en song_links
+            c.execute("SELECT id FROM song_links WHERE song_id = ?", (song_id,))
+            song_link_record = c.fetchone()
+            
+            links = {
+                'spotify_url': self._get_spotify_track_url(artist, title, album) if self.spotify else None,
+                'spotify_id': None,  # Se puede poblar con datos de Spotify
+                'youtube_url': self._get_youtube_track_url(artist, title) if self.youtube else None,
+                'musicbrainz_url': self._get_musicbrainz_recording_url(artist, title, album) if 'musicbrainz' not in self.disabled_services else None,
+                'musicbrainz_recording_id': None,
+                'lastfm_url': self._get_lastfm_track_url(artist, title) if 'lastfm' not in self.disabled_services else None,
+                'links_updated': datetime.now()
+            }
+            
+            if song_link_record:
+                # Actualizar registro existente
+                update_query = """
+                    UPDATE song_links SET 
+                    spotify_url = ?, spotify_id = ?,
+                    youtube_url = ?, 
+                    musicbrainz_url = ?, musicbrainz_recording_id = ?,
+                    lastfm_url = ?, links_updated = ?
+                    WHERE song_id = ?
+                """
+                c.execute(update_query, (
+                    links['spotify_url'], links['spotify_id'], 
+                    links['youtube_url'], 
+                    links['musicbrainz_url'], links['musicbrainz_recording_id'],
+                    links['lastfm_url'], links['links_updated'], 
+                    song_id
+                ))
+            else:
+                # Insertar nuevo registro
+                insert_query = """
+                    INSERT INTO song_links (
+                        song_id, spotify_url, spotify_id, 
+                        youtube_url, musicbrainz_url, musicbrainz_recording_id,
+                        lastfm_url, links_updated
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                c.execute(insert_query, (
+                    song_id, links['spotify_url'], links['spotify_id'], 
+                    links['youtube_url'], 
+                    links['musicbrainz_url'], links['musicbrainz_recording_id'],
+                    links['lastfm_url'], links['links_updated']
+                ))
+            
+            conn.commit()
+            self._rate_limit_pause()
+        
+        conn.close()
+        self.logger.info(f"Updated links for {total_songs} songs")
 
 
     
@@ -599,6 +651,134 @@ class MusicLinksManager:
         
         return n1_clean == n2_clean
     
+
+    def update_missing_mbids(self):
+        """
+        Actualiza los MBID faltantes en artistas, álbumes y canciones.
+        Prioriza obtener MBID antes que otros tipos de enlaces.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        # Actualizar MBID de artistas
+        c.execute("SELECT id, name FROM artists WHERE mbid IS NULL")
+        artists_without_mbid = c.fetchall()
+        
+        for artist_id, artist_name in artists_without_mbid:
+            try:
+                mbid = self._get_musicbrainz_artist_mbid(artist_name)
+                if mbid:
+                    c.execute("UPDATE artists SET mbid = ? WHERE id = ?", (mbid, artist_id))
+                    conn.commit()
+                    self.logger.info(f"Found MBID for artist: {artist_name}")
+                    self._rate_limit_pause()
+            except Exception as e:
+                self.logger.error(f"Error finding MBID for artist {artist_name}: {e}")
+
+        # Actualizar MBID de álbumes
+        c.execute("""
+            SELECT albums.id, albums.name, artists.name 
+            FROM albums 
+            JOIN artists ON albums.artist_id = artists.id 
+            WHERE albums.mbid IS NULL
+        """)
+        albums_without_mbid = c.fetchall()
+        
+        for album_id, album_name, artist_name in albums_without_mbid:
+            try:
+                mbid = self._get_musicbrainz_album_mbid(artist_name, album_name)
+                if mbid:
+                    c.execute("UPDATE albums SET mbid = ? WHERE id = ?", (mbid, album_id))
+                    conn.commit()
+                    self.logger.info(f"Found MBID for album: {album_name}")
+                    self._rate_limit_pause()
+            except Exception as e:
+                self.logger.error(f"Error finding MBID for album {album_name}: {e}")
+
+        # Actualizar MBID de canciones (opcional, dependiendo de tu estructura)
+        c.execute("""
+            SELECT id, title, artist, album 
+            FROM songs 
+            WHERE mbid IS NULL
+        """)
+        songs_without_mbid = c.fetchall()
+        
+        for song_id, title, artist, album in songs_without_mbid:
+            try:
+                mbid = self._get_musicbrainz_recording_mbid(artist, title, album)
+                if mbid:
+                    c.execute("UPDATE songs SET mbid = ? WHERE id = ?", (mbid, song_id))
+                    conn.commit()
+                    self.logger.info(f"Found MBID for song: {title}")
+                    self._rate_limit_pause()
+            except Exception as e:
+                self.logger.error(f"Error finding MBID for song {title}: {e}")
+
+        conn.close()
+
+
+    def _get_musicbrainz_artist_mbid(self, artist_name: str) -> Optional[str]:
+        """Obtiene el MBID de un artista desde MusicBrainz"""
+        if 'musicbrainz' in self.disabled_services:
+            return None
+        
+        try:
+            result = musicbrainzngs.search_artists(artist=artist_name, limit=1)
+            
+            if result['artist-list'] and len(result['artist-list']) > 0:
+                return result['artist-list'][0]['id']
+        except Exception as e:
+            self.logger.error(f"MusicBrainz artist MBID search error for {artist_name}: {str(e)}")
+        
+        return None
+
+
+
+    def _get_musicbrainz_album_mbid(self, artist_name: str, album_name: str) -> Optional[str]:
+        """Obtiene el MBID de un álbum desde MusicBrainz"""
+        if 'musicbrainz' in self.disabled_services:
+            return None
+        
+        try:
+            result = musicbrainzngs.search_releases(artist=artist_name, release=album_name, limit=1)
+            
+            if result['release-list'] and len(result['release-list']) > 0:
+                return result['release-list'][0]['id']
+        except Exception as e:
+            self.logger.error(f"MusicBrainz album MBID search error for {album_name}: {str(e)}")
+        
+        return None
+
+
+
+    def _get_musicbrainz_recording_mbid(self, artist: str, title: str, album: str) -> Optional[str]:
+        """Obtiene el MBID de una grabación desde MusicBrainz"""
+        if 'musicbrainz' in self.disabled_services:
+            return None
+        
+        try:
+            result = musicbrainzngs.search_recordings(
+                artist=artist, 
+                recording=title, 
+                release=album, 
+                limit=1
+            )
+            
+            if result['recording-list'] and len(result['recording-list']) > 0:
+                return result['recording-list'][0]['id']
+        except Exception as e:
+            self.logger.error(f"MusicBrainz recording MBID search error for {title}: {str(e)}")
+        
+        return None
+
+
+    def _get_lastfm_track_url(self, artist: str, title: str) -> Optional[str]:
+        """Genera URL de LastFM para una pista"""
+        artist_slug = artist.lower().replace(' ', '-')
+        track_slug = title.lower().replace(' ', '-')
+        return f"https://www.last.fm/music/{artist_slug}/_/{track_slug}"
+
+
     def _get_spotify_artist_url(self, artist_name: str) -> Optional[str]:
         """Obtiene la URL del artista en Spotify"""
         if not self.spotify:
@@ -675,6 +855,37 @@ class MusicLinksManager:
         
         return None
     
+    def _get_spotify_track_url(self, artist: str, title: str, album: str) -> Optional[str]:
+        """Obtiene URL de pista en Spotify"""
+        if not self.spotify:
+            return None
+        
+        try:
+            query = f"track:{title} artist:{artist} album:{album}"
+            results = self.spotify.search(q=query, type='track', limit=1)
+            
+            if results and results['tracks']['items']:
+                return results['tracks']['items'][0]['external_urls']['spotify']
+        except Exception as e:
+            self.logger.error(f"Spotify track search error for {title}: {str(e)}")
+        
+        return None
+
+    def _get_youtube_track_url(self, artist: str, title: str) -> Optional[str]:
+        """Obtiene URL de búsqueda de pista en YouTube"""
+        if not self.youtube:
+            return None
+        
+        try:
+            query = f"{artist} {title}"
+            query_encoded = query.replace(' ', '+')
+            return f"https://www.youtube.com/results?search_query={query_encoded}"
+        except Exception as e:
+            self.logger.error(f"YouTube track search error for {title}: {str(e)}")
+        
+        return None
+
+
     def _get_youtube_album_url(self, artist_name: str, album_name: str) -> Optional[str]:
         """Obtiene la URL de resultados de búsqueda del álbum en YouTube"""
         if not self.youtube:
@@ -700,6 +911,9 @@ class MusicLinksManager:
             self.logger.error(f"YouTube album search error for {album_name} by {artist_name}: {str(e)}")
         
         return None
+
+
+
     
     def _get_musicbrainz_artist_url(self, artist_name: str) -> Optional[str]:
         """Obtiene la URL del artista en MusicBrainz"""
@@ -733,6 +947,29 @@ class MusicLinksManager:
         
         return None
     
+   
+    def _get_musicbrainz_recording_url(self, artist: str, title: str, album: str) -> Optional[str]:
+        """Obtiene URL de grabación en MusicBrainz"""
+        if 'musicbrainz' in self.disabled_services:
+            return None
+        
+        try:
+            result = musicbrainzngs.search_recordings(
+                artist=artist, 
+                recording=title, 
+                release=album, 
+                limit=1
+            )
+            
+            if result['recording-list'] and len(result['recording-list']) > 0:
+                recording_id = result['recording-list'][0]['id']
+                return f"https://musicbrainz.org/recording/{recording_id}"
+        except Exception as e:
+            self.logger.error(f"MusicBrainz recording search error for {title}: {str(e)}")
+        
+        return None
+
+
     def _get_discogs_artist_url(self, artist_name: str) -> Optional[str]:
         """Obtiene la URL del artista en Discogs"""
         if not self.discogs:
@@ -800,6 +1037,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Music Library External Links Manager')
     parser.add_argument('db_path', help='Path to SQLite database')
     parser.add_argument('--force-update', action='store_true', help='Force update all records')
+    parser.add_argument('--artist', help='Artist name to find MBID')
     parser.add_argument('--days', type=int, default=30, help='Update records based on threshold of days')
     parser.add_argument('--disable-services', nargs='+', choices=['spotify', 'youtube', 'musicbrainz', 'discogs', 'rateyourmusic'], 
                         help='Disable specific services')
@@ -813,7 +1051,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     manager = MusicLinksManager(args.db_path, disabled_services=args.disable_services or [], rate_limit=args.rate_limit)
-    
+
+    # Si se proporciona un nombre de artista, buscar su MBID
+    if args.artist:
+        mbid = manager._get_musicbrainz_artist_mbid(args.artist)
+        if mbid:
+            print(mbid)
+        else:
+            print(f"None")
+
+
     if args.summary_only:
         counts = manager.get_table_counts()
         for table, count in counts.items():

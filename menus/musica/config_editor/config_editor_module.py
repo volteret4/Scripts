@@ -1,89 +1,19 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLineEdit, QLabel, QMessageBox, QGroupBox,
-    QScrollArea, QFrame, QApplication, QSizePolicy
+    QScrollArea, QFrame, QApplication, QSizePolicy,
+    QComboBox  
 )
 from PyQt6.QtCore import pyqtSignal, Qt
-from base_module import BaseModule
+from base_module import BaseModule, THEMES
 import json
 from pathlib import Path
 
-class ConfigField(QWidget):
-    """Widget para un campo individual de configuración"""
-    def __init__(self, label: str, value, parent=None):
-        super().__init__(parent)
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.label = QLabel(label)
-        self.label.setMinimumWidth(150)
-        
-        # Convertir el valor a string para el QLineEdit
-        str_value = str(value) if not isinstance(value, (dict, list)) else json.dumps(value)
-        self.input = QLineEdit(str_value)
-        self.original_value = value
-        
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.input)
-        
-    def get_value(self):
-        # Intenta convertir el valor de vuelta a su tipo original
-        text = self.input.text()
-        
-        # Si el valor original era un número, convertir de vuelta
-        if isinstance(self.original_value, int):
-            try:
-                return int(text)
-            except ValueError:
-                return text
-        elif isinstance(self.original_value, float):
-            try:
-                return float(text)
-            except ValueError:
-                return text
-        elif isinstance(self.original_value, bool):
-            lower_text = text.lower()
-            if lower_text in ('true', 't', 'yes', 'y', '1'):
-                return True
-            elif lower_text in ('false', 'f', 'no', 'n', '0'):
-                return False
-            else:
-                return text
-        
-        return text
-
-class NestedConfigGroup(QGroupBox):
-    """Widget para visualizar y editar configuración anidada"""
-    def __init__(self, title: str, config_data: dict, parent=None):
-        super().__init__(title, parent)
-        self.config_data = config_data
-        self.fields = {}
-        
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        
-        for key, value in config_data.items():
-            if isinstance(value, dict):
-                # Crear un grupo anidado para el diccionario
-                nested_group = NestedConfigGroup(key, value)
-                layout.addWidget(nested_group)
-                self.fields[key] = nested_group
-            else:
-                # Crear un campo simple para valores no anidados
-                field = ConfigField(key, value)
-                layout.addWidget(field)
-                self.fields[key] = field
-    
-    def get_value(self):
-        result = {}
-        for key, field in self.fields.items():
-            result[key] = field.get_value()
-        return result
 
 class ConfigEditorModule(BaseModule):
     config_updated = pyqtSignal()
 
-    def __init__(self, config_path: str, parent=None):
+    def __init__(self, config_path: str, parent=None, theme='Tokyo Night'):
         # Inicializa config_data antes de llamar a super().__init__
         self.config_data = {
             "modules": []
@@ -95,7 +25,10 @@ class ConfigEditorModule(BaseModule):
         self.load_config()
         
         # Ahora llama a super().__init__, que llamará a self.init_ui()
-        super().__init__(parent)
+        super().__init__(parent, theme)
+
+    def apply_theme(self, theme_name=None):
+        super().apply_theme(theme_name)
 
     def load_config(self):
         """Carga la configuración desde el archivo"""
@@ -226,3 +159,92 @@ class ConfigEditorModule(BaseModule):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error saving config: {str(e)}")
+
+
+class ConfigField(QWidget):
+    """Widget para un campo individual de configuración"""
+    def __init__(self, label: str, value):
+        super().__init__()
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.label = QLabel(label)
+        self.label.setMinimumWidth(150)
+        
+        # Si el valor es una lista, crear un QComboBox
+        if isinstance(value, list):
+            self.input = QComboBox()
+            self.input.addItems(map(str, value))
+            # Intentar preseleccionar un valor por defecto o el primer elemento
+            self.original_value = value[0] if value else None
+            self.input.setCurrentText(str(self.original_value))
+        else:
+            # Convertir el valor a string para el QLineEdit
+            str_value = str(value) if not isinstance(value, (dict, list)) else json.dumps(value)
+            self.input = QLineEdit(str_value)
+            self.original_value = value
+        
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.input)
+        
+    def apply_theme(self, theme_name=None):
+        super().apply_theme(theme_name)
+
+    def get_value(self):
+        # Para listas (QComboBox), devolver el elemento seleccionado
+        if isinstance(self.input, QComboBox):
+            return self.input.currentText()
+        
+        # Lógica existente para otros tipos de entrada
+        text = self.input.text()
+        
+        # Si el valor original era un número, convertir de vuelta
+        if isinstance(self.original_value, int):
+            try:
+                return int(text)
+            except ValueError:
+                return text
+        elif isinstance(self.original_value, float):
+            try:
+                return float(text)
+            except ValueError:
+                return text
+        elif isinstance(self.original_value, bool):
+            lower_text = text.lower()
+            if lower_text in ('true', 't', 'yes', 'y', '1'):
+                return True
+            elif lower_text in ('false', 'f', 'no', 'n', '0'):
+                return False
+            else:
+                return text
+        
+        return text
+
+class NestedConfigGroup(QGroupBox):
+    """Widget para visualizar y editar configuración anidada"""
+    def __init__(self, title: str, config_data: dict, parent=None):
+        super().__init__(title, parent)
+        self.config_data = config_data
+        self.fields = {}
+        
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        for key, value in config_data.items():
+            if isinstance(value, dict):
+                # Crear un grupo anidado para el diccionario
+                nested_group = NestedConfigGroup(key, value)
+                layout.addWidget(nested_group)
+                self.fields[key] = nested_group
+            else:
+                # Crear un campo simple para valores no anidados
+                field = ConfigField(key, value)
+                layout.addWidget(field)
+                self.fields[key] = field
+    
+    def get_value(self):
+        result = {}
+        for key, field in self.fields.items():
+            result[key] = field.get_value()
+        return result
+
