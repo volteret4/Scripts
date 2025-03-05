@@ -14,13 +14,16 @@ from base_module import BaseModule, THEMES
 class DatabaseEditor(BaseModule):
     """Módulo para buscar y editar elementos en la base de datos de música."""
     
-    def __init__(self, db_path: str = "music_database.db", parent=None, theme='Tokyo Night'):
+    def __init__(self, db_path: str = "music_database.db", parent=None, theme='Tokyo Night', **kwargs):
         # Definir atributos antes de llamar a super().__init__()
         self.db_path = db_path
         self.current_table = "songs"
         self.current_item_id = None
         self.edit_widgets = {}
         self.search_results = []
+
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
         
         # Ahora llamamos a super().__init__() que internamente llamará a self.init_ui()
         super().__init__(parent, theme)

@@ -175,7 +175,9 @@ class MusicBrowser(BaseModule):
         self.db_path = kwargs.pop('db_path', '')
         self.font_family = kwargs.pop('font_family', 'Inter')
         self.artist_images_dir = kwargs.pop('artist_images_dir', '')
-    
+        
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
 
 
         # Llamar al constructor de la clase padre con los argumentos restantes

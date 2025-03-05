@@ -1,100 +1,108 @@
 import sys
 import os
+import subprocess
+import requests
+import logging
 from base_module import BaseModule, THEMES
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, 
                              QLabel, QLineEdit, QMessageBox, QApplication, QFileDialog, QTableWidget, 
                              QTableWidgetItem, QHeaderView)
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QColor
-import requests
-import musicbrainzngs
-import logging
-from datetime import datetime, date
-# Configurar logging
+from PyQt6.QtGui import QColor, QTextDocument
+
+
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class MusicReleasesModule(BaseModule):
+class MuspyArtistModule(BaseModule):
     def __init__(self, 
                  muspy_username=None, 
                  muspy_api_key=None, 
                  artists_file=None,
-                 parent = None,
-                 theme = 'Tokyo Night',
                  query_db_script_path=None,
-                 search_mbid_script_path=None, 
+                 search_mbid_script_path=None,
+                 lastfm_username=None,
+                 parent=None, 
+                 db_path='music_database.db',
+                 theme='Tokyo Night', 
                  *args, **kwargs):
+        """
+        Initialize the Muspy Artist Management Module
+        
+        Args:
+            muspy_username (str, optional): Muspy username
+            muspy_api_key (str, optional): Muspy API key
+            artists_file (str, optional): Path to artists file
+            query_db_script_path (str, optional): Path to MBID query script
+            search_mbid_script_path (str, optional): Path to MBID search script
+            parent (QWidget, optional): Parent widget
+            theme (str, optional): UI theme
+        """
         self.muspy_username = muspy_username
         self.muspy_api_key = muspy_api_key
         self.artists_file = artists_file
-        # Store script paths as instance attributes
         self.query_db_script_path = query_db_script_path
         self.search_mbid_script_path = search_mbid_script_path
+        self.lastfm_username = lastfm_username
+        self.db_path = db_path
 
-        # Configurar MusicBrainz
-        musicbrainzngs.set_useragent("MusicReleasesTracker", "1.0", "your_email@example.com")
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)        
         
         super().__init__(parent, theme)
 
-    def apply_theme(self, theme_name=None):
-        super().apply_theme(theme_name)
-
     def init_ui(self):
-        """Método para inicializar la interfaz de usuario"""
-        layout = QVBoxLayout(self)
+        """Initialize the user interface for Muspy artist management"""
+        # Main vertical layout
+        main_layout = QVBoxLayout(self)
 
-        # Agregar QTextEdit para mostrar resultados
-        self.results_text = QTextEdit()
-        self.results_text.setReadOnly(True)  # Hacer que sea solo de lectura
-        layout.addWidget(self.results_text)
-
-        # Fila de búsqueda manual
-        manual_search_layout = QHBoxLayout()
+        # Top section with search
+        top_layout = QHBoxLayout()
         
         self.artist_input = QLineEdit()
-        self.artist_input.setPlaceholderText("Introduce nombre del artista")
+        self.artist_input.setPlaceholderText("Enter artist name")
+        self.artist_input.returnPressed.connect(self.search_and_add_artist)
+        top_layout.addWidget(self.artist_input)
+
+        self.search_add_button = QPushButton("Search & Add to Muspy")
+        self.search_add_button.clicked.connect(self.search_and_add_artist)
+        top_layout.addWidget(self.search_add_button)
+
+        main_layout.addLayout(top_layout)
+
+        # Results area (will be replaced by table when getting releases)
+        self.results_text = QTextEdit()
+        self.results_text.setReadOnly(True)
+        main_layout.addWidget(self.results_text)
+
+        # Bottom buttons layout
+        bottom_layout = QHBoxLayout()
         
-        # Añadir evento de Enter para buscar
-        self.artist_input.returnPressed.connect(self.search_manual_artist)
-        manual_search_layout.addWidget(self.artist_input)
-
-        # Botón de búsqueda manual
-        self.search_button = QPushButton("Buscar Artista")
-        self.search_button.clicked.connect(self.search_manual_artist)
-        manual_search_layout.addWidget(self.search_button)
-
-        # Botón de guardar artista
-        self.save_artist_button = QPushButton("Guardar Artista")
-        self.save_artist_button.clicked.connect(
-            lambda: self.add_artist_to_muspy(
-                self.get_mbid_artist_searched(self.artist_input.text())
-            )
-        )
-        manual_search_layout.addWidget(self.save_artist_button)
-
-        layout.addLayout(manual_search_layout)
-
-        # Tabla para mostrar resultados
-        self.results_table = QTableWidget()
-        self.results_table.setColumnCount(6)  # Título, Fecha, Tipo, Sello, Botón 1, Botón 2, URL
-        self.results_table.setHorizontalHeaderLabels(["Título", "Fecha", "Tipo", "Sello Discográfico", "Acción 1", "Acción 2", "URL"])
-        self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.results_table)
-
-        # Botón para obtener releases de Muspy
-        self.muspy_releases_button = QPushButton("Obtener Releases de Muspy")
-        self.muspy_releases_button.clicked.connect(self.get_muspy_releases)
-        layout.addWidget(self.muspy_releases_button)
-
-        # Botón para cargar artistas desde archivo
-        self.load_artists_button = QPushButton("Cargar Artistas desde Archivo")
+        self.load_artists_button = QPushButton("Load Artists")
         self.load_artists_button.clicked.connect(self.load_artists_from_file)
-        layout.addWidget(self.load_artists_button)
+        bottom_layout.addWidget(self.load_artists_button)
+
+        self.sync_artists_button = QPushButton("Sync Artists")
+        self.sync_artists_button.clicked.connect(self.sync_artists_with_muspy)
+        bottom_layout.addWidget(self.sync_artists_button)
+
+        self.sync_lastfm_button = QPushButton("Sync Lastfm")
+        self.sync_lastfm_button.clicked.connect(self.sync_lastfm_muspy)
+        bottom_layout.addWidget(self.sync_lastfm_button)
+        
+        self.get_releases_button = QPushButton("Get Releases")
+        self.get_releases_button.clicked.connect(self.get_muspy_releases)
+        bottom_layout.addWidget(self.get_releases_button)
+
+        main_layout.addLayout(bottom_layout)
+
+
     def load_artists_from_file(self):
-        """Cargar artistas desde un archivo de texto"""
-        # Si no se ha especificado un archivo, abrir selector de archivos
+        """Load artists from a text file"""
         if not self.artists_file:
-            self.artists_file = QFileDialog.getOpenFileName(self, "Seleccionar archivo de artistas", "", "Text Files (*.txt)")[0]
+            self.artists_file = QFileDialog.getOpenFileName(self, "Select Artists File", "", "Text Files (*.txt)")[0]
         
         if not self.artists_file:
             return
@@ -103,81 +111,154 @@ class MusicReleasesModule(BaseModule):
             with open(self.artists_file, 'r', encoding='utf-8') as f:
                 self.artists = [line.strip() for line in f if line.strip()]
             
-            # Limpiar resultados anteriores
             self.results_text.clear()
-            self.results_text.append(f"Cargados {len(self.artists)} artistas desde {self.artists_file}\n")
+            self.results_text.append(f"Loaded {len(self.artists)} artists from {self.artists_file}\n")
 
         except Exception as e:
-            self.results_text.append(f"Error al cargar archivo: {e}\n")
+            self.results_text.append(f"Error loading file: {e}\n")
 
-    def search_manual_artist(self):
-        """Búsqueda manual de artista y sus releases"""
+
+    def search_and_add_artist(self):
+        """Search for artist MBID and add to Muspy"""
         artist_name = self.artist_input.text().strip()
         if not artist_name:
-            QMessageBox.warning(self, "Error", "Por favor introduce un nombre de artista")
+            QMessageBox.warning(self, "Error", "Please enter an artist name")
             return
 
-        # Buscar en MusicBrainz
-        mb_releases = self.search_musicbrainz_releases(artist_name)
+        # Ensure results_text is visible
+        self.results_text.show()
+
+        # Get MBID for the artist
+        mbid = self.get_mbid_artist_searched(artist_name)
         
-        # Mostrar resultados
-        self.display_releases(artist_name, mb_releases)
+        if not mbid:
+            QMessageBox.warning(self, "Error", f"Could not find MBID for {artist_name}")
+            return
+        
+        # Add to Muspy
+        self.add_artist_to_muspy(mbid, artist_name)
 
-    def search_artists_from_file(self):
-        """Buscar releases para artistas cargados desde archivo"""
-        # Verificar si hay artistas cargados
+    def sync_artists_with_muspy(self):
+        """Synchronize artists from file with Muspy"""
         if not hasattr(self, 'artists') or not self.artists:
-            QMessageBox.warning(self, "Error", "No hay artistas cargados. Primero cargue un archivo.")
+            QMessageBox.warning(self, "Error", "No artists loaded. First load a file.")
             return
 
-        # Limpiar resultados anteriores
         self.results_text.clear()
+        successful_adds = 0
 
-        # Procesar cada artista
         for artist_name in self.artists:
-            self.results_text.append(f"Procesando artista: {artist_name}\n")
-            
-            # Añadir a Muspy
-            #self.add_artist_to_muspy(artist_name)
-            
-            # Buscar releases en MusicBrainz
-            mb_releases = self.search_musicbrainz_releases(artist_name)
-            
-            # Mostrar resultados
-            self.display_releases(artist_name, mb_releases)
+            mbid = self.get_mbid_artist_searched(artist_name)
+            if self.add_artist_to_muspy(mbid):
+                successful_adds += 1
 
-    def add_artist_to_muspy(self, artist_name, mbid=None):
+        self.results_text.append(f"Synchronized {successful_adds}/{len(self.artists)} artists with Muspy\n")
+
+    def get_mbid_artist_searched(self, artist_name):
+        """
+        Retrieve the MusicBrainz ID for a given artist
+        
+        Args:
+            artist_name (str): Name of the artist to search
+        
+        Returns:
+            str or None: MusicBrainz ID of the artist
+        """
+        if artist_name is None:
+            return None
+        
+        try:
+            # First attempt: query existing database
+            if self.query_db_script_path:
+                # Add full absolute paths
+                full_db_path = os.path.expanduser(self.db_path)
+                full_script_path = os.path.expanduser(self.query_db_script_path)
+                
+                # Print out the actual paths being used
+                self.results_text.append(f"Attempting to run script with:")
+                self.results_text.append(f"Script Path: {full_script_path}")
+                self.results_text.append(f"DB Path: {full_db_path}")
+                self.results_text.append(f"Artist: {artist_name}")
+
+                mbid_result = subprocess.run(
+                    ['python', self.query_db_script_path, "--db", self.db_path, "--artist", artist_name, "--mbid"], 
+                    capture_output=True, 
+                    text=True
+                )
+                
+                # More detailed logging
+                self.results_text.append(f"Return Code: {mbid_result.returncode}")
+                self.results_text.append(f"STDOUT: {mbid_result.stdout}")
+                self.results_text.append(f"STDERR: {mbid_result.stderr}")
+                
+                if mbid_result.returncode == 0 and mbid_result.stdout.strip():
+                    return mbid_result.stdout.strip()
+
+                # # Log stdout and stderr for debugging
+                # if mbid_result.stdout:
+                #     self.results_text.append(f"Query DB Script STDOUT: {mbid_result.stdout.strip()}")
+                # if mbid_result.stderr:
+                #     self.results_text.append(f"Query DB Script STDERR: {mbid_result.stderr.strip()}")
+                
+                # if mbid_result.returncode == 0 and mbid_result.stdout.strip():
+                #     return mbid_result.stdout.strip()
+            
+            # Second attempt: search for MBID if first method fails
+            if self.search_mbid_script_path:
+                mbid_search_result = subprocess.run(
+                    ['python', self.search_mbid_script_path, "--db", self.db_path,"--artist", artist_name], 
+                    capture_output=True, 
+                    text=True
+                )
+                
+                # Log stdout and stderr for debugging
+                if mbid_search_result.stdout:
+                    self.results_text.append(f"MBID Search Script STDOUT: {mbid_search_result.stdout.strip()}")
+                if mbid_search_result.stderr:
+                    self.results_text.append(f"MBID Search Script STDERR: {mbid_search_result.stderr.strip()}")
+                
+                if mbid_search_result.returncode == 0 and mbid_search_result.stdout.strip():
+                    return mbid_search_result.stdout.strip()
+            
+            return None
+        
+        except subprocess.TimeoutExpired:
+            self.results_text.append("Script execution timed out")
+        except PermissionError:
+            self.results_text.append(f"Permission denied running script: {full_script_path}")
+        except FileNotFoundError:
+            self.results_text.append(f"Script or database file not found: {full_script_path} or {full_db_path}")
+        except Exception as e:
+            logging.error(f"Unexpected error getting MBID for {artist_name}: {e}")
+            self.results_text.append(f"Unexpected error: {e}")
+            return None
+ 
+    def add_artist_to_muspy(self, mbid=None, artist_name=None):
         """
         Add/Follow an artist to Muspy using their MBID or name
         
         Args:
-            artist_name (str): Name of the artist
-            mbid (str, optional): MusicBrainz ID of the artist. Defaults to None.
+            mbid (str, optional): MusicBrainz ID of the artist
+            artist_name (str, optional): Name of the artist for logging
         
         Returns:
             bool: True if artist was successfully added, False otherwise
         """
         if not self.muspy_username or not self.muspy_api_key:
-            self.results_text.append("Configuración de Muspy no disponible\n")
+            QMessageBox.warning(self, "Error", "Muspy configuration not available")
             return False
 
         try:
+            # Ensure results_text is visible and clear
+            self.results_text.show()
+            self.results_text.clear()
+
             # Determine the URL based on whether MBID is provided
             if mbid:
                 # Follow a specific artist by MBID
                 url = f"https://muspy.com/api/1/artists/{self.muspy_username}/{mbid}"
                 method = 'PUT'
                 data = {}
-            else:
-                # Import artists via last.fm or other method (requires modify the code)
-                url = f"https://muspy.com/api/1/artists/{self.muspy_username}"
-                method = 'PUT'
-                data = {
-                    'import': 'last.fm',  # or adjust as needed
-                    'username': self.muspy_username,
-                    'count': 500,
-                    'period': 'overall'
-                }
 
             headers = {
                 'Authorization': f'Token {self.muspy_api_key}',
@@ -191,100 +272,70 @@ class MusicReleasesModule(BaseModule):
                 response = requests.post(url, headers=headers, json=data)
             
             if response.status_code in [200, 201]:
-                self.results_text.append(f"Artista {artist_name} añadido a Muspy\n")
+                message = f"Artist {artist_name or 'Unknown'} added to Muspy"
+                self.results_text.append(message)
+                QMessageBox.information(self, "Success", message)
                 return True
             else:
-                self.results_text.append(f"No se pudo añadir {artist_name} a Muspy: {response.text}\n")
+                message = f"Could not add {artist_name or 'Unknown'} to Muspy: {response.text}"
+                self.results_text.append(message)
+                QMessageBox.warning(self, "Error", message)
                 return False
         except Exception as e:
-            self.results_text.append(f"Error añadiendo a Muspy: {e}\n")
+            message = f"Error adding to Muspy: {e}"
+            QMessageBox.warning(self, "Error", message)
             return False
 
-    def get_mbid_artist_searched(self, artist_name):
-        """
-        Retrieve the MusicBrainz ID for a given artist
-        
-        Args:
-            artist_name (str): Name of the artist to search
-        
-        Returns:
-            str or None: MusicBrainz ID of the artist
-        """
-        
-        if artist_name is None:
-            return None
-        
-        try:
-            # First attempt: query existing database
-            mbid_result = subprocess.run(
-                ['python', self.query_db_script_path, artist_name, "--mbid"], 
-                capture_output=True, 
-                text=True
-            )
-            
-            if mbid_result.returncode == 0 and mbid_result.stdout.strip():
-                return mbid_result.stdout.strip()
-            
-            # Second attempt: search for MBID if first method fails
-            mbid_search_result = subprocess.run(
-                ['python', self.search_mbid_script_path, "--artist", artist_name], 
-                capture_output=True, 
-                text=True
-            )
-            
-            if mbid_search_result.returncode == 0 and mbid_search_result.stdout.strip():
-                return mbid_search_result.stdout.strip()
-            
-            return artist_name
-        
-        except Exception as e:
-            logging.error(f"Error getting MBID for {artist_name}: {e}")
-            return None
-
-
-
-    def search_musicbrainz_releases(self, artist_name):
-        """Buscar próximos releases en MusicBrainz"""
-        try:
-            # Buscar ID del artista
-            result = musicbrainzngs.search_artists(artist=artist_name)
-            
-            if not result['artist-list']:
-                QMessageBox.warning(self, "Error", f"Artista {artist_name} no encontrado en MusicBrainz")
-                return []
-
-            artist_id = result['artist-list'][0]['id']
-
-            # Buscar releases
-            releases = musicbrainzngs.search_releases(artist=artist_name)
-            
-            formatted_releases = []
-            for release in releases.get('release-list', []):
-                # Obtener sello discográfico
-                labels = [label.get('name', 'Desconocido') for label in release.get('label-info-list', [])]
-                
-                formatted_releases.append({
-                    'title': release.get('title', 'Título desconocido'),
-                    'date': release.get('date', 'Fecha no confirmada'),
-                    'type': release.get('release-group', {}).get('type', 'Tipo desconocido'),
-                    'label': ', '.join(labels) if labels else 'Sello no especificado',
-                    'url': release.get('url-rels', [{}])[0].get('target', '') if release.get('url-rels') else ''
-                })
-            
-            return formatted_releases
-
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Error buscando en MusicBrainz: {e}")
-            return []
-
-    def get_muspy_releases(self):
-        """Obtener releases de Muspy para el usuario"""
-        if not self.muspy_username or not self.muspy_api_key:
-            QMessageBox.warning(self, "Error", "Configuración de Muspy no disponible")
+    def sync_lastfm_muspy(self):
+        """Synchronize Last.fm artists with Muspy"""
+        if not self.lastfm_username:
+            QMessageBox.warning(self, "Error", "Last.fm username not configured")
             return
 
         try:
-            url = f"https://muspy.com/api/1/releases/upcoming"
+            # Import artists via last.fm
+            url = f"https://muspy.com/api/1/artists/{self.muspy_username}"
+            method = 'PUT'
+            data = {
+                'import': 'last.fm',
+                'username': self.lastfm_username,
+                'count': 10,
+                'period': 'overall'
+            }
+
+            headers = {
+                'Authorization': f'Token {self.muspy_api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Use the appropriate request method
+            if method == 'PUT':
+                response = requests.put(url, headers=headers, json=data)
+            else:
+                response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code in [200, 201]:
+                self.results_text.append(f"Synchronized artists from Last.fm account {self.lastfm_username}\n")
+                return True
+            else:
+                self.results_text.append(f"Could not sync Last.fm artists: {response.text}\n")
+                return False
+        except Exception as e:
+            self.results_text.append(f"Error syncing with Muspy: {e}\n")
+            return False
+
+    def get_muspy_releases(self):
+        """
+        Retrieve upcoming releases from Muspy for the current user
+        
+        Displays releases in a QTableWidget
+        """
+        if not self.muspy_username or not self.muspy_api_key:
+            QMessageBox.warning(self, "Error", "Muspy configuration not available")
+            return
+
+        try:
+            url = "https://muspy.com/api/1/releases/upcoming"
             headers = {
                 'Authorization': f'Token {self.muspy_api_key}',
                 'Content-Type': 'application/json'
@@ -294,97 +345,72 @@ class MusicReleasesModule(BaseModule):
             
             if response.status_code == 200:
                 releases = response.json()
-                self.results_text.clear()
                 
                 if not releases:
-                    self.results_text.append("No hay releases pendientes en Muspy\n")
+                    QMessageBox.information(self, "No Releases", "No upcoming releases in Muspy")
                     return
                 
-                for release in releases:
-                    release_info = (
-                        f"Artista: {release.get('artist', 'Desconocido')}\n"
-                        f"Título: {release.get('title', 'Sin título')}\n"
-                        f"Fecha: {release.get('date', 'Sin fecha')}\n"
-                        f"Tipo: {release.get('type', 'Desconocido')}\n"
-                        "---\n"
-                    )
-                    self.results_text.append(release_info)
+                # Display releases in table
+                self.display_releases_table(releases)
             else:
-                self.results_text.append(f"Error obteniendo releases: {response.text}\n")
+                QMessageBox.warning(self, "Error", f"Error retrieving releases: {response.text}")
         
         except Exception as e:
-            self.results_text.append(f"Error de conexión con Muspy: {e}\n")
+            QMessageBox.warning(self, "Connection Error", f"Connection error with Muspy: {e}")
 
 
-    def display_releases(self, artist_name, releases):
-        """Mostrar releases en la tabla"""
-        # Limpiar tabla existente
-        self.results_table.setRowCount(0)
+    def display_releases_table(self, releases):
+        """
+        Display releases in a QTableWidget for better rendering
+        """
+        # First, clear any existing table
+        for i in reversed(range(self.layout().count())): 
+            item = self.layout().itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None and isinstance(widget, QTableWidget):
+                    self.layout().removeItem(item)
+                    widget.deleteLater()
 
-        if not releases:
-            QMessageBox.information(self, "Sin Resultados", f"No se encontraron releases para {artist_name}")
-            return
-
-        # Configurar número de filas
-        self.results_table.setRowCount(len(releases))
-
-        # Fecha actual para comparación
-        today = date.today()
-
+        # Create the table
+        table = QTableWidget()
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(['Artist', 'Disambiguation', 'Title', 'Date', 'Type'])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # Configure number of rows
+        table.setRowCount(len(releases))
+        
+        # Fill the table
         for row, release in enumerate(releases):
-            # Título
-            titulo_item = QTableWidgetItem(release.get('title', 'Sin título'))
+            artist = release.get('artist', {})
             
-            # Fecha
-            fecha_str = release.get('date', 'Sin fecha')
-            fecha_item = QTableWidgetItem(fecha_str)
-            
-            # Tipo
-            tipo_item = QTableWidgetItem(release.get('type', 'Desconocido'))
-            
-            # Sello discográfico
-            sello_item = QTableWidgetItem(release.get('label', 'Sello no especificado'))
-            
-            # Verificar si la fecha es futura para resaltar
-            try:
-                if fecha_str != 'Sin fecha':
-                    release_date = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                    if release_date > today:
-                        # Resaltar en verde los no publicados
-                        titulo_item.setBackground(QColor(200, 255, 200))
-                        fecha_item.setBackground(QColor(200, 255, 200))
-                        tipo_item.setBackground(QColor(200, 255, 200))
-                        sello_item.setBackground(QColor(200, 255, 200))
-            except ValueError:
-                # Manejar fechas con formato no esperado
-                pass
+            # Create items for each column
+            table.setItem(row, 0, QTableWidgetItem(artist.get('name', 'Unknown')))
+            table.setItem(row, 1, QTableWidgetItem(artist.get('disambiguation', '')))
+            table.setItem(row, 2, QTableWidgetItem(release.get('title', 'Untitled')))
+            table.setItem(row, 3, QTableWidgetItem(release.get('date', 'No date')))
+            table.setItem(row, 4, QTableWidgetItem(release.get('type', 'Unknown')))
+        
+        # Hide the text edit and add the table to the layout
+        self.results_text.hide()
+        # Insert the table just above the bottom buttons
+        self.layout().insertWidget(self.layout().count() - 1, table)
+        return table
 
-            # Botones de acción (por definir)
-            accion1_item = QTableWidgetItem("Acción 1")
-            accion2_item = QTableWidgetItem("Acción 2")
-            
-            # Botón para abrir URL
-            url_item = QTableWidgetItem("Abrir URL")
 
-            # Añadir items a la tabla
-            self.results_table.setItem(row, 0, titulo_item)
-            self.results_table.setItem(row, 1, fecha_item)
-            self.results_table.setItem(row, 2, tipo_item)
-            self.results_table.setItem(row, 3, sello_item)
-            self.results_table.setItem(row, 4, accion1_item)
-            self.results_table.setItem(row, 5, accion2_item)
-            self.results_table.setItem(row, 6, url_item)
 
 def main():
-    """Función principal para ejecutar la aplicación"""
+    """Main function to run the Muspy Artist Management Module"""
     app = QApplication(sys.argv)
     
-    # Configurar argumentos
+    # Parse command-line arguments
     muspy_username = None
     muspy_api_key = None
     artists_file = None
-    
-    # Procesar argumentos de línea de comandos
+    query_db_script_path = None
+    search_mbid_script_path = None
+    db_path = None
     for arg in sys.argv[1:]:
         if arg.startswith('--muspy-username='):
             muspy_username = arg.split('=')[1]
@@ -396,14 +422,20 @@ def main():
             query_db_script_path = arg.split('=')[1]
         elif arg.startswith('--search-mbid-script-path='):
             search_mbid_script_path = arg.split('=')[1]
+        elif arg.startswith('--lastfm-username='):
+            lastfm_username = arg.split('=')[1]
+        elif arg.startswith('--db-path='):
+            db_path = arg.split('=')[1]
 
-    # Crear instancia del módulo
-    module = MusicReleasesModule(
+    # Create module instance
+    module = MuspyArtistModule(
         muspy_username=muspy_username, 
         muspy_api_key=muspy_api_key,
         artists_file=artists_file,
         query_db_script_path=query_db_script_path,
-        search_mbid_script_path=search_mbid_script_path
+        search_mbid_script_path=search_mbid_script_path,
+        lastfm_username=lastfm_username,
+        db_path=db_path
     )
     module.show()
     
@@ -411,3 +443,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+    

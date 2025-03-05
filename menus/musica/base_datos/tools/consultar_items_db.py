@@ -12,6 +12,137 @@ class MusicDatabaseQuery:
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
 
+    def get_mbid_by_album_artist(self, artist, album):
+        """
+        Obtiene el MBID de un álbum por artista
+        
+        :param artist: Nombre del artista
+        :param album: Nombre del álbum
+        :return: MBID del álbum o None si no se encuentra
+        """
+        query = """
+        SELECT mbid FROM albums 
+        JOIN artists ON albums.artist_id = artists.id 
+        WHERE artists.name = ? AND albums.name = ?
+        """
+        self.cursor.execute(query, (artist, album))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+
+    def get_mbid_by_album_track(self, album, track):
+        """
+        Obtiene el MBID de una canción en un álbum
+        
+        :param album: Nombre del álbum
+        :param track: Nombre de la canción
+        :return: MBID de la canción o None si no se encuentra
+        """
+        query = """
+        SELECT songs.mbid FROM songs 
+        JOIN albums ON songs.album_id = albums.id 
+        WHERE albums.name = ? AND songs.title = ?
+        """
+        self.cursor.execute(query, (album, track))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+
+    def get_album_links(self, artist, album):
+        """
+        Obtiene los links de servicios para un álbum
+        
+        :param artist: Nombre del artista
+        :param album: Nombre del álbum
+        :return: Diccionario con links de servicios
+        """
+        query = """
+        SELECT 
+            albums.spotify_url, 
+            albums.youtube_url, 
+            albums.musicbrainz_url, 
+            albums.discogs_url, 
+            albums.wikipedia_url
+        FROM albums 
+        WHERE albums.name = ?
+        """
+        self.cursor.execute(query, (album,))
+        result = self.cursor.fetchone()
+        
+        if result:
+            links = {
+                'spotify': result[0],
+                'youtube': result[1],
+                'musicbrainz': result[2],
+                'discogs': result[3],
+                'wikipedia': result[4]
+            }
+            return {k: v for k, v in links.items() if v}
+        return None
+
+
+    def get_track_links(self, album, track, services=None):
+        """
+        Obtiene los links de servicios para una canción
+        
+        :param album: Nombre del álbum
+        :param track: Nombre de la canción
+        :param services: Lista de servicios específicos (opcional)
+        :return: Diccionario con links de servicios
+        """
+        query = """
+        SELECT 
+            song_links.spotify_url, 
+            song_links.youtube_url,
+            song_links.musicbrainz_url,
+            song_links.lastfm_url
+        FROM songs 
+        JOIN song_links ON songs.id = song_links.song_id
+        WHERE songs.album = ? AND songs.title = ?
+        """
+        self.cursor.execute(query, (album, track))
+        result = self.cursor.fetchone()
+        
+        if result:
+            all_links = {
+                'spotify': result[0],
+                'youtube': result[1],
+                'musicbrainz': result[2],
+                'lastfm': result[3]
+            }
+            
+            # Si se especifican servicios, filtrar
+            if services:
+                links = {service: all_links.get(service) for service in services if service in all_links}
+                return {k: v for k, v in links.items() if v}
+            
+            return {k: v for k, v in all_links.items() if v}
+        return None
+
+    def get_album_wiki(self, artist, album):
+        """
+        Obtiene el contenido de Wikipedia para un álbum
+        
+        :param artist: Nombre del artista
+        :param album: Nombre del álbum
+        :return: Contenido de Wikipedia o None
+        """
+        query = """
+        SELECT albums.wikipedia_content 
+        FROM albums 
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE artists.name = ? AND albums.name = ?
+        """
+        self.cursor.execute(query, (artist, album))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+
+    # Resto de métodos de la clase original...
+
+    def close(self):
+        """
+        Cierra la conexión con la base de datos
+        """
+        self.conn.close()
+
     def get_artist_mbid(self, artist_name):
         """
         Obtiene el MBID de un artista
@@ -187,6 +318,23 @@ def main():
 
     try:
         db = MusicDatabaseQuery(args.db)
+        # Nueva funcionalidad de obtención de MBID
+        if args.mbid and args.artist and args.album:
+            print(json.dumps(db.get_mbid_by_album_artist(args.artist, args.album)))
+        
+        if args.mbid and args.album and args.song:
+            print(json.dumps(db.get_mbid_by_album_track(args.album, args.song)))
+        
+        # Nueva funcionalidad de obtención de links
+        if args.links is not None and args.artist and args.album:
+            print(json.dumps(db.get_album_links(args.artist, args.album)))
+        
+        if args.links is not None and args.album and args.song:
+            print(json.dumps(db.get_track_links(args.album, args.song, args.links)))
+        
+        # Nueva funcionalidad de obtención de wiki de álbum
+        if args.wiki and args.artist and args.album:
+            print(db.get_album_wiki(args.artist, args.album))
 
         if args.mbid and args.artist:
             print(json.dumps(db.get_artist_mbid(args.artist)))
