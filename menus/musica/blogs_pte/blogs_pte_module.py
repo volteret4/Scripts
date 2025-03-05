@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from base_module import BaseModule, THEME
+from base_module import BaseModule, THEMES
 import logging
 import os
 from pathlib import Path
@@ -809,7 +809,7 @@ if __name__ == "__main__":
     
     # Add multiple playlist manager modules
     module1 = PlaylistManagerModule(pending_dir="PENDIENTE1", listened_dir="ESCUCHADO1")
-    module2 = PlaylistManagerModule(pending_dir="PENDIENTE2", listened_dir="ESCUCHADO2")
+    #module2 = PlaylistManagerModule(pending_dir="PENDIENTE2", listened_dir="ESCUCHADO2")
     
     container.add_module(module1)
     container.add_module(module2)

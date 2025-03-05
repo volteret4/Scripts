@@ -3,28 +3,43 @@ import requests
 import base64
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import pylast
 import argparse
+import logging
 
-# Configurar cliente Spotify
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    filename='music_link_retrieval.log')
+
 def configure_spotify(client_id, client_secret):
-    return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
-        client_id=client_id,
-        client_secret=client_secret
-    ))
+    """Safely configure Spotify client with error handling"""
+    try:
+        return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+            client_id=client_id,
+            client_secret=client_secret
+        ))
+    except Exception as e:
+        logging.error(f"Failed to configure Spotify client: {e}")
+        raise
 
-# Configurar cliente Last.fm
 def configure_lastfm(api_key, api_secret):
-    return pylast.LastFMNetwork(
-        api_key=api_key,
-        api_secret=api_secret
-    )
+    """Safely configure Last.fm client with error handling"""
+    try:
+        return pylast.LastFMNetwork(
+            api_key=api_key,
+            api_secret=api_secret
+        )
+    except Exception as e:
+        logging.error(f"Failed to configure Last.fm client: {e}")
+        raise
+
 
 def crear_tabla_song_links(db_path):
-    """Crear una tabla para almacenar los enlaces de las canciones"""
+    """Create song links table with comprehensive schema"""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
@@ -35,7 +50,10 @@ def crear_tabla_song_links(db_path):
         spotify_url TEXT,
         spotify_id TEXT,
         lastfm_url TEXT,
-        links_updated TIMESTAMP,
+        links_status TEXT DEFAULT 'pending',
+        first_attempt TIMESTAMP,
+        last_attempt TIMESTAMP,
+        attempts_count INTEGER DEFAULT 0,
         FOREIGN KEY (song_id) REFERENCES songs (id)
     )
     ''')
@@ -44,36 +62,27 @@ def crear_tabla_song_links(db_path):
     conn.close()
 
 def buscar_en_spotify(sp, titulo, artista, album=None):
-    """Buscar una canción en Spotify y devolver su URL"""
-    try:
-        # Construir una consulta de búsqueda
-        query = f"track:{titulo} artist:{artista}"
-        if album:
-            query += f" album:{album}"
-        
-        # Realizar la búsqueda
-        results = sp.search(q=query, type='track', limit=1)
-        
-        # Verificar si se encontraron resultados
-        if results['tracks']['items']:
-            track = results['tracks']['items'][0]
-            return {
-                'spotify_url': track['external_urls']['spotify'],
-                'spotify_id': track['id']
-            }
-        else:
-            # Intentar una búsqueda más simple si no se encontraron resultados
-            results = sp.search(q=f"{titulo} {artista}", type='track', limit=1)
+    """Enhanced Spotify search with multiple fallback strategies"""
+    search_queries = [
+        f"track:{titulo} artist:{artista}",  # Exact match
+        f"{titulo} {artista}",  # Relaxed match
+        titulo  # Last resort
+    ]
+    
+    for query in search_queries:
+        try:
+            results = sp.search(q=query, type='track', limit=1)
+            
             if results['tracks']['items']:
                 track = results['tracks']['items'][0]
                 return {
                     'spotify_url': track['external_urls']['spotify'],
                     'spotify_id': track['id']
                 }
-            return None
-    except Exception as e:
-        print(f"Error al buscar en Spotify: {e}")
-        return None
+        except Exception as e:
+            logging.warning(f"Spotify search error with query '{query}': {e}")
+    
+    return None
 
 def buscar_en_lastfm(network, titulo, artista):
     """Buscar una canción en Last.fm y devolver su URL"""
@@ -86,16 +95,16 @@ def buscar_en_lastfm(network, titulo, artista):
         return None
 
 def actualizar_song_links(db_path, sp, network, limit=None):
-    """Obtener enlaces para las canciones en la base de datos"""
+    """Obtener y actualizar enlaces para canciones"""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Obtener todas las canciones que no tienen enlaces o que no se han actualizado recientemente
+    # Modificar consulta para buscar solo canciones sin enlaces
     cursor.execute('''
     SELECT s.id, s.title, s.artist, s.album
     FROM songs s
     LEFT JOIN song_links sl ON s.id = sl.song_id
-    WHERE sl.id IS NULL OR sl.links_updated < datetime('now', '-30 day')
+    WHERE sl.id IS NULL
     ''')
     
     canciones = cursor.fetchall()
@@ -105,8 +114,8 @@ def actualizar_song_links(db_path, sp, network, limit=None):
     total_canciones = len(canciones)
     print(f"Se procesarán {total_canciones} canciones" + (f" (limitado a {limit})" if limit else ""))
     
-    for i, (song_id, titulo, artista, album) in enumerate(canciones):
-        print(f"Procesando {i+1}/{total_canciones}: {artista} - {titulo}")
+    for i, (song_id, titulo, artista, album) in enumerate(canciones, 1):
+        print(f"Procesando {i}/{total_canciones}: {artista} - {titulo}")
         
         # Buscar en Spotify
         spotify_info = buscar_en_spotify(sp, titulo, artista, album)
@@ -116,31 +125,16 @@ def actualizar_song_links(db_path, sp, network, limit=None):
         # Buscar en Last.fm
         lastfm_url = buscar_en_lastfm(network, titulo, artista)
         
-        # Primero verificar si existe un registro para esta canción
-        cursor.execute('SELECT id FROM song_links WHERE song_id = ?', (song_id,))
-        existing_record = cursor.fetchone()
-        
-        if existing_record:
-            # Actualizar registro existente
+        # Solo insertar si al menos un enlace está disponible
+        if spotify_url or lastfm_url:
             cursor.execute('''
-            UPDATE song_links 
-            SET spotify_url = ?, 
-                spotify_id = ?,
-                lastfm_url = ?,
-                links_updated = datetime('now')
-            WHERE song_id = ?
-            ''', (spotify_url, spotify_id, lastfm_url, song_id))
-        else:
-            # Insertar nuevo registro
-            cursor.execute('''
-            INSERT INTO song_links (song_id, spotify_url, spotify_id, lastfm_url, links_updated)
-            VALUES (?, ?, ?, ?, datetime('now'))
+            INSERT INTO song_links (song_id, spotify_url, spotify_id, lastfm_url)
+            VALUES (?, ?, ?, ?)
             ''', (song_id, spotify_url, spotify_id, lastfm_url))
+            
+            conn.commit()
         
-        conn.commit()
-        
-        # Pausar brevemente para respetar los límites de tasa de las APIs
-        time.sleep(0.5)
+        time.sleep(0.5)  # Respetar límites de tasa
     
     conn.close()
     print("Proceso completado.")

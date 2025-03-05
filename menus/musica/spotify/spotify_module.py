@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                             QLineEdit, QListWidget, QComboBox, QMessageBox,
                             QListWidgetItem, QSplitter, QLabel, QGroupBox)
 from PyQt6.QtCore import Qt
-from base_module import BaseModule
+from base_module import BaseModule, THEMES
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from typing import Dict, List
@@ -13,9 +13,8 @@ import traceback
 import json
 
 class SpotifyPlaylistManager(BaseModule):
-    def __init__(self, client_id: str, client_secret: str, cache_path: str = None, force_update: str = False):
-        super().__init__()
-        
+    def __init__(self, client_id: str, client_secret: str, cache_path: str = None, force_update: str = False, parent=None, theme='Tokyo Night'):
+        super().__init__(parent, theme)        
         if cache_path is None:
             cache_path = str(Path.home() / ".cache" / "spotify_token.txt")
         
@@ -35,6 +34,9 @@ class SpotifyPlaylistManager(BaseModule):
         self.init_ui()
         self.load_playlists()
 
+
+    def apply_theme(self, theme_name=None):
+        super().apply_theme(theme_name)
 
     def setup_spotify(self, client_id: str, client_secret: str, cache_path: str):
         """Configurar cliente de Spotify con manejo de token"""

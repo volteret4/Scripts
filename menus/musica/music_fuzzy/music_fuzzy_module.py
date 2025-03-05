@@ -12,7 +12,7 @@ from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize, QDate
 import subprocess
 import importlib.util
-from base_module import BaseModule, THEME  # Importar la clase base
+from base_module import BaseModule, THEMES  # Importar la clase base
 import glob
 import random
 import urllib.parse
@@ -30,8 +30,8 @@ class GroupedListItem(QListWidgetItem):
             font.setBold(True)
             font.setPointSize(font.pointSize() + 2)
             self.setFont(font)
-            self.setBackground(QColor(THEME['secondary_bg']))
-            self.setForeground(QColor(THEME['accent']))
+            self.setBackground(QColor(THEMES['secondary_bg']))
+            self.setForeground(QColor(THEMES['accent']))
     pass
 
 class SearchParser:
@@ -170,15 +170,16 @@ class SearchParser:
         }
 
 class MusicBrowser(BaseModule):
-    def __init__(self, parent=None, **kwargs):
+    def __init__(self, parent=None, theme='Tokyo Night', **kwargs):
         # Extraer los argumentos específicos de MusicBrowser
         self.db_path = kwargs.pop('db_path', '')
         self.font_family = kwargs.pop('font_family', 'Inter')
         self.artist_images_dir = kwargs.pop('artist_images_dir', '')
+    
 
 
         # Llamar al constructor de la clase padre con los argumentos restantes
-        super().__init__(parent=parent, **kwargs)
+        super().__init__(parent=parent, theme=theme, **kwargs)
         
         # Inicializar componentes específicos de MusicBrowser
         self.search_parser = SearchParser()
@@ -192,7 +193,7 @@ class MusicBrowser(BaseModule):
 
         # Contenedor superior
         top_container = QWidget()
-        top_container.setMaximumHeight(150)  # Aumentado para acomodar los nuevos controles
+        top_container.setMaximumHeight(110)  # Aumentado para acomodar los nuevos controles
         top_layout = QVBoxLayout(top_container)
         top_layout.setSpacing(5)
         
@@ -282,6 +283,8 @@ class MusicBrowser(BaseModule):
             '</span>'
         )
         legend_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        legend_label.setWordWrap(True)  # Permite que el texto se ajuste a múltiples líneas
+        legend_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         top_layout.addWidget(legend_label)
 
         layout.addWidget(top_container)
@@ -311,7 +314,7 @@ class MusicBrowser(BaseModule):
         images_container = QWidget()
         images_layout = QHBoxLayout(images_container)
         images_layout.setSpacing(10)
-        images_layout.setContentsMargins(5, 5, 5, 5)
+        images_layout.setContentsMargins(45, 5, 45, 5)
         images_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         # Cover del álbum
@@ -321,6 +324,10 @@ class MusicBrowser(BaseModule):
         self.cover_label.setStyleSheet("border: 1px solid #333;")
         images_layout.addWidget(self.cover_label)
         
+        # Añadir margen entre las imagenes
+        images_layout.addSpacing(60)  # Añade un espacio fijo de 20 píxeles
+
+
         # Imagen del artista
         self.artist_image_label = QLabel()
         self.artist_image_label.setFixedSize(200, 200)
@@ -334,6 +341,8 @@ class MusicBrowser(BaseModule):
         buttons_layout = QVBoxLayout(buttons_container)
         buttons_layout.setSpacing(10)
         buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+
         
         # Botón para enviar a Spotify
         self.spotify_button = QPushButton("Enviar a Spotify")

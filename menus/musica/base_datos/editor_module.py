@@ -9,12 +9,12 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                            QCheckBox, QDialog, QFileDialog, QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal, QDateTime
 
-from base_module import BaseModule
+from base_module import BaseModule, THEMES
 
 class DatabaseEditor(BaseModule):
     """Módulo para buscar y editar elementos en la base de datos de música."""
     
-    def __init__(self, db_path: str = "music_database.db"):
+    def __init__(self, db_path: str = "music_database.db", parent=None, theme='Tokyo Night'):
         # Definir atributos antes de llamar a super().__init__()
         self.db_path = db_path
         self.current_table = "songs"
@@ -23,7 +23,7 @@ class DatabaseEditor(BaseModule):
         self.search_results = []
         
         # Ahora llamamos a super().__init__() que internamente llamará a self.init_ui()
-        super().__init__()
+        super().__init__(parent, theme)
         
     def init_ui(self):
         """Inicializa la interfaz del módulo."""
@@ -115,6 +115,11 @@ class DatabaseEditor(BaseModule):
         # Inicializar campos de búsqueda para la tabla seleccionada
         self.change_table(self.current_table)
     
+    def apply_theme(self, theme_name=None):
+        # Optional: Override if you need custom theming beyond base theme
+        super().apply_theme(theme_name)
+
+
     def change_table(self, table_name: str):
         """Cambiar la tabla actual y actualizar los campos de búsqueda."""
         self.current_table = table_name

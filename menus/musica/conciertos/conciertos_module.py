@@ -491,7 +491,7 @@ class BandsintownFetcher(BaseAPIFetcher):
 
 
 class ConciertosModule(BaseModule):
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict = None, parent=None, theme='Tokyo Night'):
         # Configuración por defecto
         self.config = {
             "country_code": "ES",
@@ -514,8 +514,12 @@ class ConciertosModule(BaseModule):
         self.active_fetchers = 0
         
         # Llamamos al inicializador de la clase base
-        super().__init__()
+        super().__init__(parent, theme)
     
+    def apply_theme(self, theme_name=None):
+        super().apply_theme(theme_name)
+
+
     def __del__(self):
         """Método destructor para limpiar recursos"""
         # Detener cualquier fetcher activo
