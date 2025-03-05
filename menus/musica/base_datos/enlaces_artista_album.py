@@ -163,9 +163,12 @@ class MusicLinksManager:
         if 'mbid' not in album_columns:
             c.execute("ALTER TABLE albums ADD COLUMN mbid TEXT")
         
-        # Verificar la existencia de la tabla song_links
+        # Verificar la existencia de la tabla song_links y sus columnas
         c.execute("PRAGMA table_info(song_links)")
-        if not c.fetchall():
+        existing_song_link_columns = {col[1] for col in c.fetchall()}
+        
+        # Si la tabla no existe, crearla con todas las columnas necesarias
+        if not existing_song_link_columns:
             c.execute("""
                 CREATE TABLE IF NOT EXISTS song_links (
                     id INTEGER PRIMARY KEY,
@@ -180,6 +183,24 @@ class MusicLinksManager:
                     FOREIGN KEY(song_id) REFERENCES songs(id)
                 )
             """)
+        else:
+            # Si la tabla existe, añadir columnas faltantes
+            columns_to_add = {
+                'youtube_url': "ALTER TABLE song_links ADD COLUMN youtube_url TEXT",
+                'spotify_url': "ALTER TABLE song_links ADD COLUMN spotify_url TEXT",
+                'spotify_id': "ALTER TABLE song_links ADD COLUMN spotify_id TEXT",
+                'musicbrainz_url': "ALTER TABLE song_links ADD COLUMN musicbrainz_url TEXT",
+                'musicbrainz_recording_id': "ALTER TABLE song_links ADD COLUMN musicbrainz_recording_id TEXT",
+                'lastfm_url': "ALTER TABLE song_links ADD COLUMN lastfm_url TEXT",
+                'links_updated': "ALTER TABLE song_links ADD COLUMN links_updated TIMESTAMP"
+            }
+            
+            for column, alter_query in columns_to_add.items():
+                if column not in existing_song_link_columns:
+                    try:
+                        c.execute(alter_query)
+                    except sqlite3.OperationalError as e:
+                        self.logger.warning(f"Could not add column {column}: {e}")
         
         conn.commit()
         conn.close()
@@ -652,13 +673,55 @@ class MusicLinksManager:
         return n1_clean == n2_clean
     
 
+    def count_missing_mbids(self):
+        """
+        Cuenta los registros sin MBID en artistas, álbumes y canciones.
+        
+        Returns:
+            Dict con el número de registros sin MBID en cada tabla
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        missing_mbids = {
+            'artists': 0,
+            'albums': 0,
+            'songs': 0
+        }
+        
+        # Contar artistas sin MBID
+        c.execute("SELECT COUNT(*) FROM artists WHERE mbid IS NULL")
+        missing_mbids['artists'] = c.fetchone()[0]
+        
+        # Contar álbumes sin MBID
+        c.execute("SELECT COUNT(*) FROM albums WHERE mbid IS NULL")
+        missing_mbids['albums'] = c.fetchone()[0]
+        
+        # Contar canciones sin MBID (si la tabla existe)
+        tables = self._check_tables_exist()
+        if 'songs' in tables:
+            c.execute("SELECT COUNT(*) FROM songs WHERE mbid IS NULL")
+            missing_mbids['songs'] = c.fetchone()[0]
+        
+        conn.close()
+        return missing_mbids
+
+
+
     def update_missing_mbids(self):
         """
         Actualiza los MBID faltantes en artistas, álbumes y canciones.
         Prioriza obtener MBID antes que otros tipos de enlaces.
         """
+        before_mbids = self.count_missing_mbids()
+        self.logger.info("Missing MBIDs before update:")
+        for table, count in before_mbids.items():
+            self.logger.info(f"{table.capitalize()}: {count}")
+        
+        
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+
 
         # Actualizar MBID de artistas
         c.execute("SELECT id, name FROM artists WHERE mbid IS NULL")
@@ -715,7 +778,24 @@ class MusicLinksManager:
                 self.logger.error(f"Error finding MBID for song {title}: {e}")
 
         conn.close()
-
+        # Contar registros sin MBID después de la actualización
+        after_mbids = self.count_missing_mbids()
+        self.logger.info("Missing MBIDs after update:")
+        for table, count in after_mbids.items():
+            self.logger.info(f"{table.capitalize()}: {count}")
+            
+        # Calcular y registrar cuántos MBID se encontraron
+        mbids_found = {
+            table: before_count - after_count 
+            for table, (before_count, after_count) in zip(
+                before_mbids.keys(), 
+                zip(before_mbids.values(), after_mbids.values())
+            )
+        }
+        
+        self.logger.info("MBIDs found during update:")
+        for table, count in mbids_found.items():
+            self.logger.info(f"{table.capitalize()}: {count}")
 
     def _get_musicbrainz_artist_mbid(self, artist_name: str) -> Optional[str]:
         """Obtiene el MBID de un artista desde MusicBrainz"""
@@ -1063,7 +1143,14 @@ if __name__ == "__main__":
 
     if args.summary_only:
         counts = manager.get_table_counts()
+        missing_mbids = manager.count_missing_mbids()
+        
+        print("Table Record Counts:")
         for table, count in counts.items():
+            print(f"{table.capitalize()}: {count}")
+        
+        print("\nMissing MBIDs:")
+        for table, count in missing_mbids.items():
             print(f"{table.capitalize()}: {count}")
     else:
         manager.update_links(

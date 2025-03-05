@@ -37,18 +37,37 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 
-class MusicManagerModule(BaseModule):
+class BlogPlaylists(BaseModule):
     def __init__(self, **kwargs):
+        # Extract theme-related arguments
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', None)
+        
+        # Remove 'theme' if it exists to prevent passing it to the parent class
+        kwargs.pop('theme', None)
+        
+        # Set up directories BEFORE calling parent's __init__
         self.pending_dir = Path(kwargs.get('pending_dir', 'playlists/PENDIENTE'))
         self.listened_dir = Path(kwargs.get('listened_dir', 'playlists/ESCUCHADO'))
         self.local_dir = Path(kwargs.get('local_dir', 'playlists/locales'))
-        self.output_dir = kwargs.get('output_dir', str(self.pending_dir))
+        self.output_dir = kwargs.get('output_dir', 'playlists/output')
+        
+        # Call parent's __init__ with remaining kwargs
+        # Pass the selected theme explicitly
+        super().__init__(parent=None, theme=self.selected_theme)
+        
+        # Other initializations
         self.selected_blog = None
         self.worker = None
-        parent = None
-        theme = 'Tokyo Night'
-        super().__init__(parent, theme)
-
+        
+        # Ensure directories exist
+        self.pending_dir.mkdir(parents=True, exist_ok=True)
+        self.listened_dir.mkdir(parents=True, exist_ok=True)
+        self.local_dir.mkdir(parents=True, exist_ok=True)
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Initialize UI
+        self.init_ui()
 
     def apply_theme(self, theme_name=None):
         super().apply_theme(theme_name)
@@ -754,65 +773,3 @@ class PlaylistManager:
                         feed_dir,
                         month_key
                     )
-
-# def extract_music_urls(url):
-#     """
-#     Extrae las URLs de música (Bandcamp, SoundCloud, YouTube) del contenido HTML de la URL dada.
-#     """
-#     try:
-#         response = requests.get(url)
-#         content = response.text
-
-#         music_patterns = [
-#             r'"(bandcamp\.com/[^"]+)"',
-#             r'(https?://(?:www\.)?soundcloud\.com/[^\s"\'<>]+)',
-#             r'(https?://(?:www\.)?youtube\.com/embed/[^\s"\'<>]+)',
-#             r'(https?://(?:www\.)?youtube\.com/watch\?[^\s"\'<>]+)',
-#             r'(https?://(?:www\.)?youtu\.be/[^\s"\'<>]+)'
-#         ]
-
-#         music_urls = set()
-#         for pattern in music_patterns:
-#             matches = re.findall(pattern, content)
-#             for match in matches:
-#                 extracted_url = match[0] if isinstance(match, tuple) else match
-#                 if 'bandcamp.com' in extracted_url:
-#                     if extracted_url.startswith('//'):
-#                         extracted_url = 'https:' + extracted_url
-#                     extracted_url = extract_bandcamp_id(extracted_url)
-#                 else:
-#                     extracted_url = clean_youtube_url(extracted_url)
-#                 music_urls.add(extracted_url)
-
-#         return list(music_urls)
-
-#     except Exception as e:
-#         print(f"Error al extraer URLs: {e}")
-#         return [] 
-
-# def extract_bandcamp_id(url):
-#     """Extrae el ID de álbum/track de Bandcamp desde un iframe."""
-#     album_match = re.search(r'album=(\d+)', url)
-#     track_match = re.search(r'track=(\d+)', url)
-    
-#     if album_match:
-#         return f"https://bandcamp.com/album/{album_match.group(1)}"
-#     elif track_match:
-#         return f"https://bandcamp.com/track/{track_match.group(1)}"
-#     return url
-
-# def clean_youtube_url(url):
-#     """Normaliza la URL de YouTube para obtener el formato watch?v=."""
-#     parsed_url = urlparse(url)
-#     if 'youtube.com/embed/' in url:
-#         video_id = parsed_url.path.split('/')[-1]
-#         return f'https://youtube.com/watch?v={video_id}'
-#     if 'youtu.be' in url:
-#         video_id = parsed_url.path.lstrip('/')
-#         return f'https://youtube.com/watch?v={video_id}'
-#     if 'youtube.com/watch' in url:
-#         parsed_query = parse_qs(parsed_url.query)
-#         video_id = parsed_query.get('v', [''])[0]
-#         return f'https://youtube.com/watch?v={video_id}'
-#     return url
-

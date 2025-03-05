@@ -1,15 +1,48 @@
-import sys
 import os
 from typing import Dict
 import json
 from pathlib import Path
 import importlib.util
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, 
-                            QVBoxLayout, QTabWidget)
+                            QVBoxLayout, QTabWidget, QMessageBox)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 from base_module import BaseModule, THEMES
 import traceback
+import sys
+import argparse
+import logging
+
+
+
+def exception_hook(exc_type, exc_value, exc_traceback):
+    """Global exception handler to log unhandled exceptions"""
+    error_msg = "Uncaught exception:\n" + "".join(
+        traceback.format_exception(exc_type, exc_value, exc_traceback)
+    )
+    logging.critical(error_msg)
+    print(error_msg)  # Also print to console
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+# Ensure log directory exists
+log_dir = os.path.expanduser('~/.config/your_app_name/logs')
+os.makedirs(log_dir, exist_ok=True)
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(log_dir, 'application_debug.log'), mode='w'),
+        logging.StreamHandler()
+    ]
+)
+
+# Set the global exception hook
+sys.excepthook = exception_hook
+
+# Set the global exception hook
+sys.excepthook = exception_hook
 
 # Tema Tokyo Night (puedes personalizarlo o cargar desde config)
 THEME = {
@@ -57,7 +90,7 @@ class TabManager(QMainWindow):
         self.apply_theme(self.font_size)
 
     def load_modules(self):
-        """Carga los módulos desde la configuración."""
+        """Loads modules from configuration."""
         try:
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
@@ -70,14 +103,14 @@ class TabManager(QMainWindow):
                 module_args = module_config.get('args', {})
                 
                 try:
-                    # Cargar el módulo dinámicamente
-                    print(f"Intentando cargar módulo desde {module_path}\n")
+                    # Dynamically load the module
+                    print(f"Attempting to load module from {module_path}\n")
                     spec = importlib.util.spec_from_file_location(module_name, module_path)
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
                         
-                        # Buscar la clase principal del módulo
+                        # Find the main class of the module
                         main_class = None
                         for attr_name in dir(module):
                             attr = getattr(module, attr_name)
@@ -86,23 +119,25 @@ class TabManager(QMainWindow):
                                 break
                                 
                         if main_class:
-                            # Instanciar el módulo
+                            # Instantiate the module
                             module_instance = main_class(**module_args)
-
                     
-                            # Pasar referencia al TabManager
+                            # Pass reference to TabManager
                             if hasattr(module_instance, 'set_tab_manager'):
                                 module_instance.set_tab_manager(self)                           
 
-                            # Si es el editor de configuración, conectar la señal
+                            # If it's the config editor, connect the signals
                             if module_name == "Config Editor":
                                 module_instance.config_updated.connect(self.reload_application)
+                                
+                                # Connect the module theme changed signal
+                                module_instance.module_theme_changed.connect(self.change_module_theme)
                             
-                            # Añadir al gestor de pestañas
+                            # Add to tab manager
                             self.tab_widget.addTab(module_instance, module_name)
                             self.tabs[module_name] = module_instance
                         else:
-                            print(f"No se encontró una clase válida en el módulo {module_name}")
+                            print(f"    No valid class found in module {module_name}")
                             
                 except Exception as e:
                     print(f"Error loading module {module_name}: {e}")
@@ -112,7 +147,21 @@ class TabManager(QMainWindow):
             print(f"Error loading configuration: {e}")
             traceback.print_exc()
 
-
+    def change_module_theme(self, module_name, new_theme):
+        """
+        Change theme for a specific module or global theme
+        
+        Args:
+            module_name (str): Name of the module to change theme for, or 'global'
+            new_theme (str): New theme name
+        """
+        if module_name == 'global':
+            # If global theme, change all module themes
+            for module in self.tabs.values():
+                module.apply_theme(new_theme)
+        elif module_name in self.tabs:
+            # Change theme for specific module
+            self.tabs[module_name].apply_theme(new_theme)
 
 
     def apply_theme(self, font_size="14px"):
@@ -225,14 +274,25 @@ class TabManager(QMainWindow):
             # Reapply theme to TabManager
             self.apply_theme()
             
-            # Reapply theme to all modules
-            for module in self.tabs.values():
-                module.apply_theme(new_theme)
-            
-            # Update config file
+            # Check global theme configuration
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
             
+            # Determine if individual themes are enabled
+            enable_individual_themes = config.get('global_theme_config', {}).get('enable_individual_themes', True)
+            
+            # Reapply theme to modules
+            for module_name, module in self.tabs.items():
+                # If individual themes are disabled, or the module doesn't have a specific theme set
+                module_config = next((m for m in config['modules'] if m['name'] == module_name), None)
+                
+                if not enable_individual_themes or (module_config and 'tema_seleccionado' not in module_config.get('args', {})):
+                    module.apply_theme(new_theme)
+                else:
+                    # If individual themes are enabled and a specific theme is set, keep that theme
+                    module.apply_theme(module_config['args'].get('tema_seleccionado', new_theme))
+            
+            # Update config file
             config['tema_seleccionado'] = new_theme
             
             with open(self.config_path, 'w') as f:
@@ -266,29 +326,83 @@ class TabManager(QMainWindow):
                             method(*args, **kwargs)
                             return True
                         else:
-                            print(f"El atributo '{method_to_call}' no es una función en el módulo '{tab_name}'")
+                            print(f"    El atributo '{method_to_call}' no es una función en el módulo '{tab_name}'")
                     else:
-                        print(f"El módulo '{tab_name}' no tiene un método llamado '{method_to_call}'")
+                        print(f"    El módulo '{tab_name}' no tiene un método llamado '{method_to_call}'")
                 return True
         
-        print(f"No se encontró la pestaña '{tab_name}'")
+        print(f"   No se encontró la pestaña '{tab_name}'")
         return False
 
 
+
+
+
 def main():
-    import argparse
-    
+
+
     parser = argparse.ArgumentParser(description='Multi-Module Manager')
     parser.add_argument('config_path', help='Ruta al archivo de configuración JSON')
     parser.add_argument('--font', default='Inter', help='Fuente a usar en la interfaz')
     parser.add_argument('--font_size', default='12px', help='Tamaño de la Fuente a usar en la interfaz')
+    parser.add_argument('--log', type=str,
+                        choices=['true', 'false'],
+                        default=None,
+                        help='Habilitar logging detallado (true/false)')
     
     args = parser.parse_args()
+
+    # Load configuration to potentially override logging setting
+    try:
+        with open(args.config_path, 'r') as f:
+            config = json.load(f)
+        
+        # Determine logging state with multiple configuration options
+        if args.log is not None:
+            # CLI argument takes precedence
+            log_enabled = args.log.lower() == 'true'
+        else:
+            # Check for different logging configuration formats
+            logging_options = config.get('logging_options', ['true', 'false'])
+            logging_state = config.get('logging_state', 'false')
+            log_enabled = logging_state.lower() == 'true'
+
+    except Exception as e:
+        print(f"Error reading config: {e}")
+        log_enabled = False
+
+    # Configure logging if logging is enabled
+    if log_enabled:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),  # Print to console
+                logging.FileHandler('multi_module_manager.log')  # Log to file
+            ]
+        )
+        
+        class LoggerWriter:
+            def __init__(self, logger, level):
+                self.logger = logger
+                self.level = level
+                self.buffer = []
+
+            def write(self, message):
+                if message.strip():
+                    self.logger.log(self.level, message.rstrip())
+
+            def flush(self):
+                pass
+
+        sys.stdout = LoggerWriter(logging.getLogger('STDOUT'), logging.INFO)
+        sys.stderr = LoggerWriter(logging.getLogger('STDERR'), logging.ERROR)
     
     app = QApplication(sys.argv)
-    manager = TabManager(args.config_path, font_family=args.font)
+    manager = TabManager(args.config_path, font_family=args.font, font_size=args.font_size)
     manager.show()
     sys.exit(app.exec())
+
 
 if __name__ == '__main__':
     main()

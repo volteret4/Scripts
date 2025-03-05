@@ -14,6 +14,8 @@ from PyQt6.QtGui import QDesktopServices, QColor, QFont
 from base_module import BaseModule
 
 
+
+
 class ConcertEvent:
     """Clase para estandarizar eventos de conciertos de diferentes APIs"""
     def __init__(self, id: str, name: str, artist: str, date: str, venue: str, city: str, 
@@ -67,431 +69,10 @@ END:VCALENDAR
         return ical
 
 
-class BaseAPIFetcher(QThread):
-    """Clase base para los fetcheres de API"""
-    finished = pyqtSignal(object, str)  # Usar 'object' en lugar de List[ConcertEvent]
-    error = pyqtSignal(str)
-    
-    def __init__(self, country_code: str, artists_file: str):
-        super().__init__()
-        self.country_code = country_code
-        self.artists_file = artists_file
-        self.directorio_actual = os.path.dirname(os.path.abspath(self.artists_file))
-        self._is_running = True
-    
-    def stop(self):
-        """Método para detener el hilo correctamente"""
-        self._is_running = False
-        self.wait()  # Espera a que el hilo termine
-    
-    def get_artists_list(self) -> List[str]:
-        """Obtiene la lista de artistas del archivo"""
-        self.log(f"Intentando leer artistas desde: {self.artists_file}")
-        try:
-            with open(self.artists_file, 'r', encoding='utf-8') as f:
-                artistas = [line.strip() for line in f if line.strip()]
-                self.log(f"Artistas leídos: {len(artistas)}")
-                if artistas:
-                    self.log(f"Primeros 5 artistas: {artistas[:5]}")
-                    self.log(f"Último artista: {artistas[-1]}")
-                else:
-                    self.log("¡Advertencia! No se encontraron artistas en el archivo")
-                return artistas
-        except Exception as e:
-            error_msg = f"Error al leer archivo de artistas: {str(e)}"
-            self.log(error_msg)
-            self.error.emit(error_msg)
-            return []
-
-class TicketmasterFetcher(BaseAPIFetcher):
-    def __init__(self, api_key: str, country_code: str, artists_file: str):
-        super().__init__(country_code, artists_file)
-        self.api_key = api_key
-        
-    def run(self):
-        try:
-            # Obtener fechas
-            fecha_actual = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-            fecha_proxima = (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%dT%H:%M:%SZ')
-            
-            artistas_lista = self.get_artists_list()
-            if not artistas_lista:
-                self.error.emit("No se encontraron artistas en el archivo")
-                return
-            
-            # Obtener datos de la API de Ticketmaster
-            url = f"https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime={fecha_actual}&endDateTime={fecha_proxima}&countryCode={self.country_code}&apikey={self.api_key}"
-            
-            self.log(f"Realizando petición a Ticketmaster: {url}")
-            response = requests.get(url)
-            if response.status_code != 200:
-                self.error.emit(f"Error en la API de Ticketmaster: {response.status_code} - {response.text}")
-                return
-                
-            json_data = response.json()
-            
-            # Mostrar estadísticas de eventos devueltos por la API
-            total_eventos = len(json_data.get('_embedded', {}).get('events', []))
-            self.log(f"La API de Ticketmaster devolvió {total_eventos} eventos totales")
-            
-            if total_eventos > 0:
-                # Mostrar algunos nombres de eventos para verificar
-                event_names = [event['name'] for event in json_data.get('_embedded', {}).get('events', [])[:5]]
-                self.log(f"Ejemplos de eventos: {event_names}")
-            
-            # Filtrar los conciertos según los artistas
-            eventos_filtrados = []
-            artistas_encontrados = set()
-            
-            if '_embedded' in json_data and 'events' in json_data['_embedded']:
-                for event in json_data['_embedded']['events']:
-                    event_name = event['name']
-                    matched_artist = None
-                    
-                    for artista in artistas_lista:
-                        if self.artist_match(artista, event_name):
-                            matched_artist = artista
-                            artistas_encontrados.add(artista)
-                            break
-                    
-                    if matched_artist:
-                        # Crear un objeto ConcertEvent estandarizado
-                        venue_name = event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'Desconocido')
-                        city = event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'Desconocido')
-                        url = event.get('url', '')
-                        if not url and 'links' in event:
-                            url = next((link['url'] for link in event.get('links', {}).get('self', []) 
-                                    if link.get('method') == 'GET'), '')
-                        
-                        # Imagen del evento
-                        image_url = None
-                        if 'images' in event and event['images']:
-                            image_url = next((img['url'] for img in event['images'] 
-                                            if img.get('ratio') == '16_9' and img.get('width') > 500), None)
-                            if not image_url and event['images']:
-                                image_url = event['images'][0].get('url')
-                        
-                        concierto = ConcertEvent(
-                            id=event.get('id', ''),
-                            name=event.get('name', 'Sin nombre'),
-                            artist=matched_artist,
-                            date=event.get('dates', {}).get('start', {}).get('localDate', 'Sin fecha'),
-                            venue=venue_name,
-                            city=city,
-                            country=self.country_code,
-                            url=url,
-                            source="Ticketmaster",
-                            image_url=image_url
-                        )
-                        eventos_filtrados.append(concierto)
-                        self.log(f"¡Coincidencia encontrada! Evento: '{event['name']}' coincide con artista: '{matched_artist}'")
-                
-                # Mostrar estadísticas de coincidencias
-                self.log(f"Se encontraron coincidencias para {len(artistas_encontrados)} artistas de {len(artistas_lista)}")
-                if artistas_encontrados:
-                    self.log(f"Artistas con coincidencias: {list(artistas_encontrados)}")
-                
-                # Mostrar artistas sin coincidencias (primeros 10)
-                artistas_sin_coincidencia = set(artistas_lista) - artistas_encontrados
-                if artistas_sin_coincidencia:
-                    self.log(f"Ejemplos de artistas sin coincidencias: {list(artistas_sin_coincidencia)[:10]}")
-            else:
-                self.log("No se encontraron eventos en la respuesta de Ticketmaster")
-            
-            # Enviar los eventos encontrados
-            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Ticketmaster")
-                
-        except Exception as e:
-            import traceback
-            error_msg = f"Error durante la obtención de conciertos de Ticketmaster: {str(e)}\n{traceback.format_exc()}"
-            self.log(error_msg)
-            self.error.emit(error_msg)
-
-    # Implementa esta función de comparación en la clase BaseAPIFetcher
-    def artist_match(self, artist_name: str, event_name: str) -> bool:
-        """
-        Comprueba si un nombre de artista coincide con el nombre de un evento
-        usando diferentes estrategias para aumentar la probabilidad de coincidencia
-        """
-        artist_lower = artist_name.lower().strip()
-        event_lower = event_name.lower().strip()
-        
-        # Estrategia 1: Coincidencia exacta
-        if artist_lower == event_lower:
-            return True
-        
-        # Estrategia 2: El artista está en el nombre del evento
-        if artist_lower in event_lower:
-            # Verificar que sea una palabra completa (evita coincidencias parciales)
-            words = event_lower.split()
-            for i, word in enumerate(words):
-                # Eliminar signos de puntuación al principio o final de la palabra
-                word = word.strip(".,;:!?()[]{}")
-                if word == artist_lower:
-                    return True
-                # También verificar combinaciones de palabras (para artistas con nombres compuestos)
-                for j in range(1, min(5, len(words) - i)):  # Limitar a combinaciones de hasta 5 palabras
-                    phrase = " ".join(words[i:i+j])
-                    if phrase == artist_lower:
-                        return True
-        
-        # Estrategia 3: Comparación de palabras clave
-        artist_words = set(artist_lower.split())
-        event_words = set(event_lower.split())
-        # Si todas las palabras del nombre del artista están en el nombre del evento
-        # y el artista tiene al menos 2 palabras (para evitar falsos positivos con nombres cortos)
-        if len(artist_words) >= 2 and artist_words.issubset(event_words):
-            return True
-        
-        return False
-
-
-    def log(self, message: str):
-        """Envía mensaje de log desde el fetcher"""
-        print(f"[{self.__class__.__name__}] {message}")
-        # No podemos llamar directamente a QTextEdit desde un hilo
-        # Usamos la señal de error para mostrar mensajes informativos también
-        self.error.emit(f"[INFO] {message}")
-
-
-class SongkickFetcher(BaseAPIFetcher):
-    def __init__(self, api_key: str, country_code: str, artists_file: str):
-        super().__init__(country_code, artists_file)
-        self.api_key = api_key
-        
-    def run(self):
-        try:
-            artistas_lista = self.get_artists_list()
-            if not artistas_lista:
-                self.error.emit("No se encontraron artistas en el archivo")
-                return
-            
-            eventos_filtrados = []
-            
-            # Iterar por cada artista y buscar sus eventos
-            for artista in artistas_lista:
-                # 1. Primero buscar el ID del artista
-                search_url = f"https://api.songkick.com/api/3.0/search/artists.json?query={artista}&apikey={self.api_key}"
-                response = requests.get(search_url)
-                
-                if response.status_code != 200:
-                    self.error.emit(f"Error en la búsqueda de artista en Songkick: {response.status_code}")
-                    continue
-                
-                artist_data = response.json()
-                if not artist_data.get('resultsPage', {}).get('results', {}).get('artist', []):
-                    continue  # No se encontró el artista
-                
-                artist_id = artist_data['resultsPage']['results']['artist'][0]['id']
-                
-                # 2. Obtener los eventos del artista
-                events_url = f"https://api.songkick.com/api/3.0/artists/{artist_id}/calendar.json?apikey={self.api_key}"
-                response = requests.get(events_url)
-                
-                if response.status_code != 200:
-                    self.error.emit(f"Error al obtener eventos de Songkick: {response.status_code}")
-                    continue
-                
-                events_data = response.json()
-                events = events_data.get('resultsPage', {}).get('results', {}).get('event', [])
-                
-                # Filtrar por país si está especificado
-                for event in events:
-                    event_country = event.get('venue', {}).get('metroArea', {}).get('country', {}).get('code')
-                    
-                    if not self.country_code or event_country == self.country_code:
-                        concierto = ConcertEvent(
-                            id=str(event.get('id', '')),
-                            name=event.get('displayName', 'Sin nombre'),
-                            artist=artista,
-                            date=event.get('start', {}).get('date', 'Sin fecha'),
-                            venue=event.get('venue', {}).get('displayName', 'Desconocido'),
-                            city=event.get('venue', {}).get('metroArea', {}).get('displayName', 'Desconocido'),
-                            country=event_country or 'Desconocido',
-                            url=event.get('uri', ''),
-                            source="Songkick"
-                        )
-                        eventos_filtrados.append(concierto)
-            
-            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Songkick")
-            
-        except Exception as e:
-            import traceback
-            self.error.emit(f"Error durante la obtención de conciertos de Songkick: {str(e)}\n{traceback.format_exc()}")
-
-
-class MetalConcertsFetcher(BaseAPIFetcher):
-    def __init__(self, country_code: str, artists_file: str):
-        super().__init__(country_code, artists_file)
-        
-    def run(self):
-        try:
-            # Esta API no tiene autenticación pero es específica para conciertos de metal
-            # Implementaremos un web scraping simple para https://es.concerts-metal.com
-            
-            artistas_lista = self.get_artists_list()
-            if not artistas_lista:
-                self.error.emit("No se encontraron artistas en el archivo")
-                return
-            
-            eventos_filtrados = []
-            
-            # Limitamos a 10 artistas para no sobrecargar el sitio
-            for artista in artistas_lista[:10]:
-                # Construir URL de búsqueda
-                search_url = f"https://es.concerts-metal.com/band_{artista.replace(' ', '_')}.html"
-                response = requests.get(search_url)
-                
-                if response.status_code != 200:
-                    continue  # Simplemente pasamos al siguiente si no hay resultados
-                
-                # Aquí necesitaríamos un parser HTML para extraer la información
-                # Como esto es un ejemplo, crearemos algunos datos ficticios
-                import random
-                ciudades = ["Madrid", "Barcelona", "Valencia", "Bilbao", "Sevilla"]
-                venues = ["Wizink Center", "Palau Sant Jordi", "Sala Apolo", "La Riviera", "Sala But"]
-                
-                # Simular 0-2 conciertos por artista
-                for _ in range(random.randint(0, 2)):
-                    fecha = (datetime.now() + timedelta(days=random.randint(30, 300))).strftime('%Y-%m-%d')
-                    ciudad_idx = random.randint(0, len(ciudades) - 1)
-                    
-                    concierto = ConcertEvent(
-                        id=f"metal-{artista}-{fecha}",
-                        name=f"Concierto de {artista}",
-                        artist=artista,
-                        date=fecha,
-                        venue=venues[random.randint(0, len(venues) - 1)],
-                        city=ciudades[ciudad_idx],
-                        country=self.country_code,
-                        url=f"https://es.concerts-metal.com/concierto_{artista.replace(' ', '_')}_{fecha}.html",
-                        source="Concerts-Metal"
-                    )
-                    eventos_filtrados.append(concierto)
-            
-            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Concerts-Metal")
-            
-        except Exception as e:
-            import traceback
-            self.error.emit(f"Error durante la obtención de conciertos de Concerts-Metal: {str(e)}\n{traceback.format_exc()}")
-
-
-class RapidAPIFetcher(BaseAPIFetcher):
-    def __init__(self, api_key: str, country_code: str, artists_file: str):
-        super().__init__(country_code, artists_file)
-        self.api_key = api_key
-        
-    def run(self):
-        try:
-            artistas_lista = self.get_artists_list()
-            if not artistas_lista:
-                self.error.emit("No se encontraron artistas en el archivo")
-                return
-            
-            eventos_filtrados = []
-            
-            # Usando la API de Predicthq Events como ejemplo (disponible en RapidAPI)
-            for artista in artistas_lista:
-                url = "https://predicthq-events.p.rapidapi.com/v1/events/"
-                querystring = {
-                    "category": "concerts",
-                    "q": artista,
-                    "country": self.country_code,
-                    "limit": "10"
-                }
-                headers = {
-                    "X-RapidAPI-Key": self.api_key,
-                    "X-RapidAPI-Host": "predicthq-events.p.rapidapi.com"
-                }
-                
-                response = requests.get(url, headers=headers, params=querystring)
-                
-                if response.status_code != 200:
-                    self.error.emit(f"Error en RapidAPI: {response.status_code} - {response.text}")
-                    continue
-                
-                eventos = response.json().get('results', [])
-                
-                for evento in eventos:
-                    concierto = ConcertEvent(
-                        id=evento.get('id', ''),
-                        name=evento.get('title', 'Sin nombre'),
-                        artist=artista,
-                        date=evento.get('start', 'Sin fecha').split('T')[0],
-                        venue=evento.get('entities', [{}])[0].get('name', 'Desconocido') if evento.get('entities') else 'Desconocido',
-                        city=evento.get('location', [0, 0])[0] if evento.get('location') else 'Desconocido',
-                        country=self.country_code,
-                        url=evento.get('url', ''),
-                        source="RapidAPI"
-                    )
-                    eventos_filtrados.append(concierto)
-            
-            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en RapidAPI")
-            
-        except Exception as e:
-            import traceback
-            self.error.emit(f"Error durante la obtención de conciertos de RapidAPI: {str(e)}\n{traceback.format_exc()}")
-
-
-class BandsintownFetcher(BaseAPIFetcher):
-    def __init__(self, app_id: str, country_code: str, artists_file: str):
-        super().__init__(country_code, artists_file)
-        self.app_id = app_id
-    
-    def run(self):
-        try:
-            artistas_lista = self.get_artists_list()
-            if not artistas_lista:
-                self.error.emit("No se encontraron artistas en el archivo")
-                return
-            
-            eventos_filtrados = []
-            
-            for artista in artistas_lista:
-                # Codificar el nombre del artista para la URL
-                encoded_artist = requests.utils.quote(artista)
-                
-                # Obtener eventos para este artista
-                url = f"https://rest.bandsintown.com/artists/{encoded_artist}/events?app_id={self.app_id}"
-                response = requests.get(url)
-                
-                if response.status_code != 200:
-                    self.error.emit(f"Error en Bandsintown para {artista}: {response.status_code}")
-                    continue
-                
-                eventos = response.json()
-                if not eventos or (isinstance(eventos, dict) and 'errors' in eventos):
-                    continue
-                
-                for evento in eventos:
-                    # Filtrar por país si está especificado
-                    venue_country = evento.get('venue', {}).get('country')
-                    if self.country_code and venue_country != self.country_code:
-                        continue
-                    
-                    concierto = ConcertEvent(
-                        id=str(evento.get('id', '')),
-                        name=f"{artista} - {evento.get('title', 'Sin título')}",
-                        artist=artista,
-                        date=evento.get('datetime', 'Sin fecha').split('T')[0] if 'T' in evento.get('datetime', '') else evento.get('datetime', 'Sin fecha'),
-                        venue=evento.get('venue', {}).get('name', 'Desconocido'),
-                        city=evento.get('venue', {}).get('city', 'Desconocido'),
-                        country=venue_country or 'Desconocido',
-                        url=evento.get('url', ''),
-                        source="Bandsintown",
-                        image_url=evento.get('artist', {}).get('image_url')
-                    )
-                    eventos_filtrados.append(concierto)
-            
-            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Bandsintown")
-            
-        except Exception as e:
-            import traceback
-            self.error.emit(f"Error durante la obtención de conciertos de Bandsintown: {str(e)}\n{traceback.format_exc()}")
 
 
 class ConciertosModule(BaseModule):
-    def __init__(self, config: Dict = None, parent=None, theme='Tokyo Night'):
+    def __init__(self, config: Dict = None, parent=None, theme='Tokyo Night', **kwargs):
         # Configuración por defecto
         self.config = {
             "country_code": "ES",
@@ -512,6 +93,9 @@ class ConciertosModule(BaseModule):
         # Lista para almacenar todos los eventos encontrados
         self.all_events: List[ConcertEvent] = []
         self.active_fetchers = 0
+
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
         
         # Llamamos al inicializador de la clase base
         super().__init__(parent, theme)
@@ -1096,6 +680,433 @@ class ConciertosModule(BaseModule):
         # No podemos llamar directamente a QTextEdit desde un hilo
         # Usamos la señal de error para mostrar mensajes informativos también
         #self.error.emit(f"[INFO] {message}")
+
+
+
+class BaseAPIFetcher(QThread):
+    """Clase base para los fetcheres de API"""
+    finished = pyqtSignal(object, str)  # Usar 'object' en lugar de List[ConcertEvent]
+    error = pyqtSignal(str)
+    
+    def __init__(self, country_code: str, artists_file: str):
+        super().__init__()
+        self.country_code = country_code
+        self.artists_file = artists_file
+        self.directorio_actual = os.path.dirname(os.path.abspath(self.artists_file))
+        self._is_running = True
+    
+    def stop(self):
+        """Método para detener el hilo correctamente"""
+        self._is_running = False
+        self.wait()  # Espera a que el hilo termine
+    
+    def get_artists_list(self) -> List[str]:
+        """Obtiene la lista de artistas del archivo"""
+        self.log(f"Intentando leer artistas desde: {self.artists_file}")
+        try:
+            with open(self.artists_file, 'r', encoding='utf-8') as f:
+                artistas = [line.strip() for line in f if line.strip()]
+                self.log(f"Artistas leídos: {len(artistas)}")
+                if artistas:
+                    self.log(f"Primeros 5 artistas: {artistas[:5]}")
+                    self.log(f"Último artista: {artistas[-1]}")
+                else:
+                    self.log("¡Advertencia! No se encontraron artistas en el archivo")
+                return artistas
+        except Exception as e:
+            error_msg = f"Error al leer archivo de artistas: {str(e)}"
+            self.log(error_msg)
+            self.error.emit(error_msg)
+            return []
+
+class TicketmasterFetcher(BaseAPIFetcher):
+    def __init__(self, api_key: str, country_code: str, artists_file: str):
+        super().__init__(country_code, artists_file)
+        self.api_key = api_key
+        
+    def run(self):
+        try:
+            # Obtener fechas
+            fecha_actual = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+            fecha_proxima = (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            artistas_lista = self.get_artists_list()
+            if not artistas_lista:
+                self.error.emit("No se encontraron artistas en el archivo")
+                return
+            
+            # Obtener datos de la API de Ticketmaster
+            url = f"https://app.ticketmaster.com/discovery/v2/events.json?size=200&classificationName=music&startDateTime={fecha_actual}&endDateTime={fecha_proxima}&countryCode={self.country_code}&apikey={self.api_key}"
+            
+            self.log(f"Realizando petición a Ticketmaster: {url}")
+            response = requests.get(url)
+            if response.status_code != 200:
+                self.error.emit(f"Error en la API de Ticketmaster: {response.status_code} - {response.text}")
+                return
+                
+            json_data = response.json()
+            
+            # Mostrar estadísticas de eventos devueltos por la API
+            total_eventos = len(json_data.get('_embedded', {}).get('events', []))
+            self.log(f"La API de Ticketmaster devolvió {total_eventos} eventos totales")
+            
+            if total_eventos > 0:
+                # Mostrar algunos nombres de eventos para verificar
+                event_names = [event['name'] for event in json_data.get('_embedded', {}).get('events', [])[:5]]
+                self.log(f"Ejemplos de eventos: {event_names}")
+            
+            # Filtrar los conciertos según los artistas
+            eventos_filtrados = []
+            artistas_encontrados = set()
+            
+            if '_embedded' in json_data and 'events' in json_data['_embedded']:
+                for event in json_data['_embedded']['events']:
+                    event_name = event['name']
+                    matched_artist = None
+                    
+                    for artista in artistas_lista:
+                        if self.artist_match(artista, event_name):
+                            matched_artist = artista
+                            artistas_encontrados.add(artista)
+                            break
+                    
+                    if matched_artist:
+                        # Crear un objeto ConcertEvent estandarizado
+                        venue_name = event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'Desconocido')
+                        city = event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'Desconocido')
+                        url = event.get('url', '')
+                        if not url and 'links' in event:
+                            url = next((link['url'] for link in event.get('links', {}).get('self', []) 
+                                    if link.get('method') == 'GET'), '')
+                        
+                        # Imagen del evento
+                        image_url = None
+                        if 'images' in event and event['images']:
+                            image_url = next((img['url'] for img in event['images'] 
+                                            if img.get('ratio') == '16_9' and img.get('width') > 500), None)
+                            if not image_url and event['images']:
+                                image_url = event['images'][0].get('url')
+                        
+                        concierto = ConcertEvent(
+                            id=event.get('id', ''),
+                            name=event.get('name', 'Sin nombre'),
+                            artist=matched_artist,
+                            date=event.get('dates', {}).get('start', {}).get('localDate', 'Sin fecha'),
+                            venue=venue_name,
+                            city=city,
+                            country=self.country_code,
+                            url=url,
+                            source="Ticketmaster",
+                            image_url=image_url
+                        )
+                        eventos_filtrados.append(concierto)
+                        self.log(f"¡Coincidencia encontrada! Evento: '{event['name']}' coincide con artista: '{matched_artist}'")
+                
+                # Mostrar estadísticas de coincidencias
+                self.log(f"Se encontraron coincidencias para {len(artistas_encontrados)} artistas de {len(artistas_lista)}")
+                if artistas_encontrados:
+                    self.log(f"Artistas con coincidencias: {list(artistas_encontrados)}")
+                
+                # Mostrar artistas sin coincidencias (primeros 10)
+                artistas_sin_coincidencia = set(artistas_lista) - artistas_encontrados
+                if artistas_sin_coincidencia:
+                    self.log(f"Ejemplos de artistas sin coincidencias: {list(artistas_sin_coincidencia)[:10]}")
+            else:
+                self.log("No se encontraron eventos en la respuesta de Ticketmaster")
+            
+            # Enviar los eventos encontrados
+            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Ticketmaster")
+                
+        except Exception as e:
+            import traceback
+            error_msg = f"Error durante la obtención de conciertos de Ticketmaster: {str(e)}\n{traceback.format_exc()}"
+            self.log(error_msg)
+            self.error.emit(error_msg)
+
+    # Implementa esta función de comparación en la clase BaseAPIFetcher
+    def artist_match(self, artist_name: str, event_name: str) -> bool:
+        """
+        Comprueba si un nombre de artista coincide con el nombre de un evento
+        usando diferentes estrategias para aumentar la probabilidad de coincidencia
+        """
+        artist_lower = artist_name.lower().strip()
+        event_lower = event_name.lower().strip()
+        
+        # Estrategia 1: Coincidencia exacta
+        if artist_lower == event_lower:
+            return True
+        
+        # Estrategia 2: El artista está en el nombre del evento
+        if artist_lower in event_lower:
+            # Verificar que sea una palabra completa (evita coincidencias parciales)
+            words = event_lower.split()
+            for i, word in enumerate(words):
+                # Eliminar signos de puntuación al principio o final de la palabra
+                word = word.strip(".,;:!?()[]{}")
+                if word == artist_lower:
+                    return True
+                # También verificar combinaciones de palabras (para artistas con nombres compuestos)
+                for j in range(1, min(5, len(words) - i)):  # Limitar a combinaciones de hasta 5 palabras
+                    phrase = " ".join(words[i:i+j])
+                    if phrase == artist_lower:
+                        return True
+        
+        # Estrategia 3: Comparación de palabras clave
+        artist_words = set(artist_lower.split())
+        event_words = set(event_lower.split())
+        # Si todas las palabras del nombre del artista están en el nombre del evento
+        # y el artista tiene al menos 2 palabras (para evitar falsos positivos con nombres cortos)
+        if len(artist_words) >= 2 and artist_words.issubset(event_words):
+            return True
+        
+        return False
+
+
+    def log(self, message: str):
+        """Envía mensaje de log desde el fetcher"""
+        print(f"[{self.__class__.__name__}] {message}")
+        # No podemos llamar directamente a QTextEdit desde un hilo
+        # Usamos la señal de error para mostrar mensajes informativos también
+        self.error.emit(f"[INFO] {message}")
+
+
+class SongkickFetcher(BaseAPIFetcher):
+    def __init__(self, api_key: str, country_code: str, artists_file: str):
+        super().__init__(country_code, artists_file)
+        self.api_key = api_key
+        
+    def run(self):
+        try:
+            artistas_lista = self.get_artists_list()
+            if not artistas_lista:
+                self.error.emit("No se encontraron artistas en el archivo")
+                return
+            
+            eventos_filtrados = []
+            
+            # Iterar por cada artista y buscar sus eventos
+            for artista in artistas_lista:
+                # 1. Primero buscar el ID del artista
+                search_url = f"https://api.songkick.com/api/3.0/search/artists.json?query={artista}&apikey={self.api_key}"
+                response = requests.get(search_url)
+                
+                if response.status_code != 200:
+                    self.error.emit(f"Error en la búsqueda de artista en Songkick: {response.status_code}")
+                    continue
+                
+                artist_data = response.json()
+                if not artist_data.get('resultsPage', {}).get('results', {}).get('artist', []):
+                    continue  # No se encontró el artista
+                
+                artist_id = artist_data['resultsPage']['results']['artist'][0]['id']
+                
+                # 2. Obtener los eventos del artista
+                events_url = f"https://api.songkick.com/api/3.0/artists/{artist_id}/calendar.json?apikey={self.api_key}"
+                response = requests.get(events_url)
+                
+                if response.status_code != 200:
+                    self.error.emit(f"Error al obtener eventos de Songkick: {response.status_code}")
+                    continue
+                
+                events_data = response.json()
+                events = events_data.get('resultsPage', {}).get('results', {}).get('event', [])
+                
+                # Filtrar por país si está especificado
+                for event in events:
+                    event_country = event.get('venue', {}).get('metroArea', {}).get('country', {}).get('code')
+                    
+                    if not self.country_code or event_country == self.country_code:
+                        concierto = ConcertEvent(
+                            id=str(event.get('id', '')),
+                            name=event.get('displayName', 'Sin nombre'),
+                            artist=artista,
+                            date=event.get('start', {}).get('date', 'Sin fecha'),
+                            venue=event.get('venue', {}).get('displayName', 'Desconocido'),
+                            city=event.get('venue', {}).get('metroArea', {}).get('displayName', 'Desconocido'),
+                            country=event_country or 'Desconocido',
+                            url=event.get('uri', ''),
+                            source="Songkick"
+                        )
+                        eventos_filtrados.append(concierto)
+            
+            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Songkick")
+            
+        except Exception as e:
+            import traceback
+            self.error.emit(f"Error durante la obtención de conciertos de Songkick: {str(e)}\n{traceback.format_exc()}")
+
+
+class MetalConcertsFetcher(BaseAPIFetcher):
+    def __init__(self, country_code: str, artists_file: str):
+        super().__init__(country_code, artists_file)
+        
+    def run(self):
+        try:
+            # Esta API no tiene autenticación pero es específica para conciertos de metal
+            # Implementaremos un web scraping simple para https://es.concerts-metal.com
+            
+            artistas_lista = self.get_artists_list()
+            if not artistas_lista:
+                self.error.emit("No se encontraron artistas en el archivo")
+                return
+            
+            eventos_filtrados = []
+            
+            # Limitamos a 10 artistas para no sobrecargar el sitio
+            for artista in artistas_lista[:10]:
+                # Construir URL de búsqueda
+                search_url = f"https://es.concerts-metal.com/band_{artista.replace(' ', '_')}.html"
+                response = requests.get(search_url)
+                
+                if response.status_code != 200:
+                    continue  # Simplemente pasamos al siguiente si no hay resultados
+                
+                # Aquí necesitaríamos un parser HTML para extraer la información
+                # Como esto es un ejemplo, crearemos algunos datos ficticios
+                import random
+                ciudades = ["Madrid", "Barcelona", "Valencia", "Bilbao", "Sevilla"]
+                venues = ["Wizink Center", "Palau Sant Jordi", "Sala Apolo", "La Riviera", "Sala But"]
+                
+                # Simular 0-2 conciertos por artista
+                for _ in range(random.randint(0, 2)):
+                    fecha = (datetime.now() + timedelta(days=random.randint(30, 300))).strftime('%Y-%m-%d')
+                    ciudad_idx = random.randint(0, len(ciudades) - 1)
+                    
+                    concierto = ConcertEvent(
+                        id=f"metal-{artista}-{fecha}",
+                        name=f"Concierto de {artista}",
+                        artist=artista,
+                        date=fecha,
+                        venue=venues[random.randint(0, len(venues) - 1)],
+                        city=ciudades[ciudad_idx],
+                        country=self.country_code,
+                        url=f"https://es.concerts-metal.com/concierto_{artista.replace(' ', '_')}_{fecha}.html",
+                        source="Concerts-Metal"
+                    )
+                    eventos_filtrados.append(concierto)
+            
+            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Concerts-Metal")
+            
+        except Exception as e:
+            import traceback
+            self.error.emit(f"Error durante la obtención de conciertos de Concerts-Metal: {str(e)}\n{traceback.format_exc()}")
+
+
+class RapidAPIFetcher(BaseAPIFetcher):
+    def __init__(self, api_key: str, country_code: str, artists_file: str):
+        super().__init__(country_code, artists_file)
+        self.api_key = api_key
+        
+    def run(self):
+        try:
+            artistas_lista = self.get_artists_list()
+            if not artistas_lista:
+                self.error.emit("No se encontraron artistas en el archivo")
+                return
+            
+            eventos_filtrados = []
+            
+            # Usando la API de Predicthq Events como ejemplo (disponible en RapidAPI)
+            for artista in artistas_lista:
+                url = "https://predicthq-events.p.rapidapi.com/v1/events/"
+                querystring = {
+                    "category": "concerts",
+                    "q": artista,
+                    "country": self.country_code,
+                    "limit": "10"
+                }
+                headers = {
+                    "X-RapidAPI-Key": self.api_key,
+                    "X-RapidAPI-Host": "predicthq-events.p.rapidapi.com"
+                }
+                
+                response = requests.get(url, headers=headers, params=querystring)
+                
+                if response.status_code != 200:
+                    self.error.emit(f"Error en RapidAPI: {response.status_code} - {response.text}")
+                    continue
+                
+                eventos = response.json().get('results', [])
+                
+                for evento in eventos:
+                    concierto = ConcertEvent(
+                        id=evento.get('id', ''),
+                        name=evento.get('title', 'Sin nombre'),
+                        artist=artista,
+                        date=evento.get('start', 'Sin fecha').split('T')[0],
+                        venue=evento.get('entities', [{}])[0].get('name', 'Desconocido') if evento.get('entities') else 'Desconocido',
+                        city=evento.get('location', [0, 0])[0] if evento.get('location') else 'Desconocido',
+                        country=self.country_code,
+                        url=evento.get('url', ''),
+                        source="RapidAPI"
+                    )
+                    eventos_filtrados.append(concierto)
+            
+            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en RapidAPI")
+            
+        except Exception as e:
+            import traceback
+            self.error.emit(f"Error durante la obtención de conciertos de RapidAPI: {str(e)}\n{traceback.format_exc()}")
+
+
+class BandsintownFetcher(BaseAPIFetcher):
+    def __init__(self, app_id: str, country_code: str, artists_file: str):
+        super().__init__(country_code, artists_file)
+        self.app_id = app_id
+    
+    def run(self):
+        try:
+            artistas_lista = self.get_artists_list()
+            if not artistas_lista:
+                self.error.emit("No se encontraron artistas en el archivo")
+                return
+            
+            eventos_filtrados = []
+            
+            for artista in artistas_lista:
+                # Codificar el nombre del artista para la URL
+                encoded_artist = requests.utils.quote(artista)
+                
+                # Obtener eventos para este artista
+                url = f"https://rest.bandsintown.com/artists/{encoded_artist}/events?app_id={self.app_id}"
+                response = requests.get(url)
+                
+                if response.status_code != 200:
+                    self.error.emit(f"Error en Bandsintown para {artista}: {response.status_code}")
+                    continue
+                
+                eventos = response.json()
+                if not eventos or (isinstance(eventos, dict) and 'errors' in eventos):
+                    continue
+                
+                for evento in eventos:
+                    # Filtrar por país si está especificado
+                    venue_country = evento.get('venue', {}).get('country')
+                    if self.country_code and venue_country != self.country_code:
+                        continue
+                    
+                    concierto = ConcertEvent(
+                        id=str(evento.get('id', '')),
+                        name=f"{artista} - {evento.get('title', 'Sin título')}",
+                        artist=artista,
+                        date=evento.get('datetime', 'Sin fecha').split('T')[0] if 'T' in evento.get('datetime', '') else evento.get('datetime', 'Sin fecha'),
+                        venue=evento.get('venue', {}).get('name', 'Desconocido'),
+                        city=evento.get('venue', {}).get('city', 'Desconocido'),
+                        country=venue_country or 'Desconocido',
+                        url=evento.get('url', ''),
+                        source="Bandsintown",
+                        image_url=evento.get('artist', {}).get('image_url')
+                    )
+                    eventos_filtrados.append(concierto)
+            
+            self.finished.emit(eventos_filtrados, f"Se encontraron {len(eventos_filtrados)} conciertos en Bandsintown")
+            
+        except Exception as e:
+            import traceback
+            self.error.emit(f"Error durante la obtención de conciertos de Bandsintown: {str(e)}\n{traceback.format_exc()}")
+
+
+
 
 
 # Nueva clase para el diálogo de configuración de Radicale

@@ -18,6 +18,8 @@ class ScriptRunnerModule(BaseModule):
         self.theme = theme
         self.config_file = config_file
         self.scripts_section = scripts_section
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
         self.scripts = {}
         self.processes = {}
         super().__init__(parent, theme)

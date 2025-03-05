@@ -10,10 +10,293 @@ from PyQt6.QtCore import Qt, QTime, QDateTime, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette, QFont
 from base_module import BaseModule, THEMES
 
+
+class RadicaleCalendarModule(BaseModule):
+    """Módulo de calendario que se sincroniza con Radicale"""
+    
+    def __init__(self, radicale_url, username="", password="", parent=None, theme='Tokyo Night', **kwargs):
+        super().__init__(parent, theme)
+        self.radicale_url = radicale_url
+        self.username = username
+        self.password = password
+        self.client = None
+        self.calendars = []
+        self.selected_calendar = None
+        
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
+        
+        self.setup_ui()
+        self.connect_to_radicale()
+
+    def apply_theme(self, theme_name=None): 
+        # Optional: Override if you need custom theming beyond base theme
+        super().apply_theme(theme_name)
+
+    def init_ui(self):
+        """Implement the base module's UI initialization method"""
+        self.setup_ui()  # Call the existing setup_ui method
+        
+    def setup_ui(self):
+        """Configura la interfaz del módulo"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Selector de calendario y botones
+        toolbar_layout = QHBoxLayout()
+        
+        # Selector de calendario
+        toolbar_layout.addWidget(QLabel("Calendario:"))
+        self.calendar_selector = QComboBox()
+        self.calendar_selector.currentIndexChanged.connect(self.on_calendar_selected)
+        toolbar_layout.addWidget(self.calendar_selector)
+        
+        # Espacio
+        toolbar_layout.addStretch()
+        
+        # Botón para actualizar
+        self.refresh_button = QPushButton("Actualizar")
+        self.refresh_button.clicked.connect(self.load_calendars)
+        toolbar_layout.addWidget(self.refresh_button)
+        
+        # Botón para crear evento
+        self.add_event_button = QPushButton("Nuevo Evento")
+        self.add_event_button.clicked.connect(self.create_event)
+        toolbar_layout.addWidget(self.add_event_button)
+        
+        layout.addLayout(toolbar_layout)
+        
+        # Vista diaria
+        self.daily_view = DailyCalendarView(self)
+        layout.addWidget(self.daily_view)
+        
+    def connect_to_radicale(self):
+        """Conecta con el servidor Radicale"""
+        try:
+            # Crear cliente de caldav con más logging
+            print(f"Conectando a: {self.radicale_url}")
+            print(f"Usuario: {self.username}")
+            
+            self.client = caldav.DAVClient(
+                url=self.radicale_url,
+                username=self.username,
+                password=self.password
+            )
+            
+            # Verificar la conexión
+            principal = self.client.principal()
+            calendars = principal.calendars()
+            
+            print(f"Calendarios encontrados: {len(calendars)}")
+            for cal in calendars:
+                print(f"Calendario: {cal.name} - URL: {cal.url}")
+            
+            # Cargar calendarios disponibles
+            self.load_calendars()
+            
+        except Exception as e:
+            print(f"Error COMPLETO al conectar con Radicale: {e}")
+            print(traceback.format_exc())
+            
+    def load_calendars(self):
+        """Carga los calendarios disponibles del servidor"""
+        if not self.client:
+            return
+            
+        try:
+            # Limpiar selector
+            self.calendar_selector.clear()
+            self.calendars = []
+            
+            # Obtener principal
+            principal = self.client.principal()
+            calendars = principal.calendars()
+            
+            # Añadir al selector
+            for cal in calendars:
+                cal_name = cal.name or str(cal.url).split('/')[-2]
+                self.calendars.append(cal)
+                self.calendar_selector.addItem(cal_name)
+                
+            # Seleccionar el primero por defecto
+            if self.calendars:
+                self.selected_calendar = self.calendars[0]
+                self.load_events()
+                
+        except Exception as e:
+            print(f"Error al cargar calendarios: {e}")
+            
+    def on_calendar_selected(self, index):
+        """Maneja el cambio de calendario seleccionado"""
+        if 0 <= index < len(self.calendars):
+            self.selected_calendar = self.calendars[index]
+            self.load_events()
+            
+    def load_events(self):
+        """Carga los eventos del calendario seleccionado para la fecha actual"""
+        if not self.selected_calendar:
+            print("No hay calendario seleccionado")
+            return
+            
+        try:
+            # Limpiar eventos existentes
+            self.daily_view.clear_events()
+            
+            # Obtener fecha actual de la vista
+            current_date = self.daily_view.current_date
+            
+            # Definir intervalo (todo el día)
+            start_date = datetime.combine(current_date, datetime.min.time())
+            end_date = datetime.combine(current_date, datetime.max.time())
+            
+            print(f"Buscando eventos entre {start_date} y {end_date}")
+            
+            # Usar .search en lugar de .date_search
+            events = self.selected_calendar.search(
+                start=start_date,
+                end=end_date,
+                expand=True
+            )
+            
+            print(f"Eventos encontrados: {len(events)}")  
+            
+            # Añadir eventos a la vista
+            for event in events:
+                try:
+                    # Añadir un atributo calendar al evento si no existe
+                    if not hasattr(event, 'calendar'):
+                        event.calendar = self.selected_calendar
+                    
+                    # Convertir a objeto vobject si es necesario
+                    if not hasattr(event, 'vobject_instance'):
+                        # Intentar parsear el evento
+                        import vobject
+                        event.vobject_instance = vobject.readOne(event.data)
+                    
+                    self.daily_view.add_event(event)
+                except Exception as event_error:
+                    print(f"Error procesando evento individual: {event_error}")
+                    print(traceback.format_exc())
+                    
+        except Exception as e:
+            print(f"Error COMPLETO al cargar eventos: {e}")
+            print(traceback.format_exc())
+            
+    def create_event(self):
+        """Crea un nuevo evento en el calendario seleccionado"""
+        if not self.selected_calendar:
+            return
+            
+        dialog = EventDialog(self)
+        if dialog.exec():
+            try:
+                # Obtener datos del diálogo
+                event_data = dialog.get_event_data()
+                
+                # Crear fechas con la fecha actual de la vista
+                current_date = self.daily_view.current_date
+                start_time = event_data['start_time']
+                end_time = event_data['end_time']
+                
+                start_datetime = datetime(
+                    current_date.year, current_date.month, current_date.day,
+                    start_time.hour(), start_time.minute()
+                )
+                
+                end_datetime = datetime(
+                    current_date.year, current_date.month, current_date.day,
+                    end_time.hour(), end_time.minute()
+                )
+                
+                # Crear evento iCalendar
+                vcal = vobject.iCalendar()
+                vevent = vcal.add('vevent')
+                vevent.add('summary').value = event_data['summary']
+                vevent.add('dtstart').value = start_datetime
+                vevent.add('dtend').value = end_datetime
+                
+                if event_data['description']:
+                    vevent.add('description').value = event_data['description']
+                
+                # Guardar en el calendario
+                self.selected_calendar.save_event(vcal.serialize())
+                
+                # Recargar eventos
+                self.load_events()
+                
+            except Exception as e:
+                print(f"Error al crear evento: {e}")
+                
+    def edit_event(self, event):
+        """Edita un evento existente"""
+        if not event:
+            return
+            
+        dialog = EventDialog(self, event, self.selected_calendar)
+        if dialog.exec():
+            try:
+                # Obtener datos actualizados
+                event_data = dialog.get_event_data()
+                
+                # Modificar el evento
+                vevent = event.vobject_instance.vevent
+                
+                # Actualizar título
+                if hasattr(vevent, 'summary'):
+                    vevent.summary.value = event_data['summary']
+                else:
+                    vevent.add('summary').value = event_data['summary']
+                
+                # Actualizar descripción
+                if hasattr(vevent, 'description'):
+                    vevent.description.value = event_data['description']
+                elif event_data['description']:
+                    vevent.add('description').value = event_data['description']
+                
+                # Actualizar horas manteniendo la fecha
+                if hasattr(vevent, 'dtstart') and hasattr(vevent, 'dtend'):
+                    start_date = vevent.dtstart.value.date()
+                    end_date = vevent.dtend.value.date()
+                    
+                    start_time = event_data['start_time']
+                    end_time = event_data['end_time']
+                    
+                    new_start = datetime.combine(
+                        start_date,
+                        datetime.min.time().replace(
+                            hour=start_time.hour(),
+                            minute=start_time.minute()
+                        )
+                    )
+                    
+                    new_end = datetime.combine(
+                        end_date,
+                        datetime.min.time().replace(
+                            hour=end_time.hour(),
+                            minute=end_time.minute()
+                        )
+                    )
+                    
+                    vevent.dtstart.value = new_start
+                    vevent.dtend.value = new_end
+                
+                # Guardar cambios
+                event.save()
+                
+                # Recargar eventos
+                self.load_events()
+                
+            except Exception as e:
+                print(f"Error al editar evento: {e}")
+
+
+
+
+
 class EventDialog(QDialog):
     """Diálogo para crear o editar eventos"""
     def __init__(self, parent=None, event=None, calendar=None):
-        super().__init__(parent)
+        super().__init__(parent, theme)
         self.event = event
         self.calendar = calendar
         self.setup_ui()
@@ -318,280 +601,5 @@ class DailyCalendarView(QWidget):
             hour_frame = self.hours_layout.itemAtPosition(hour, 1).widget()
             if hour_frame:
                 hour_frame.layout().addWidget(event_widget)
-
-
-class RadicaleCalendarModule(BaseModule):
-    """Módulo de calendario que se sincroniza con Radicale"""
-    
-    def __init__(self, radicale_url, username="", password="", parent=None, theme='Tokyo Night'):
-        super().__init__(parent, theme)
-        self.radicale_url = radicale_url
-        self.username = username
-        self.password = password
-        self.client = None
-        self.calendars = []
-        self.selected_calendar = None
-        self.setup_ui()
-        self.connect_to_radicale()
-
-    def apply_theme(self, theme_name=None): 
-        # Optional: Override if you need custom theming beyond base theme
-        super().apply_theme(theme_name)
-
-    def init_ui(self):
-        """Implement the base module's UI initialization method"""
-        self.setup_ui()  # Call the existing setup_ui method
-        
-    def setup_ui(self):
-        """Configura la interfaz del módulo"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Selector de calendario y botones
-        toolbar_layout = QHBoxLayout()
-        
-        # Selector de calendario
-        toolbar_layout.addWidget(QLabel("Calendario:"))
-        self.calendar_selector = QComboBox()
-        self.calendar_selector.currentIndexChanged.connect(self.on_calendar_selected)
-        toolbar_layout.addWidget(self.calendar_selector)
-        
-        # Espacio
-        toolbar_layout.addStretch()
-        
-        # Botón para actualizar
-        self.refresh_button = QPushButton("Actualizar")
-        self.refresh_button.clicked.connect(self.load_calendars)
-        toolbar_layout.addWidget(self.refresh_button)
-        
-        # Botón para crear evento
-        self.add_event_button = QPushButton("Nuevo Evento")
-        self.add_event_button.clicked.connect(self.create_event)
-        toolbar_layout.addWidget(self.add_event_button)
-        
-        layout.addLayout(toolbar_layout)
-        
-        # Vista diaria
-        self.daily_view = DailyCalendarView(self)
-        layout.addWidget(self.daily_view)
-        
-    def connect_to_radicale(self):
-        """Conecta con el servidor Radicale"""
-        try:
-            # Crear cliente de caldav con más logging
-            print(f"Conectando a: {self.radicale_url}")
-            print(f"Usuario: {self.username}")
-            
-            self.client = caldav.DAVClient(
-                url=self.radicale_url,
-                username=self.username,
-                password=self.password
-            )
-            
-            # Verificar la conexión
-            principal = self.client.principal()
-            calendars = principal.calendars()
-            
-            print(f"Calendarios encontrados: {len(calendars)}")
-            for cal in calendars:
-                print(f"Calendario: {cal.name} - URL: {cal.url}")
-            
-            # Cargar calendarios disponibles
-            self.load_calendars()
-            
-        except Exception as e:
-            print(f"Error COMPLETO al conectar con Radicale: {e}")
-            print(traceback.format_exc())
-            
-    def load_calendars(self):
-        """Carga los calendarios disponibles del servidor"""
-        if not self.client:
-            return
-            
-        try:
-            # Limpiar selector
-            self.calendar_selector.clear()
-            self.calendars = []
-            
-            # Obtener principal
-            principal = self.client.principal()
-            calendars = principal.calendars()
-            
-            # Añadir al selector
-            for cal in calendars:
-                cal_name = cal.name or str(cal.url).split('/')[-2]
-                self.calendars.append(cal)
-                self.calendar_selector.addItem(cal_name)
-                
-            # Seleccionar el primero por defecto
-            if self.calendars:
-                self.selected_calendar = self.calendars[0]
-                self.load_events()
-                
-        except Exception as e:
-            print(f"Error al cargar calendarios: {e}")
-            
-    def on_calendar_selected(self, index):
-        """Maneja el cambio de calendario seleccionado"""
-        if 0 <= index < len(self.calendars):
-            self.selected_calendar = self.calendars[index]
-            self.load_events()
-            
-    def load_events(self):
-        """Carga los eventos del calendario seleccionado para la fecha actual"""
-        if not self.selected_calendar:
-            print("No hay calendario seleccionado")
-            return
-            
-        try:
-            # Limpiar eventos existentes
-            self.daily_view.clear_events()
-            
-            # Obtener fecha actual de la vista
-            current_date = self.daily_view.current_date
-            
-            # Definir intervalo (todo el día)
-            start_date = datetime.combine(current_date, datetime.min.time())
-            end_date = datetime.combine(current_date, datetime.max.time())
-            
-            print(f"Buscando eventos entre {start_date} y {end_date}")
-            
-            # Usar .search en lugar de .date_search
-            events = self.selected_calendar.search(
-                start=start_date,
-                end=end_date,
-                expand=True
-            )
-            
-            print(f"Eventos encontrados: {len(events)}")  
-            
-            # Añadir eventos a la vista
-            for event in events:
-                try:
-                    # Añadir un atributo calendar al evento si no existe
-                    if not hasattr(event, 'calendar'):
-                        event.calendar = self.selected_calendar
-                    
-                    # Convertir a objeto vobject si es necesario
-                    if not hasattr(event, 'vobject_instance'):
-                        # Intentar parsear el evento
-                        import vobject
-                        event.vobject_instance = vobject.readOne(event.data)
-                    
-                    self.daily_view.add_event(event)
-                except Exception as event_error:
-                    print(f"Error procesando evento individual: {event_error}")
-                    print(traceback.format_exc())
-                    
-        except Exception as e:
-            print(f"Error COMPLETO al cargar eventos: {e}")
-            print(traceback.format_exc())
-            
-    def create_event(self):
-        """Crea un nuevo evento en el calendario seleccionado"""
-        if not self.selected_calendar:
-            return
-            
-        dialog = EventDialog(self)
-        if dialog.exec():
-            try:
-                # Obtener datos del diálogo
-                event_data = dialog.get_event_data()
-                
-                # Crear fechas con la fecha actual de la vista
-                current_date = self.daily_view.current_date
-                start_time = event_data['start_time']
-                end_time = event_data['end_time']
-                
-                start_datetime = datetime(
-                    current_date.year, current_date.month, current_date.day,
-                    start_time.hour(), start_time.minute()
-                )
-                
-                end_datetime = datetime(
-                    current_date.year, current_date.month, current_date.day,
-                    end_time.hour(), end_time.minute()
-                )
-                
-                # Crear evento iCalendar
-                vcal = vobject.iCalendar()
-                vevent = vcal.add('vevent')
-                vevent.add('summary').value = event_data['summary']
-                vevent.add('dtstart').value = start_datetime
-                vevent.add('dtend').value = end_datetime
-                
-                if event_data['description']:
-                    vevent.add('description').value = event_data['description']
-                
-                # Guardar en el calendario
-                self.selected_calendar.save_event(vcal.serialize())
-                
-                # Recargar eventos
-                self.load_events()
-                
-            except Exception as e:
-                print(f"Error al crear evento: {e}")
-                
-    def edit_event(self, event):
-        """Edita un evento existente"""
-        if not event:
-            return
-            
-        dialog = EventDialog(self, event, self.selected_calendar)
-        if dialog.exec():
-            try:
-                # Obtener datos actualizados
-                event_data = dialog.get_event_data()
-                
-                # Modificar el evento
-                vevent = event.vobject_instance.vevent
-                
-                # Actualizar título
-                if hasattr(vevent, 'summary'):
-                    vevent.summary.value = event_data['summary']
-                else:
-                    vevent.add('summary').value = event_data['summary']
-                
-                # Actualizar descripción
-                if hasattr(vevent, 'description'):
-                    vevent.description.value = event_data['description']
-                elif event_data['description']:
-                    vevent.add('description').value = event_data['description']
-                
-                # Actualizar horas manteniendo la fecha
-                if hasattr(vevent, 'dtstart') and hasattr(vevent, 'dtend'):
-                    start_date = vevent.dtstart.value.date()
-                    end_date = vevent.dtend.value.date()
-                    
-                    start_time = event_data['start_time']
-                    end_time = event_data['end_time']
-                    
-                    new_start = datetime.combine(
-                        start_date,
-                        datetime.min.time().replace(
-                            hour=start_time.hour(),
-                            minute=start_time.minute()
-                        )
-                    )
-                    
-                    new_end = datetime.combine(
-                        end_date,
-                        datetime.min.time().replace(
-                            hour=end_time.hour(),
-                            minute=end_time.minute()
-                        )
-                    )
-                    
-                    vevent.dtstart.value = new_start
-                    vevent.dtend.value = new_end
-                
-                # Guardar cambios
-                event.save()
-                
-                # Recargar eventos
-                self.load_events()
-                
-            except Exception as e:
-                print(f"Error al editar evento: {e}")
 
 

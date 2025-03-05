@@ -13,7 +13,7 @@ import traceback
 import json
 
 class SpotifyPlaylistManager(BaseModule):
-    def __init__(self, client_id: str, client_secret: str, cache_path: str = None, force_update: str = False, parent=None, theme='Tokyo Night'):
+    def __init__(self, client_id: str, client_secret: str, cache_path: str = None, force_update: str = False, parent=None, theme='Tokyo Night', **kwargs):
         super().__init__(parent, theme)        
         if cache_path is None:
             cache_path = str(Path.home() / ".cache" / "spotify_token.txt")
@@ -30,6 +30,9 @@ class SpotifyPlaylistManager(BaseModule):
         self.setup_spotify(client_id, client_secret, cache_path)
         self.playlists = {}
         self.temp_playlist_tracks = []
+
+        self.available_themes = kwargs.pop('temas', [])
+        self.selected_theme = kwargs.pop('tema_seleccionado', theme)
         
         self.init_ui()
         self.load_playlists()
