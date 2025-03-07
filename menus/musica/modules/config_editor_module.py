@@ -34,10 +34,12 @@ class ConfigEditorModule(BaseModule):
                 }
             },
             
-            "modules": []
+            "modules": [],
+            "modulos_desactivados": []  # Add list for disabled modules
         }
         self.config_path = config_path
         self.fields = {}
+        self.module_checkboxes = {}  # Store module checkboxes
 
         self.available_themes = kwargs.pop('temas', [])
         self.selected_theme = kwargs.pop('tema_seleccionado', theme)        
@@ -45,6 +47,7 @@ class ConfigEditorModule(BaseModule):
         self.load_config()
         
         super().__init__(parent, theme)
+        
 
     def apply_theme(self, theme_name=None):
         super().apply_theme(theme_name)
@@ -62,6 +65,10 @@ class ConfigEditorModule(BaseModule):
                     # Validate selected theme
                     if loaded_config["tema_seleccionado"] not in THEMES:
                         loaded_config["tema_seleccionado"] = list(THEMES.keys())[0]
+                    
+                    # Ensure modulos_desactivados exists
+                    if "modulos_desactivados" not in loaded_config:
+                        loaded_config["modulos_desactivados"] = []
                     
                     self.config_data = loaded_config
             else:
@@ -166,79 +173,54 @@ class ConfigEditorModule(BaseModule):
         
         global_layout.addWidget(shared_db_group)
         
-        # # Existing database paths
-        # self.shared_db_fields = {}
-        # for db_key, db_path in shared_db_paths.items():
-        #     db_field_layout = QHBoxLayout()
-        #     db_field = ConfigField(f"{db_key.replace('_', ' ').title()} Path", db_path)
-        #     remove_button = QPushButton("Remove")
-        #     remove_button.clicked.connect(lambda checked, key=db_key: self.remove_shared_db_path(key))
-            
-        #     db_field_layout.addWidget(db_field)
-        #     db_field_layout.addWidget(remove_button)
-            
-        #     shared_db_layout.addLayout(db_field_layout)
-        #     self.shared_db_fields[db_key] = db_field
-        
-        # # Connect the add database path button
-        # add_db_button.clicked.connect(lambda: self.add_shared_db_path(
-        #     add_db_name_input.text(), 
-        #     add_db_path_input.text()
-        # ))
-        
-        
-        
         container_layout.addWidget(global_group)
         
-        # Module configurations
-        if not self.config_data["modules"]:
-            # If no modules are configured, show a message
+        # Create "Active Modules" group
+        active_modules_group = QGroupBox("Active Modules")
+        active_modules_layout = QVBoxLayout()
+        active_modules_group.setLayout(active_modules_layout)
+        
+        # Create "Disabled Modules" group
+        disabled_modules_group = QGroupBox("Disabled Modules")
+        disabled_modules_layout = QVBoxLayout()
+        disabled_modules_group.setLayout(disabled_modules_layout)
+        
+        # Flag to check if we need to show any modules section
+        has_active_modules = False
+        has_disabled_modules = False
+        
+        # Module configurations - Active modules
+        if self.config_data["modules"]:
+            has_active_modules = True
+            # Create groups for each active module
+            for module in self.config_data["modules"]:
+                module_group = self.create_module_group(module, True)
+                active_modules_layout.addWidget(module_group)
+        
+        # Disabled modules
+        if "modulos_desactivados" in self.config_data and self.config_data["modulos_desactivados"]:
+            has_disabled_modules = True
+            # Create groups for each disabled module
+            for module in self.config_data["modulos_desactivados"]:
+                module_group = self.create_module_group(module, False)
+                disabled_modules_layout.addWidget(module_group)
+        
+        # Only add the groups if they have modules
+        if has_active_modules:
+            container_layout.addWidget(active_modules_group)
+        else:
+            # If no active modules, show a message
+            label = QLabel("No active modules configured.")
+            active_modules_layout.addWidget(label)
+            container_layout.addWidget(active_modules_group)
+        
+        if has_disabled_modules:
+            container_layout.addWidget(disabled_modules_group)
+        
+        if not has_active_modules and not has_disabled_modules:
+            # If no modules at all, show a general message
             label = QLabel("No modules configured. Add modules to config file.")
             container_layout.addWidget(label)
-        else:
-            # Create groups for each module
-            for module in self.config_data["modules"]:
-                group = QGroupBox(module["name"])
-                group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-                group_layout = QVBoxLayout()
-                
-                # Fields specific to each module
-                fields = {}
-                
-                # Add module-specific theme dropdown if individual themes are enabled
-                if (self.config_data.get("global_theme_config", {}).get("enable_individual_themes", True) and 
-                    "temas" in module.get("args", {})):
-                    theme_dropdown = ConfigField(f"{module['name']} Theme", module["args"]["temas"])
-                    theme_dropdown.set_value(module["args"].get("tema_seleccionado", list(THEMES.keys())[0]))
-                    group_layout.addWidget(theme_dropdown)
-                    fields["theme_dropdown"] = theme_dropdown
-                
-                # Process module arguments
-                for key, value in module.get("args", {}).items():
-                    # Skip 'temas' and 'tema_seleccionado' as they're handled separately
-                    if key in ["temas", "tema_seleccionado"]:
-                        continue
-                    
-                    if isinstance(value, dict):
-                        # Use NestedConfigGroup for nested structures
-                        nested_group = NestedConfigGroup(key, value)
-                        group_layout.addWidget(nested_group)
-                        fields[key] = nested_group
-                    else:
-                        # Use ConfigField for simple values
-                        field = ConfigField(key, value)
-                        group_layout.addWidget(field)
-                        fields[key] = field
-                
-                self.fields[module["name"]] = fields
-                
-                # Save button for this module
-                save_button = QPushButton(f"Save {module['name']} Settings")
-                save_button.clicked.connect(lambda checked, m=module["name"]: self.save_module_config(m))
-                group_layout.addWidget(save_button)
-                
-                group.setLayout(group_layout)
-                container_layout.addWidget(group)
         
         # Button to save all changes
         save_all_button = QPushButton("Save All Changes")
@@ -250,6 +232,149 @@ class ConfigEditorModule(BaseModule):
         # Add flexible space at the end to align everything at the top
         container_layout.addStretch()
 
+
+
+    def create_module_group(self, module, is_active):
+        """Create a group for a module with enable/disable checkbox and ordering buttons"""
+        module_name = module["name"]
+        
+        # Create the group
+        group = QGroupBox()
+        group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        group_layout = QVBoxLayout()
+        
+        # Create header with checkbox and ordering buttons
+        header_layout = QHBoxLayout()
+        
+        # Enable/disable checkbox
+        enable_checkbox = QCheckBox(module_name)
+        enable_checkbox.setChecked(is_active)
+        enable_checkbox.setStyleSheet("font-weight: bold;")
+        header_layout.addWidget(enable_checkbox)
+        
+        # Add spacer to push ordering buttons to the right
+        header_layout.addStretch()
+        
+        # Add ordering buttons
+        move_up_button = QPushButton("↑")
+        move_up_button.setFixedWidth(30)
+        move_up_button.setToolTip("Move module up")
+        move_up_button.clicked.connect(lambda: self.move_module(module_name, "up"))
+        
+        move_down_button = QPushButton("↓")
+        move_down_button.setFixedWidth(30)
+        move_down_button.setToolTip("Move module down")
+        move_down_button.clicked.connect(lambda: self.move_module(module_name, "down"))
+        
+        header_layout.addWidget(move_up_button)
+        header_layout.addWidget(move_down_button)
+        
+        # Store the checkbox for later use
+        self.module_checkboxes[module_name] = enable_checkbox
+        
+        group_layout.addLayout(header_layout)
+        
+     # Fields specific to each module
+        fields = {}
+        
+        # Add module-specific theme dropdown if individual themes are enabled
+        if (self.config_data.get("global_theme_config", {}).get("enable_individual_themes", True) and 
+            "temas" in module.get("args", {})):
+            theme_dropdown = ConfigField(f"Theme", module["args"]["temas"])
+            theme_dropdown.set_value(module["args"].get("tema_seleccionado", list(THEMES.keys())[0]))
+            group_layout.addWidget(theme_dropdown)
+            fields["theme_dropdown"] = theme_dropdown
+        
+        # Process module arguments
+        for key, value in module.get("args", {}).items():
+            # Skip 'temas' and 'tema_seleccionado' as they're handled separately
+            if key in ["temas", "tema_seleccionado"]:
+                continue
+            
+            if isinstance(value, dict):
+                # Use NestedConfigGroup for nested structures
+                nested_group = NestedConfigGroup(key, value)
+                group_layout.addWidget(nested_group)
+                fields[key] = nested_group
+            else:
+                # Use ConfigField for simple values
+                field = ConfigField(key, value)
+                group_layout.addWidget(field)
+                fields[key] = field
+        
+        self.fields[module_name] = fields
+        
+        # Save button for this module
+        save_button = QPushButton(f"Save {module_name} Settings")
+        save_button.clicked.connect(lambda checked, m=module_name: self.save_module_config(m))
+        group_layout.addWidget(save_button)
+        
+        group.setLayout(group_layout)
+        return group
+
+
+
+   # Añadir este nuevo método a la clase ConfigEditorModule
+    def move_module(self, module_name, direction):
+        """Move a module up or down in its list"""
+        # Find the module's current list and position
+        module_index = -1
+        module_list = None
+        is_active = self.module_checkboxes[module_name].isChecked()
+        
+        if is_active:
+            # Check in active modules
+            for i, module in enumerate(self.config_data["modules"]):
+                if module["name"] == module_name:
+                    module_index = i
+                    module_list = self.config_data["modules"]
+                    break
+        else:
+            # Check in disabled modules
+            for i, module in enumerate(self.config_data["modulos_desactivados"]):
+                if module["name"] == module_name:
+                    module_index = i
+                    module_list = self.config_data["modulos_desactivados"]
+                    break
+        
+        if module_list is None or module_index == -1:
+            QMessageBox.warning(self, "Error", f"Cannot find module '{module_name}' in the configuration")
+            return
+        
+        # Calculate new position
+        new_index = -1
+        if direction == "up" and module_index > 0:
+            new_index = module_index - 1
+        elif direction == "down" and module_index < len(module_list) - 1:
+            new_index = module_index + 1
+        
+        if new_index == -1:
+            # Module already at the top/bottom
+            return
+        
+        # Move the module
+        module = module_list.pop(module_index)
+        module_list.insert(new_index, module)
+        
+        # Save the changes
+        try:
+            with open(self.config_path, 'w') as f:
+                json.dump(self.config_data, f, indent=2)
+            
+            # Notify user and emit signal
+            QMessageBox.information(
+                self, 
+                "Module Reordered", 
+                f"Module '{module_name}' has been moved {direction}."
+            )
+            
+            # Emit config updated signal to trigger reload
+            self.config_updated.emit()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error saving configuration: {str(e)}")
+
+
     def update_db_path_input(self, current_key):
         """Update the path input when a new database is selected from dropdown"""
         global_theme_config = self.config_data.get("global_theme_config", {})
@@ -257,6 +382,8 @@ class ConfigEditorModule(BaseModule):
         
         if current_key in shared_db_paths:
             self.db_path_input.setText(shared_db_paths[current_key])
+
+
 
 
     def add_shared_db_path(self):
@@ -319,6 +446,8 @@ class ConfigEditorModule(BaseModule):
 
 
 
+
+
     def remove_shared_db_path(self):
         """Remove selected shared database path"""
         current_key = self.db_paths_dropdown.currentText()
@@ -364,30 +493,71 @@ class ConfigEditorModule(BaseModule):
             
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not remove database path: {str(e)}")
+                
 
     def save_module_config(self, module_name: str):
         """Save configuration for a specific module"""
         try:
-            # Update values in config_data
-            for module in self.config_data["modules"]:
+            # Find the module in either active or disabled modules
+            is_active = self.module_checkboxes[module_name].isChecked()
+            
+            # Find where the module currently exists (active or disabled list)
+            module_list = None
+            module_index = -1
+            
+            # Look in active modules first
+            for i, module in enumerate(self.config_data["modules"]):
                 if module["name"] == module_name:
-                    module_fields = self.fields[module_name]
-                    
-                    # Handle module theme change
-                    if "theme_dropdown" in module_fields:
-                        new_theme = module_fields["theme_dropdown"].get_value()
-                        module["args"]["tema_seleccionado"] = new_theme
-                        
-                        # Emit signal to change theme for this specific module
-                        self.module_theme_changed.emit(module_name, new_theme)
-                    
-                    # Update other fields
-                    for key, field in module_fields.items():
-                        if key != "theme_dropdown":
-                            module["args"][key] = field.get_value()
-                    
+                    module_list = self.config_data["modules"]
+                    module_index = i
                     break
-                    
+            
+            # If not found in active, look in disabled
+            if module_index == -1:
+                for i, module in enumerate(self.config_data["modulos_desactivados"]):
+                    if module["name"] == module_name:
+                        module_list = self.config_data["modulos_desactivados"]
+                        module_index = i
+                        break
+            
+            if module_list is None or module_index == -1:
+                QMessageBox.critical(self, "Error", f"Module {module_name} not found in configuration")
+                return
+            
+            # Update module settings
+            module = module_list[module_index]
+            module_fields = self.fields[module_name]
+            
+            # Handle module theme change
+            if "theme_dropdown" in module_fields:
+                new_theme = module_fields["theme_dropdown"].get_value()
+                module["args"]["tema_seleccionado"] = new_theme
+                
+                # Emit signal to change theme for this specific module
+                if is_active:  # Only emit if module is active
+                    self.module_theme_changed.emit(module_name, new_theme)
+            
+            # Update other fields
+            for key, field in module_fields.items():
+                if key != "theme_dropdown":
+                    module["args"][key] = field.get_value()
+            
+            # Move module if needed between active/disabled lists
+            source_list = module_list
+            dest_list = self.config_data["modules"] if is_active else self.config_data["modulos_desactivados"]
+            
+            if source_list != dest_list:
+                # Remove from source list
+                module = source_list.pop(module_index)
+                # Add to destination list
+                dest_list.append(module)
+                
+                QMessageBox.information(
+                    self, 
+                    "Module Status Changed",
+                    f"Module '{module_name}' has been {'enabled' if is_active else 'disabled'}."
+                )
+            
             # Save to file
             with open(self.config_path, 'w') as f:
                 json.dump(self.config_data, f, indent=2)
@@ -397,7 +567,6 @@ class ConfigEditorModule(BaseModule):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error saving config: {str(e)}")
-
 
     def save_all_config(self, enable_individual_themes=True):
         """Save all configuration changes"""
@@ -430,21 +599,59 @@ class ConfigEditorModule(BaseModule):
             if logging_fields:
                 self.config_data["logging_state"] = logging_fields[0].get_value()
             
-            # Update modules
-            for module in self.config_data["modules"]:
-                module_name = module["name"]
-                if module_name in self.fields:
-                    module_fields = self.fields[module_name]
-                    
-                    # Update module theme if individual themes are enabled
-                    if "theme_dropdown" in module_fields:
-                        theme_value = module_fields["theme_dropdown"].get_value()
-                        module["args"]["tema_seleccionado"] = theme_value
-                    
-                    # Update other module-specific fields
-                    for key, field in module_fields.items():
-                        if key != "theme_dropdown":
-                            module["args"][key] = field.get_value()
+            # Process all module checkboxes to move modules between active/disabled lists
+            for module_name, checkbox in self.module_checkboxes.items():
+                is_active = checkbox.isChecked()
+                
+                # Find the module in either list
+                found_in_active = False
+                found_in_disabled = False
+                active_index = -1
+                disabled_index = -1
+                
+                # Check active modules
+                for i, module in enumerate(self.config_data["modules"]):
+                    if module["name"] == module_name:
+                        found_in_active = True
+                        active_index = i
+                        break
+                
+                # Check disabled modules
+                for i, module in enumerate(self.config_data["modulos_desactivados"]):
+                    if module["name"] == module_name:
+                        found_in_disabled = True
+                        disabled_index = i
+                        break
+                
+                # Move module if needed
+                if found_in_active and not is_active:
+                    # Move from active to disabled
+                    module = self.config_data["modules"].pop(active_index)
+                    self.config_data["modulos_desactivados"].append(module)
+                elif found_in_disabled and is_active:
+                    # Move from disabled to active
+                    module = self.config_data["modulos_desactivados"].pop(disabled_index)
+                    self.config_data["modules"].append(module)
+                
+                # Update module settings
+                module_list = self.config_data["modules"] if is_active else self.config_data["modulos_desactivados"]
+                
+                # Find module in the appropriate list
+                for module in module_list:
+                    if module["name"] == module_name:
+                        if module_name in self.fields:
+                            module_fields = self.fields[module_name]
+                            
+                            # Update module theme if individual themes are enabled
+                            if "theme_dropdown" in module_fields:
+                                theme_value = module_fields["theme_dropdown"].get_value()
+                                module["args"]["tema_seleccionado"] = theme_value
+                            
+                            # Update other module-specific fields
+                            for key, field in module_fields.items():
+                                if key != "theme_dropdown":
+                                    module["args"][key] = field.get_value()
+                        break
             
             # Save file
             with open(self.config_path, 'w') as f:
@@ -458,6 +665,8 @@ class ConfigEditorModule(BaseModule):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error saving config: {str(e)}")
             return False  # Indicate save failure
+
+
 
 
 
@@ -533,7 +742,6 @@ class ConfigField(QWidget):
         else:
             self.input.setText(str(value))
 
-
 class NestedConfigGroup(QGroupBox):
     """Widget para visualizar y editar configuración anidada"""
     def __init__(self, title: str, config_data: dict, parent=None):
@@ -555,7 +763,7 @@ class NestedConfigGroup(QGroupBox):
                 field = ConfigField(key, value)
                 layout.addWidget(field)
                 self.fields[key] = field
-    
+                
     def get_value(self):
         result = {}
         for key, field in self.fields.items():

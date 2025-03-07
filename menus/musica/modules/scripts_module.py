@@ -8,9 +8,7 @@ from base_module import BaseModule, THEMES
 from pathlib import Path
 import os
 
-from PyQt6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-                           QScrollArea, QWidget, QGridLayout, QLineEdit,
-                           QTextEdit, QSplitter, QMessageBox, QComboBox)
+
 
 
 class ScriptRunnerModule(BaseModule):

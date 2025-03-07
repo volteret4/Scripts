@@ -83,7 +83,11 @@ class MusicLibraryManager:
             'added_month': 'INTEGER',
             'added_year': 'INTEGER',
             'duration': 'REAL',
-            'lyrics_id': 'INTEGER'
+            'lyrics_id': 'INTEGER',
+            'replay_gain_track_gain': 'REAL',
+            'replay_gain_track_peak': 'REAL',
+            'replay_gain_album_gain': 'REAL',
+            'replay_gain_album_peak': 'REAL'
         }
         
         for col_name, col_type in new_columns.items():
@@ -237,7 +241,7 @@ class MusicLibraryManager:
         conn.close()
         
     def get_audio_metadata(self, file_path: Path) -> Optional[Dict]:
-        """Extract comprehensive audio metadata."""
+        """Extract comprehensive audio metadata including replay gain."""
         try:
             audio = None
             audio_tech = None
@@ -248,14 +252,25 @@ class MusicLibraryManager:
                 audio = EasyID3(file_path)
                 audio_tech = mutagen.File(file_path)
                 track_number = audio.get('tracknumber', ['0'])[0].split('/')[0]
+                
+                # Get ID3 tags for replay gain (MP3)
+                raw_audio = mutagen.File(file_path)
+                
             elif file_path.suffix.lower() == '.flac':
                 audio = FLAC(file_path)
                 audio_tech = audio
                 track_number = str(audio.get('tracknumber', ['0'])[0]).split('/')[0]
+                
+                # FLAC has direct access to replay gain
+                raw_audio = audio
+                
             elif file_path.suffix.lower() == '.m4a':
                 audio = mutagen.File(file_path)
                 audio_tech = audio
                 track_number = audio.get('trkn', [[0, 0]])[0][0]
+                
+                # For M4A, tags are directly accessible
+                raw_audio = audio
                 
             if not audio or not audio_tech:
                 return None
@@ -287,12 +302,75 @@ class MusicLibraryManager:
                 metadata['sample_rate'] = getattr(audio_tech.info, 'sample_rate', 0)
                 metadata['bit_depth'] = getattr(audio_tech.info, 'bits_per_sample', 0)
                 metadata['duration'] = getattr(audio_tech.info, 'length', 0)
+            
+            # Extract ReplayGain information based on file format
+            # For FLAC files
+            if file_path.suffix.lower() == '.flac':
+                metadata['replay_gain_track_gain'] = self._extract_float_tag(raw_audio, 'replaygain_track_gain')
+                metadata['replay_gain_track_peak'] = self._extract_float_tag(raw_audio, 'replaygain_track_peak')
+                metadata['replay_gain_album_gain'] = self._extract_float_tag(raw_audio, 'replaygain_album_gain')
+                metadata['replay_gain_album_peak'] = self._extract_float_tag(raw_audio, 'replaygain_album_peak')
+            
+            # For MP3 files - different tag formats exist, try multiple variants
+            elif file_path.suffix.lower() == '.mp3':
+                # Try to find replay gain info in raw ID3 tags
+                metadata['replay_gain_track_gain'] = self._extract_mp3_replay_gain(raw_audio, 'TXXX:REPLAYGAIN_TRACK_GAIN', 'TXXX:replaygain_track_gain')
+                metadata['replay_gain_track_peak'] = self._extract_mp3_replay_gain(raw_audio, 'TXXX:REPLAYGAIN_TRACK_PEAK', 'TXXX:replaygain_track_peak')
+                metadata['replay_gain_album_gain'] = self._extract_mp3_replay_gain(raw_audio, 'TXXX:REPLAYGAIN_ALBUM_GAIN', 'TXXX:replaygain_album_gain')
+                metadata['replay_gain_album_peak'] = self._extract_mp3_replay_gain(raw_audio, 'TXXX:REPLAYGAIN_ALBUM_PEAK', 'TXXX:replaygain_album_peak')
+                
+            # For M4A files
+            elif file_path.suffix.lower() == '.m4a':
+                # M4A usually has replay gain in ----:com.apple.iTunes:replaygain_track_gain format
+                for tag in raw_audio:
+                    if 'replaygain_track_gain' in tag.lower():
+                        metadata['replay_gain_track_gain'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
+                    if 'replaygain_track_peak' in tag.lower():
+                        metadata['replay_gain_track_peak'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
+                    if 'replaygain_album_gain' in tag.lower():
+                        metadata['replay_gain_album_gain'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
+                    if 'replaygain_album_peak' in tag.lower():
+                        metadata['replay_gain_album_peak'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
 
             return metadata
 
         except Exception as e:
             self.logger.error(f"Metadata extraction error for {file_path}: {str(e)}")
             return None
+
+
+    def _extract_float_tag(self, audio, tag_name):
+        """Extract a float value from an audio tag, handling different formats."""
+        if tag_name in audio:
+            try:
+                # Extract the numerical part and convert to float
+                value = str(audio[tag_name][0])
+                return self._parse_replay_gain_value(value)
+            except (IndexError, ValueError, TypeError):
+                return None
+        return None
+
+    def _extract_mp3_replay_gain(self, audio, *tag_names):
+        """Try multiple possible tag names for MP3 replay gain."""
+        for tag_name in tag_names:
+            if tag_name in audio:
+                try:
+                    value = str(audio[tag_name].text[0])
+                    return self._parse_replay_gain_value(value)
+                except (IndexError, ValueError, AttributeError, TypeError):
+                    continue
+        return None
+
+    def _parse_replay_gain_value(self, value_str):
+        """Parse replay gain value from string, handling different formats."""
+        try:
+            # Strip 'dB' suffix and any whitespace
+            value_str = value_str.replace('dB', '').strip()
+            # Convert to float
+            return float(value_str)
+        except (ValueError, TypeError):
+            return None
+
 
     def scan_library(self, force_update=False):
         """Comprehensive library scanning with selective updates."""
@@ -387,8 +465,10 @@ class MusicLibraryManager:
                                         (file_path, title, track_number, artist, album_artist, 
                                         album, date, genre, label, mbid, bitrate, 
                                         bit_depth, sample_rate, last_modified, duration,
-                                        added_timestamp, added_week, added_month, added_year)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        added_timestamp, added_week, added_month, added_year,
+                                        replay_gain_track_gain, replay_gain_track_peak, 
+                                        replay_gain_album_gain, replay_gain_album_peak)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                     ''', (
                                         metadata['file_path'], metadata['title'], metadata['track_number'], 
                                         metadata['artist'], consistent_album_artist, folder_metadata['album'], 
@@ -396,7 +476,9 @@ class MusicLibraryManager:
                                         metadata['mbid'], metadata.get('bitrate'), metadata.get('bit_depth'),
                                         metadata.get('sample_rate'), metadata['last_modified'], 
                                         metadata.get('duration'), metadata['added_timestamp'],
-                                        metadata['added_week'], metadata['added_month'], metadata['added_year']
+                                        metadata['added_week'], metadata['added_month'], metadata['added_year'],
+                                        metadata.get('replay_gain_track_gain'), metadata.get('replay_gain_track_peak'),
+                                        metadata.get('replay_gain_album_gain'), metadata.get('replay_gain_album_peak')
                                     ))
                                     
                                     # Asegurarse de que la canción también tenga entrada en song_links
@@ -425,8 +507,10 @@ class MusicLibraryManager:
                                         (file_path, title, track_number, artist, album_artist, 
                                         album, date, genre, label, mbid, bitrate, 
                                         bit_depth, sample_rate, last_modified, duration,
-                                        added_timestamp, added_week, added_month, added_year)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        added_timestamp, added_week, added_month, added_year,
+                                        replay_gain_track_gain, replay_gain_track_peak, 
+                                        replay_gain_album_gain, replay_gain_album_peak)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                     ''', (
                                         metadata['file_path'], metadata['title'], metadata['track_number'], 
                                         metadata['artist'], metadata['album_artist'], metadata['album'], 
@@ -434,7 +518,9 @@ class MusicLibraryManager:
                                         metadata['mbid'], metadata.get('bitrate'), metadata.get('bit_depth'),
                                         metadata.get('sample_rate'), metadata['last_modified'], 
                                         metadata.get('duration'), metadata['added_timestamp'],
-                                        metadata['added_week'], metadata['added_month'], metadata['added_year']
+                                        metadata['added_week'], metadata['added_month'], metadata['added_year'],
+                                        metadata.get('replay_gain_track_gain'), metadata.get('replay_gain_track_peak'),
+                                        metadata.get('replay_gain_album_gain'), metadata.get('replay_gain_album_peak')
                                     ))
                                     
                                     # Asegurarse de que la canción también tenga entrada en song_links
@@ -625,13 +711,88 @@ class MusicLibraryManager:
             except ValueError:
                 return datetime.now() - timedelta(days=365)  # Default to a year ago
 
+    def update_replay_gain_only(self):
+        """One-time update to extract replay gain for all files in the database."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            # Get all files in the database
+            c.execute("SELECT file_path FROM songs")
+            files = c.fetchall()
+            
+            updated_count = 0
+            for file_path_tuple in files:
+                file_path = file_path_tuple[0]
+                path_obj = Path(file_path)
+                
+                if path_obj.exists() and path_obj.is_file():
+                    try:
+                        # Just extract the replay gain data
+                        audio = None
+                        if path_obj.suffix.lower() == '.flac':
+                            audio = FLAC(path_obj)
+                        elif path_obj.suffix.lower() == '.mp3':
+                            audio = mutagen.File(path_obj)
+                        elif path_obj.suffix.lower() == '.m4a':
+                            audio = mutagen.File(path_obj)
+                        
+                        if audio:
+                            # Extract replay gain using the methods you implemented
+                            replay_gains = {
+                                'replay_gain_track_gain': self._extract_float_tag(audio, 'replaygain_track_gain'),
+                                'replay_gain_track_peak': self._extract_float_tag(audio, 'replaygain_track_peak'),
+                                'replay_gain_album_gain': self._extract_float_tag(audio, 'replaygain_album_gain'),
+                                'replay_gain_album_peak': self._extract_float_tag(audio, 'replaygain_album_peak')
+                            }
+                            
+                            # Update the database with just the replay gain data
+                            c.execute("""
+                                UPDATE songs 
+                                SET replay_gain_track_gain = ?,
+                                    replay_gain_track_peak = ?,
+                                    replay_gain_album_gain = ?,
+                                    replay_gain_album_peak = ?
+                                WHERE file_path = ?
+                            """, (
+                                replay_gains['replay_gain_track_gain'],
+                                replay_gains['replay_gain_track_peak'],
+                                replay_gains['replay_gain_album_gain'],
+                                replay_gains['replay_gain_album_peak'],
+                                file_path
+                            ))
+                            updated_count += 1
+                            
+                            if updated_count % 100 == 0:
+                                conn.commit()
+                                self.logger.info(f"Updated replay gain for {updated_count} files")
+                                
+                    except Exception as e:
+                        self.logger.error(f"Error updating replay gain for {file_path}: {str(e)}")
+            
+            conn.commit()
+            self.logger.info(f"Replay gain update completed. Updated {updated_count} files.")
+        
+        except Exception as e:
+            self.logger.error(f"Replay gain update error: {str(e)}")
+        
+        finally:
+            conn.close()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Music Library Manager')
     parser.add_argument('root_path', help='Root directory of music library')
     parser.add_argument('db_path', help='Path to SQLite database')
     parser.add_argument('--force-update', action='store_true', help='Force update all files')
-    
+    parser.add_argument('--update-replay-gain', action='store_true', help='Update replay gain information only')
+
     args = parser.parse_args()
     
-    manager = MusicLibraryManager(args.root_path, args.db_path)
+    manager = MusicLibraryManager(args.db_path, args.root_path)
+    
+    if args.update_replay_gain:
+        manager.update_replay_gain_only()
+    
+    
     manager.scan_library(force_update=args.force_update)

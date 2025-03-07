@@ -7,7 +7,9 @@ import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLineEdit, QPushButton, QListWidget,
                             QListWidgetItem, QLabel, QScrollArea, QSplitter,
-                            QAbstractItemView, QSpinBox, QComboBox, QSizePolicy)
+                            QAbstractItemView, QSpinBox, QComboBox, QSizePolicy,
+                            QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
+                            QCheckBox)
 from PyQt6.QtGui import QPixmap, QShortcut, QKeySequence, QColor
 from PyQt6.QtCore import Qt, QSize, QDate
 import subprocess
@@ -30,8 +32,8 @@ class GroupedListItem(QListWidgetItem):
             font.setBold(True)
             font.setPointSize(font.pointSize() + 2)
             self.setFont(font)
-            self.setBackground(QColor(THEMES['secondary_bg']))
-            self.setForeground(QColor(THEMES['accent']))
+            # self.setBackground(QColor(THEMES['secondary_bg']))
+            # self.setForeground(QColor(THEMES['accent']))
     pass
 
 class SearchParser:
@@ -170,6 +172,7 @@ class SearchParser:
         }
 
 class MusicBrowser(BaseModule):
+
     def __init__(self, parent=None, theme='Tokyo Night', **kwargs):
         # Extraer los argumentos específicos de MusicBrowser
         self.db_path = kwargs.pop('db_path', '')
@@ -194,9 +197,9 @@ class MusicBrowser(BaseModule):
         layout.setContentsMargins(10, 10, 10, 10)
 
         # Contenedor superior
-        top_container = QWidget()
-        top_container.setMaximumHeight(110)  # Aumentado para acomodar los nuevos controles
-        top_layout = QVBoxLayout(top_container)
+        self.top_container = QWidget()
+        self.top_container.setMaximumHeight(50)  # Aumentado para acomodar los nuevos controles
+        top_layout = QVBoxLayout(self.top_container)
         top_layout.setSpacing(5)
         
         # Inicializar los botones antes de usarlos
@@ -206,24 +209,41 @@ class MusicBrowser(BaseModule):
         self.custom_button2 = QPushButton('Script 2')
         self.custom_button3 = QPushButton('Script 3')
         
-        # Barra de búsqueda
+        # Barra de búsqueda y checkbox para ajustes avanzados
         search_layout = QHBoxLayout()
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText('Buscar en base de datos...')
+        self.search_box.setPlaceholderText('a:artista - b:álbum - g:género - l:sello - t:título - aa:album-artist - br:bitrate - d:fecha - w:semanas - m:meses - y:años - am:mes/año - ay:año')
         self.search_box.textChanged.connect(self.search)
         search_layout.addWidget(self.search_box)
 
-        # Botones existentes
-        for button in [self.play_button, self.folder_button, 
-                    self.custom_button1, self.custom_button2, self.custom_button3]:
+        # Botones básicos (siempre visibles)
+        for button in [self.play_button, self.folder_button]:
             button.setFixedWidth(100)
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             search_layout.addWidget(button)
+        
+        # Checkbox para ajustes avanzados
+        self.advanced_settings_check = QCheckBox("Más")
+        self.advanced_settings_check.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.advanced_settings_check.stateChanged.connect(self.toggle_advanced_settings)
+        search_layout.addWidget(self.advanced_settings_check)
+        
+        # Botones avanzados (inicialmente ocultos)
+        self.advanced_buttons = []
+        for button in [self.custom_button1, self.custom_button2, self.custom_button3]:
+            button.setFixedWidth(100)
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            button.hide()  # Ocultar inicialmente
+            search_layout.addWidget(button)
+            self.advanced_buttons.append(button)
 
         top_layout.addLayout(search_layout)
 
         # Nuevo layout para filtros temporales
-        time_filters_layout = QHBoxLayout()
+        self.time_filters_widget = QWidget()
+        time_filters_layout = QHBoxLayout(self.time_filters_widget)
+        time_filters_layout.setContentsMargins(0, 0, 0, 0)
+        self.time_filters_widget.hide()  # Ocultar inicialmente
 
         # Filtro de últimas X unidades de tiempo
         time_unit_layout = QHBoxLayout()
@@ -275,21 +295,21 @@ class MusicBrowser(BaseModule):
         year_layout.addWidget(self.apply_year)
         time_filters_layout.addLayout(year_layout)
 
-        top_layout.addLayout(time_filters_layout)
+        top_layout.addWidget(self.time_filters_widget)
+        layout.addWidget(self.top_container)
 
-        # Leyenda de filtros
-        legend_label = QLabel(
-            '<span style="color: #7aa2f7;">'
-            'Filtros: a:artista - b:álbum - g:género - l:sello - t:título - aa:album-artist - br:bitrate - d:fecha - '
-            'w:semanas - m:meses - y:años - am:mes/año - ay:año'
-            '</span>'
-        )
-        legend_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        legend_label.setWordWrap(True)  # Permite que el texto se ajuste a múltiples líneas
-        legend_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        top_layout.addWidget(legend_label)
+        # # Leyenda de filtros
+        # legend_label = QLabel(
+        #     '<span style="color: #7aa2f7;">'
+        #     'Filtros: a:artista - b:álbum - g:género - l:sello - t:título - aa:album-artist - br:bitrate - d:fecha - '
+        #     'w:semanas - m:meses - y:años - am:mes/año - ay:año'
+        #     '</span>'
+        # )
+        # legend_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # legend_label.setWordWrap(True)  # Permite que el texto se ajuste a múltiples líneas
+        # legend_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        # top_layout.addWidget(legend_label)
 
-        layout.addWidget(top_container)
 
         # Splitter principal: lista de resultados y panel de detalles
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -300,6 +320,7 @@ class MusicBrowser(BaseModule):
         self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.results_list.currentItemChanged.connect(self.handle_item_change)
         self.results_list.itemClicked.connect(self.handle_item_click)
+        self.results_list.doubleClicked.connect(self.add_to_playlist)  # Conectar doble clic para añadir a playlist
         self.results_list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         main_splitter.addWidget(self.results_list)
 
@@ -309,6 +330,14 @@ class MusicBrowser(BaseModule):
         details_layout.setContentsMargins(0, 0, 0, 0)
         details_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
+        # Crear un TabWidget para los paneles de la derecha
+        self.right_tabs = QTabWidget()
+        
+        # Primer tab (panel original de detalles)
+        details_tab = QWidget()
+        details_tab_layout = QVBoxLayout(details_tab)
+        details_tab_layout.setContentsMargins(0, 0, 0, 0)
+        
         # Splitter vertical para separar imágenes y texto
         details_splitter = QSplitter(Qt.Orientation.Vertical)
         
@@ -329,14 +358,12 @@ class MusicBrowser(BaseModule):
         # Añadir margen entre las imagenes
         images_layout.addSpacing(60)  # Añade un espacio fijo de 20 píxeles
 
-
         # Imagen del artista
         self.artist_image_label = QLabel()
         self.artist_image_label.setFixedSize(200, 200)
         self.artist_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.artist_image_label.setStyleSheet("border: 1px solid #333;")
         images_layout.addWidget(self.artist_image_label)
-        
 
         # Añadir contenedor de botones verticales a la derecha
         buttons_container = QWidget()
@@ -344,7 +371,6 @@ class MusicBrowser(BaseModule):
         buttons_layout.setSpacing(10)
         buttons_layout.setContentsMargins(0, 0, 0, 0)
         buttons_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
-
         
         # Botón para enviar a Spotify
         self.spotify_button = QPushButton("Enviar a Spotify")
@@ -352,16 +378,6 @@ class MusicBrowser(BaseModule):
         self.spotify_button.clicked.connect(self.handle_spotify_button)
         buttons_layout.addWidget(self.spotify_button)
         
-        # Espacio para futuros botones
-        # Puedes añadir más botones aquí siguiendo el mismo patrón
-        # self.otro_boton = QPushButton("Otra acción")
-        # self.otro_boton.setFixedWidth(120)
-        # self.otro_boton.clicked.connect(self.otra_funcion)
-        # buttons_layout.addWidget(self.otro_boton)
-        
-        # Añadir espacio en blanco para empujar los botones hacia arriba
-
-
         buttons_layout.addStretch()
         
         # Añadir el contenedor de botones al layout de imágenes
@@ -375,8 +391,6 @@ class MusicBrowser(BaseModule):
         info_container_layout.setContentsMargins(5, 5, 5, 5)
         info_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-
-        
         # ScrollArea para la información
         self.info_scroll = QScrollArea()
         self.info_scroll.setWidgetResizable(True)
@@ -389,8 +403,6 @@ class MusicBrowser(BaseModule):
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
         self.info_layout.setContentsMargins(5, 5, 5, 5)
-        
-
         
         # Labels para la información
         self.lastfm_label = QLabel()
@@ -420,8 +432,58 @@ class MusicBrowser(BaseModule):
         # Configurar proporciones iniciales del splitter vertical (imágenes/información)
         details_splitter.setSizes([200, 800])
         
-        # Añadir el splitter vertical al layout de detalles
-        details_layout.addWidget(details_splitter)
+        # Añadir el splitter vertical al layout del tab de detalles
+        details_tab_layout.addWidget(details_splitter)
+        
+        # Segundo tab (Playlist)
+        playlist_tab = QWidget()
+        playlist_layout = QVBoxLayout(playlist_tab)
+        playlist_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Tabla para la playlist
+        self.playlist_table = QTableWidget()
+        self.playlist_table.setColumnCount(5)
+        self.playlist_table.setHorizontalHeaderLabels(["Artista", "Álbum", "Canción", "Sello", "Fecha"])
+        self.playlist_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.playlist_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.playlist_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.playlist_table.verticalHeader().setVisible(False)
+        playlist_layout.addWidget(self.playlist_table)
+        
+        # Contenedor para los botones de la playlist
+        playlist_buttons_container = QWidget()
+        playlist_buttons_layout = QHBoxLayout(playlist_buttons_container)
+        playlist_buttons_layout.setSpacing(10)
+        
+        # Botones para la playlist
+        self.clear_playlist_button = QPushButton("Vaciar Playlist")
+        self.clear_playlist_button.clicked.connect(self.clear_playlist)
+        playlist_buttons_layout.addWidget(self.clear_playlist_button)
+        
+        self.playlist_button1 = QPushButton("Función 1")
+        self.playlist_button1.clicked.connect(self.playlist_function1)
+        playlist_buttons_layout.addWidget(self.playlist_button1)
+        
+        self.playlist_button2 = QPushButton("Función 2")
+        self.playlist_button2.clicked.connect(self.playlist_function2)
+        playlist_buttons_layout.addWidget(self.playlist_button2)
+        
+        self.playlist_button3 = QPushButton("Función 3")
+        self.playlist_button3.clicked.connect(self.playlist_function3)
+        playlist_buttons_layout.addWidget(self.playlist_button3)
+        
+        self.playlist_button4 = QPushButton("Función 4")
+        self.playlist_button4.clicked.connect(self.playlist_function4)
+        playlist_buttons_layout.addWidget(self.playlist_button4)
+        
+        playlist_layout.addWidget(playlist_buttons_container)
+        
+        # Añadir los tabs al TabWidget
+        self.right_tabs.addTab(details_tab, "Detalles")
+        self.right_tabs.addTab(playlist_tab, "Playlist")
+        
+        # Añadir el TabWidget al layout de detalles
+        details_layout.addWidget(self.right_tabs)
         
         # Añadir el panel de detalles al splitter principal
         main_splitter.addWidget(details_widget)
@@ -434,6 +496,303 @@ class MusicBrowser(BaseModule):
         
         # Aplicar el tema
         self.apply_theme()
+        
+        # Configurar evento para la tecla espacio
+        self.setup_space_key()
+
+    def setup_space_key(self):
+        """Configura el evento para añadir a playlist al presionar espacio"""
+        self.results_list.keyPressEvent = self.custom_key_press_event
+
+    def custom_key_press_event(self, event):
+        """Maneja eventos de teclado en la lista de resultados"""
+        if event.key() == Qt.Key.Key_Space:
+            self.add_to_playlist()
+        # Llamar al método original para manejar otros eventos de teclado
+        QListWidget.keyPressEvent(self.results_list, event)
+
+    def toggle_advanced_settings(self, state):
+        """Muestra u oculta los elementos de configuración avanzada según el estado del checkbox"""
+        
+        # Verificar el estado del checkbox
+        is_visible = (state == 2)  # 2 es Qt.Checked
+        
+        
+        # Mostrar/ocultar botones avanzados
+        for button in self.advanced_buttons:
+            button.setVisible(is_visible)
+        
+        
+        # Mostrar/ocultar el widget de filtros temporales
+        self.time_filters_widget.setVisible(is_visible)
+        
+        
+        # Ajustar la altura del contenedor según corresponda
+        if is_visible:
+            self.top_container.setMaximumHeight(90)
+        else:
+            self.top_container.setMaximumHeight(50)
+        
+        # Forzar actualización
+        self.repaint()
+        QApplication.processEvents()
+        
+
+
+    def add_to_playlist(self):
+        """Añade el elemento seleccionado a la playlist"""
+        current_item = self.results_list.currentItem()
+        if current_item:
+            # Obtener datos del elemento seleccionado
+            item_data = current_item.data(Qt.ItemDataRole.UserRole)
+            
+            # Verificar si es un elemento de encabezado (artista/álbum) o una pista individual
+            if hasattr(item_data, 'type') and item_data.type in ['artist', 'album']:
+                # Si es un encabezado, obtener todas las pistas asociadas
+                tracks = self.get_tracks_for_header(item_data)
+                for track in tracks:
+                    self.add_track_to_playlist(track)
+            else:
+                # Si es una pista individual
+                self.add_track_to_playlist(item_data)
+            
+            # Cambiar al tab de playlist automáticamente
+            self.right_tabs.setCurrentIndex(1)
+
+    def add_track_to_playlist(self, track_data):
+        """Añade una pista individual a la playlist"""
+        # Verificar si tenemos datos válidos
+        if not track_data:
+            print("No hay datos de pista para añadir")
+            return
+            
+        # Para depuración
+        print(f"track_data: {track_data}, tipo: {type(track_data)}")
+        
+        # Extraer información de la pista según el tipo de datos
+        if isinstance(track_data, dict):
+            # Si los datos son un diccionario
+            artist = track_data.get('artist', 'Desconocido')
+            album = track_data.get('album', 'Desconocido')
+            title = track_data.get('title', 'Desconocido')
+            label = track_data.get('label', 'Desconocido')
+            date = track_data.get('date', 'Desconocido')
+        elif isinstance(track_data, tuple):
+            # Si los datos son una tupla, extraer los valores según la estructura observada
+            try:
+                # Basado en el ejemplo que proporcionaste:
+                # track_data: (1743, '/mnt/NFS/moode/moode/A/Arca/(2017) Arca (XL Recordings) (XLCD834)/Disc 1/04 - Urchin.flac', 'Urchin', 'Arca', 'Arca', 'Arca', '2017-04-07', 'Ambient', 'XL Recordings', ...)
+                
+                # Índices (ajustar según sea necesario):
+                # 0: id, 1: path, 2: title, 3: artist, 4: album_artist, 5: album, 6: date, 7: genre, 8: label, ...
+                
+                # ID está en la posición 0
+                title = track_data[2] if len(track_data) > 2 else 'Desconocido'
+                artist = track_data[3] if len(track_data) > 3 else 'Desconocido'
+                album = track_data[5] if len(track_data) > 5 else 'Desconocido'
+                label = track_data[8] if len(track_data) > 8 else 'Desconocido'
+                date = track_data[6] if len(track_data) > 6 else 'Desconocido'
+            except IndexError:
+                # Si hay problemas con los índices, usar valores por defecto
+                print(f"Error al procesar la tupla: {track_data}")
+                title = "Desconocido"
+                artist = "Desconocido"
+                album = "Desconocido"
+                label = "Desconocido"
+                date = "Desconocido"
+        else:
+            # Si los datos están en un objeto personalizado
+            try:
+                artist = getattr(track_data, 'artist', 'Desconocido')
+                album = getattr(track_data, 'album', 'Desconocido')
+                title = getattr(track_data, 'title', 'Desconocido')
+                label = getattr(track_data, 'label', 'Desconocido')
+                date = getattr(track_data, 'date', 'Desconocido')
+            except AttributeError:
+                # Si no podemos acceder a los atributos, usar texto del ítem actual
+                current_item = self.results_list.currentItem()
+                title = current_item.text() if current_item else "Elemento seleccionado"
+                artist = "Artista (No disponible)"
+                album = "Álbum (No disponible)"
+                label = "Sello (No disponible)"
+                date = "Fecha (No disponible)"
+        
+        # Para depuración
+        print(f"Añadiendo pista: {artist} - {album} - {title} - {label} - {date}")
+        
+        # Añadir a la tabla de playlist
+        row_position = self.playlist_table.rowCount()
+        self.playlist_table.insertRow(row_position)
+        self.playlist_table.setItem(row_position, 0, QTableWidgetItem(str(artist)))
+        self.playlist_table.setItem(row_position, 1, QTableWidgetItem(str(album)))
+        self.playlist_table.setItem(row_position, 2, QTableWidgetItem(str(title)))
+        self.playlist_table.setItem(row_position, 3, QTableWidgetItem(str(label)))
+        self.playlist_table.setItem(row_position, 4, QTableWidgetItem(str(date)))
+        
+        # Almacenar el elemento para referencia futura
+        self.playlist_items.append({
+            'artist': artist,
+            'album': album,
+            'title': title,
+            'label': label,
+            'date': date,
+            'original_data': track_data  # Guarda los datos originales si los necesitas después
+        })
+
+    def get_tracks_for_header(self, header_data):
+        """Obtiene todas las pistas asociadas a un encabezado (artista/álbum)"""
+        tracks = []
+        
+        # Depuración
+        print(f"Obteniendo pistas para encabezado: {header_data}")
+        
+        try:
+            if hasattr(header_data, 'type'):
+                header_type = header_data.type
+                if header_type == 'artist':
+                    # Lógica para obtener pistas de artista
+                    artist_name = getattr(header_data, 'name', 'Desconocido')
+                    # Aquí debería ir tu lógica para buscar pistas por artista
+                    print(f"Buscando pistas para artista: {artist_name}")
+                    
+                    # Ejemplo: llamar a una función de la base de datos
+                    # tracks = self.db.get_tracks_by_artist(artist_name)
+                    
+                elif header_type == 'album':
+                    # Lógica para obtener pistas de álbum
+                    album_name = getattr(header_data, 'name', 'Desconocido')
+                    # Aquí debería ir tu lógica para buscar pistas por álbum
+                    print(f"Buscando pistas para álbum: {album_name}")
+                    
+                    # Ejemplo: llamar a una función de la base de datos
+                    # tracks = self.db.get_tracks_by_album(album_name)
+        except Exception as e:
+            print(f"Error al obtener pistas para encabezado: {e}")
+        
+        # Si no se encontraron pistas, imprimir mensaje de depuración
+        if not tracks:
+            print(f"No se encontraron pistas para el encabezado")
+        else:
+            print(f"Se encontraron {len(tracks)} pistas")
+        
+        return tracks
+
+    def clear_playlist(self):
+        """Vacía la playlist"""
+        self.playlist_table.setRowCount(0)
+        self.playlist_items = []
+
+    def get_song_data_from_current_item(self):
+        """Extrae los datos de canción del ítem actualmente seleccionado"""
+        current_item = self.results_list.currentItem()
+        if not current_item:
+            return None
+            
+        # Intenta obtener los datos completos del ítem
+        track_data = current_item.data(Qt.ItemDataRole.UserRole)
+        
+        # Si no hay datos adjuntos al ítem o son incorrectos, intentar 
+        # obtener información del texto visible y metadatos disponibles
+        if not track_data or not hasattr(track_data, 'artist'):
+            # Extraer información de las etiquetas de metadatos
+            # Suponiendo que esta información está disponible en algún lugar
+            artist = self._extract_artist_from_ui()
+            album = self._extract_album_from_ui()
+            title = current_item.text()
+            label = self._extract_label_from_ui()
+            date = self._extract_date_from_ui()
+            
+            # Crear un objeto o diccionario con los datos extraídos
+            track_data = {
+                'artist': artist,
+                'album': album,
+                'title': title,
+                'label': label,
+                'date': date
+            }
+            
+        return track_data
+        
+    def _extract_artist_from_ui(self):
+        """Extrae información del artista desde la UI actual"""
+        # Este es un método auxiliar para extraer el artista de la UI
+        # Por ejemplo, podrías buscar en el texto de metadata_label o lastfm_label
+        
+        # Ejemplo muy básico:
+        artist = "Desconocido"
+        
+        metadata_text = self.metadata_label.text()
+        if "Artista:" in metadata_text:
+            # Intenta extraer el artista usando expresiones regulares o parsing de texto
+            import re
+            match = re.search(r'Artista:\s*([^<]+)', metadata_text)
+            if match:
+                artist = match.group(1).strip()
+                
+        return artist
+        
+    def _extract_album_from_ui(self):
+        """Extrae información del álbum desde la UI actual"""
+        # Similar al método anterior, pero para el álbum
+        album = "Desconocido"
+        
+        metadata_text = self.metadata_label.text()
+        if "Álbum:" in metadata_text:
+            import re
+            match = re.search(r'Álbum:\s*([^<]+)', metadata_text)
+            if match:
+                album = match.group(1).strip()
+                
+        return album
+        
+    def _extract_label_from_ui(self):
+        """Extrae información del sello desde la UI actual"""
+        # Similar a los métodos anteriores, pero para el sello
+        label = "Desconocido"
+        
+        metadata_text = self.metadata_label.text()
+        if "Sello:" in metadata_text:
+            import re
+            match = re.search(r'Sello:\s*([^<]+)', metadata_text)
+            if match:
+                label = match.group(1).strip()
+                
+        return label
+        
+    def _extract_date_from_ui(self):
+        """Extrae información de la fecha desde la UI actual"""
+        # Similar a los métodos anteriores, pero para la fecha
+        date = "Desconocido"
+        
+        metadata_text = self.metadata_label.text()
+        if "Fecha:" in metadata_text:
+            import re
+            match = re.search(r'Fecha:\s*([^<]+)', metadata_text)
+            if match:
+                date = match.group(1).strip()
+                
+        return date
+    def playlist_function1(self):
+        """Función personalizada 1 para la playlist"""
+        # Implementa tu función aquí
+        pass
+
+    def playlist_function2(self):
+        """Función personalizada 2 para la playlist"""
+        # Implementa tu función aquí
+        pass
+
+    def playlist_function3(self):
+        """Función personalizada 3 para la playlist"""
+        # Implementa tu función aquí
+        pass
+
+    def playlist_function4(self):
+        """Función personalizada 4 para la playlist"""
+        # Implementa tu función aquí
+        pass
+
+
 
 
 
