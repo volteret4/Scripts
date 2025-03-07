@@ -17,10 +17,10 @@
 #
 # source debug.sh
 # 
-# notify_info "Esto muestra todos los botones"   mostrar todos los botones (comportamiento por defecto)
-# notify_info "Solo botón de VSCodium" "$0" "Título" "100"  Mostrar solo el botón de VSCodium
+# notify_info "Esto muestra todos los botones"                      # Mostrar todos los botones (comportamiento por defecto)
+# notify_info "Solo botón de VSCodium" "$0" "Título" "100"          # Mostrar solo el botón de VSCodium
 # notify_warning "Sin botón de VSCodium" "$0" "Advertencia" "011"   # Mostrar solo botones de carpeta y tareas
-# notify_success "Sin botones" "$0" "Éxito" "000"   # Sin botones
+# notify_success "Sin botones" "$0" "Éxito" "000"                   # Sin botones
 
 
 

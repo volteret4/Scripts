@@ -8,16 +8,17 @@
     "Nord",
     "Synthwave"
   ],
-  "tema_seleccionado": "Tokyo Night",
+  "tema_seleccionado": "Synthwave",
   "logging": [
     "true",
     "false"
   ],
   "logging_state": "true",
   "global_theme_config": {
-    "enable_individual_themes": false,
+    "enable_individual_themes": true,
     "shared_db_paths": {
-      "music_database": "/home/huan/Scripts/MOODE.sqlite"
+      "music_database": "/home/huan/Scripts/MOODE.sqlite",
+      "tt": "/home/huan/Scripts/MOODE.sqliteaa"
     }
   },
   "modules": [
@@ -33,7 +34,7 @@
           "Solarized Dark",
           "Monokai"
         ],
-        "tema_seleccionado": "Tokyo Night"
+        "tema_seleccionado": "Monokai"
       }
     },
     {
@@ -46,7 +47,7 @@
           "Solarized Dark",
           "Monokai"
         ],
-        "tema_seleccionado": "Tokyo Night"
+        "tema_seleccionado": "Monokai"
       }
     },
     {
@@ -125,9 +126,7 @@
         ],
         "tema_seleccionado": "Tokyo Night"
       }
-    }
-  ],
-  "modulos_desactivados": [
+    },
     {
       "name": "Spotify Playlists",
       "path": "modules/spotify_module.py",
@@ -143,7 +142,9 @@
         ],
         "tema_seleccionado": "Monokai"
       }
-    },
+    }
+  ],
+  "modulos_desactivados": [
     {
       "name": "Conciertos",
       "path": "modules/conciertos_module.py",
