@@ -1,13 +1,14 @@
 import os
 import sqlite3
+import json
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
                            QLineEdit, QPushButton, QComboBox, QTableWidget, 
                            QTableWidgetItem, QLabel, QFormLayout, QMessageBox,
                            QTextEdit, QDateTimeEdit, QSpinBox, QDoubleSpinBox,
-                           QCheckBox, QDialog, QFileDialog, QScrollArea)
-from PyQt6.QtCore import Qt, pyqtSignal, QDateTime
+                           QCheckBox, QDialog, QFileDialog, QScrollArea, QHeaderView)
+from PyQt6.QtCore import Qt, pyqtSignal, QDateTime, QSettings
 
 from base_module import BaseModule, THEMES
 
@@ -21,9 +22,13 @@ class DatabaseEditor(BaseModule):
         self.current_item_id = None
         self.edit_widgets = {}
         self.search_results = []
-
+        self.column_order = {}  # Diccionario para almacenar el orden de columnas por tabla
+        
         self.available_themes = kwargs.pop('temas', [])
         self.selected_theme = kwargs.pop('tema_seleccionado', theme)
+        
+        # Cargar el orden de columnas si está en los argumentos
+        self.column_order = kwargs.pop('column_order', {})
         
         # Ahora llamamos a super().__init__() que internamente llamará a self.init_ui()
         super().__init__(parent, theme)
@@ -69,6 +74,13 @@ class DatabaseEditor(BaseModule):
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.itemDoubleClicked.connect(self.load_item_for_edit)
+        
+        # Permitir mover y ordenar columnas
+        self.results_table.horizontalHeader().setSectionsMovable(True)
+        self.results_table.horizontalHeader().setSortIndicatorShown(True)
+        self.results_table.horizontalHeader().sortIndicatorChanged.connect(self.sort_table)
+        self.results_table.horizontalHeader().sectionMoved.connect(self.column_moved)
+        
         results_layout.addWidget(self.results_table)
         
         # Botones debajo de la tabla de resultados
@@ -85,6 +97,10 @@ class DatabaseEditor(BaseModule):
         delete_button = QPushButton("Eliminar Seleccionado")
         delete_button.clicked.connect(self.delete_selected_item)
         buttons_layout.addWidget(delete_button)
+        
+        save_layout_button = QPushButton("Guardar Orden de Columnas")
+        save_layout_button.clicked.connect(self.save_column_order_to_config)
+        buttons_layout.addWidget(save_layout_button)
         
         results_layout.addLayout(buttons_layout)
         
@@ -121,7 +137,115 @@ class DatabaseEditor(BaseModule):
     def apply_theme(self, theme_name=None):
         # Optional: Override if you need custom theming beyond base theme
         super().apply_theme(theme_name)
-
+    
+    def sort_table(self, column_index, order):
+        """Ordena la tabla por la columna indicada."""
+        self.results_table.sortItems(column_index, Qt.SortOrder(order))
+    
+    def column_moved(self, logical_index, old_visual_index, new_visual_index):
+        """Guarda el nuevo orden de columnas cuando una columna es movida."""
+        table_name = self.current_table
+        if table_name not in self.column_order:
+            self.column_order[table_name] = {}
+        
+        # Obtener todas las columnas y su posición visual actual
+        visual_to_logical = {}
+        logical_to_visual = {}
+        header = self.results_table.horizontalHeader()
+        
+        for i in range(header.count()):
+            logical = i
+            visual = header.visualIndex(logical)
+            visual_to_logical[visual] = logical
+            logical_to_visual[logical] = visual
+        
+        # Guardar el mapeo visual a lógico
+        self.column_order[table_name] = visual_to_logical
+    
+    def save_column_order_to_config(self):
+        """Guarda el orden actual de columnas en la configuración."""
+        if not hasattr(self, 'tab_manager') or not self.tab_manager:
+            QMessageBox.warning(self, "Error", "No se puede guardar la configuración porque no hay acceso al gestor de pestañas.")
+            return
+        
+        try:
+            # Verificar si existe el módulo "Config Editor"
+            if "Config Editor" in self.tab_manager.tabs:
+                config_editor = self.tab_manager.tabs["Config Editor"]
+                
+                # Obtener la configuración actual
+                current_config = config_editor.load_config()
+                
+                # Buscar la configuración de este módulo
+                for module_config in current_config.get('modules', []):
+                    if module_config.get('name') == 'DatabaseEditor':
+                        # Actualizar o agregar el orden de columnas
+                        if 'args' not in module_config:
+                            module_config['args'] = {}
+                        module_config['args']['column_order'] = self.column_order
+                        break
+                else:
+                    # Si no se encontró la configuración del módulo, crear una nueva
+                    if 'modules' not in current_config:
+                        current_config['modules'] = []
+                    
+                    current_config['modules'].append({
+                        'name': 'DatabaseEditor',
+                        'path': 'modules/database_editor.py',
+                        'args': {'column_order': self.column_order}
+                    })
+                
+                # Guardar la configuración actualizada
+                config_editor.update_config(current_config)
+                config_editor.save_config()
+                
+                QMessageBox.information(self, "Éxito", "Orden de columnas guardado en la configuración.")
+            else:
+                # Si no existe el módulo Config Editor, usar el método de guardar configuración directamente
+                self.save_column_order_directly()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al guardar orden de columnas: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def save_column_order_directly(self):
+        """Guarda el orden de columnas directamente en el archivo de configuración."""
+        try:
+            config_path = getattr(self.tab_manager, 'config_path', 'config.json')
+            
+            # Cargar configuración existente
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+            else:
+                config = {'modules': []}
+            
+            # Encontrar el módulo DatabaseEditor o crear uno nuevo
+            found = False
+            for module_config in config.get('modules', []):
+                if module_config.get('name') == 'DatabaseEditor':
+                    if 'args' not in module_config:
+                        module_config['args'] = {}
+                    module_config['args']['column_order'] = self.column_order
+                    found = True
+                    break
+            
+            if not found:
+                config['modules'].append({
+                    'name': 'DatabaseEditor',
+                    'path': 'modules/database_editor.py',
+                    'args': {'column_order': self.column_order}
+                })
+            
+            # Guardar configuración
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+            
+            QMessageBox.information(self, "Éxito", "Orden de columnas guardado en la configuración.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al guardar orden de columnas directamente: {e}")
+            import traceback
+            traceback.print_exc()
 
     def change_table(self, table_name: str):
         """Cambiar la tabla actual y actualizar los campos de búsqueda."""
@@ -192,6 +316,19 @@ class DatabaseEditor(BaseModule):
                 for col, value in enumerate(result):
                     item = QTableWidgetItem(str(value) if value is not None else "")
                     self.results_table.setItem(row, col, item)
+            
+            # Aplicar orden de columnas guardado si existe para esta tabla
+            if table in self.column_order and self.column_order[table]:
+                header = self.results_table.horizontalHeader()
+                visual_to_logical = self.column_order[table]
+                
+                # Establecer el orden visual de las columnas
+                for visual, logical in visual_to_logical.items():
+                    if isinstance(visual, str):
+                        visual = int(visual)
+                    if isinstance(logical, str):
+                        logical = int(logical)
+                    header.moveSection(header.visualIndex(logical), visual)
             
             self.results_table.resizeColumnsToContents()
             conn.close()
@@ -502,5 +639,5 @@ class DatabaseEditor(BaseModule):
     
     def cleanup(self):
         """Método llamado cuando se cierra el módulo."""
-        # Aquí se puede realizar cualquier limpieza necesaria
-        pass
+        # Guardar el orden de columnas antes de cerrar
+        self.save_column_order_to_config()

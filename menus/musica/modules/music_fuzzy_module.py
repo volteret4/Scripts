@@ -209,11 +209,16 @@ class MusicBrowser(BaseModule):
         self.custom_button2 = QPushButton('Script 2')
         self.custom_button3 = QPushButton('Script 3')
         
+        # Conectar botones
+        self.play_button.clicked.connect(self.play_item)
+        self.folder_button.clicked.connect(self.open_folder)
+
         # Barra de búsqueda y checkbox para ajustes avanzados
         search_layout = QHBoxLayout()
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText('a:artista - b:álbum - g:género - l:sello - t:título - aa:album-artist - br:bitrate - d:fecha - w:semanas - m:meses - y:años - am:mes/año - ay:año')
         self.search_box.textChanged.connect(self.search)
+        self.search_box.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         search_layout.addWidget(self.search_box)
 
         # Botones básicos (siempre visibles)
@@ -1397,7 +1402,7 @@ class MusicBrowser(BaseModule):
             if arg.startswith("https://open.spotify.com/") or arg.startswith("spotify:"):
                 # Aquí la lógica para manejar URLs de Spotify directamente
                 print(f"Enviando URL de Spotify al creador de listas: {arg}")
-                self.switch_to_tab("Spotify Playlists", "add_track_by_url", arg)
+                self.switch_tab("Spotify Playlists", "add_track_by_url", arg)
             else:
                 self.switch_tab("Spotify Playlists", "search_track_by_query", arg)
                 print(f"Buscando en Spotify: {arg}")
@@ -1497,6 +1502,10 @@ class MusicBrowser(BaseModule):
         current = self.results_list.currentItem()
         if not current:
             return
+
+        if getattr(current, 'is_header', True):
+            # Si es un header, abrir la carpeta del primer archivo del álbum
+            self.open_album_folder()
             
         try:
             if getattr(current, 'is_header', False):

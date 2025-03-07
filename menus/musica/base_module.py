@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMessageBox, QTableWidget, QTableView, QProgressBar, QFrame, QGroupBox
 from typing import Dict, Optional
 
 # Default themes
@@ -101,33 +101,19 @@ class BaseModule(QWidget):
         # Get the current theme dictionary
         theme = self.themes[self.current_theme]
 
-        # Optional: Apply theme to the entire module
+        # The base module should have more minimal styling to avoid conflicts
+        # when it's included in TabManager
         self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {theme['bg']};
-                color: {theme['fg']};
-            }}
-            
+            /* Base styles - kept minimal to avoid conflicts */
             QLabel {{
                 color: {theme['fg']};
             }}
             
-            QPushButton {{
+            /* Custom module-specific styling - use class selectors */
+            .custom-widget {{
                 background-color: {theme['secondary_bg']};
                 color: {theme['fg']};
                 border: 1px solid {theme['border']};
-                border-radius: 3px;
-            }}
-            
-            QPushButton:hover {{
-                background-color: {theme['button_hover']};
-            }}
-            
-            QLineEdit, QTextEdit, QComboBox {{
-                background-color: {theme['secondary_bg']};
-                color: {theme['fg']};
-                border: 1px solid {theme['border']};
-                border-radius: 3px;
             }}
         """)
 
@@ -136,7 +122,7 @@ class BaseModule(QWidget):
 
     def _apply_theme_to_children(self, parent, theme):
         """
-        Recursively apply theme to child widgets
+        Recursively apply theme to child widgets with special handling for specific widget types
         
         Args:
             parent (QWidget): Parent widget to start theme application
@@ -144,8 +130,63 @@ class BaseModule(QWidget):
         """
         for child in parent.findChildren(QWidget):
             try:
+                # First call custom apply_theme if available
                 if hasattr(child, 'apply_theme'):
                     child.apply_theme(self.current_theme)
+                    continue
+                    
+                # Special handling for specific widget types
+                widget_type = child.__class__.__name__
+                    
+                # Apply specific styling for various widget types
+                if hasattr(child, 'setStyleSheet'):
+                    # Using direct style application for better specificity
+                    if isinstance(child, QTableWidget) or isinstance(child, QTableView):
+                        child.setStyleSheet(f"""
+                            QTableWidget, QTableView {{
+                                background-color: {theme['secondary_bg']};
+                                color: {theme['fg']};
+                                gridline-color: {theme['border']};
+                            }}
+                        """)
+                        # Adjust header properties
+                        if hasattr(child, 'horizontalHeader') and hasattr(child, 'verticalHeader'):
+                            child.horizontalHeader().setStyleSheet(f"""
+                                QHeaderView::section {{
+                                    background-color: {theme['secondary_bg']};
+                                    color: {theme['fg']};
+                                    border: 1px solid {theme['border']};
+                                }}
+                            """)
+                            child.verticalHeader().setStyleSheet(f"""
+                                QHeaderView::section {{
+                                    background-color: {theme['secondary_bg']};
+                                    color: {theme['fg']};
+                                    border: 1px solid {theme['border']};
+                                }}
+                            """)
+                    
+                    # Progress bars need special handling for chunks
+                    elif isinstance(child, QProgressBar):
+                        child.setStyleSheet(f"""
+                            QProgressBar {{
+                                text-align: center;
+                                border: 1px solid {theme['border']};
+                                border-radius: 3px;
+                                background-color: {theme['secondary_bg']};
+                                color: {theme['fg']};
+                            }}
+                            QProgressBar::chunk {{
+                                background-color: {theme['accent']};
+                            }}
+                        """)
+                    
+                    # Apply theme to frames and containers
+                    elif isinstance(child, QFrame) or isinstance(child, QGroupBox):
+                        child.setStyleSheet(f"""
+                            border: 1px solid {theme['border']};
+                            background-color: {theme['bg']};
+                        """)
             except Exception as e:
                 print(f"Warning: Could not apply theme to {child}: {e}")
 

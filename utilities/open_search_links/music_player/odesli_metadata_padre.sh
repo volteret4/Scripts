@@ -10,7 +10,7 @@
 #
 
 
-source "/home/huan/Scripts/utilities/notificaciones/debug.sh"
+source "/home/huan/Scripts/utilities/notificaciones/debug/debug.sh"
 setup_error_trap
 
 
