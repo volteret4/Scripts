@@ -29,9 +29,44 @@ THEMES = {
         'border': '#75715e',
         'selection': '#49483e',
         'button_hover': '#5c6370'
+    },
+    "Catppuccin": {  # Catppuccin Mocha
+        'bg': '#1e1e2e',
+        'fg': '#cdd6f4',
+        'accent': '#89b4fa',
+        'secondary_bg': '#313244',
+        'border': '#6c7086',
+        'selection': '#45475a',
+        'button_hover': '#585b70'
+    },
+    "Dracula": {  # Dracula
+        'bg': '#282a36',
+        'fg': '#f8f8f2',
+        'accent': '#bd93f9',
+        'secondary_bg': '#44475a',
+        'border': '#6272a4',
+        'selection': '#44475a',
+        'button_hover': '#50fa7b'
+    },
+    "Nord": {  # Nord
+        'bg': '#2e3440',
+        'fg': '#eceff4',
+        'accent': '#88c0d0',
+        'secondary_bg': '#3b4252',
+        'border': '#4c566a',
+        'selection': '#434c5e',
+        'button_hover': '#5e81ac'
+    },
+    "Synthwave": {  # Synthwave
+        'bg': '#262335',
+        'fg': '#f8f8f2',
+        'accent': '#ff8adc',
+        'secondary_bg': '#3b315e',
+        'border': '#7d77a9',
+        'selection': '#4b3c83',
+        'button_hover': '#fe5f86'
     }
 }
-
 class BaseModule(QWidget):
     """Clase base para todos los módulos."""
     def __init__(self, parent=None, theme='Tokyo Night'):

@@ -14,16 +14,16 @@ class MusicDatabaseQuery:
 
     def get_mbid_by_album_artist(self, artist, album):
         """
-        Obtiene el MBID de un álbum por artista
+        Obtiene el MBID de un álbum por artista (case insensitive)
         
         :param artist: Nombre del artista
         :param album: Nombre del álbum
         :return: MBID del álbum o None si no se encuentra
         """
         query = """
-        SELECT mbid FROM albums 
+        SELECT albums.mbid FROM albums 
         JOIN artists ON albums.artist_id = artists.id 
-        WHERE artists.name = ? AND albums.name = ?
+        WHERE LOWER(artists.name) = LOWER(?) AND LOWER(albums.name) = LOWER(?)
         """
         self.cursor.execute(query, (artist, album))
         result = self.cursor.fetchone()
@@ -31,7 +31,7 @@ class MusicDatabaseQuery:
 
     def get_mbid_by_album_track(self, album, track):
         """
-        Obtiene el MBID de una canción en un álbum
+        Obtiene el MBID de una canción en un álbum (case insensitive)
         
         :param album: Nombre del álbum
         :param track: Nombre de la canción
@@ -39,8 +39,7 @@ class MusicDatabaseQuery:
         """
         query = """
         SELECT songs.mbid FROM songs 
-        JOIN albums ON songs.album_id = albums.id 
-        WHERE albums.name = ? AND songs.title = ?
+        WHERE LOWER(songs.album) = LOWER(?) AND LOWER(songs.title) = LOWER(?)
         """
         self.cursor.execute(query, (album, track))
         result = self.cursor.fetchone()
@@ -48,7 +47,7 @@ class MusicDatabaseQuery:
 
     def get_album_links(self, artist, album):
         """
-        Obtiene los links de servicios para un álbum
+        Obtiene los links de servicios para un álbum (case insensitive)
         
         :param artist: Nombre del artista
         :param album: Nombre del álbum
@@ -62,9 +61,10 @@ class MusicDatabaseQuery:
             albums.discogs_url, 
             albums.wikipedia_url
         FROM albums 
-        WHERE albums.name = ?
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE LOWER(albums.name) = LOWER(?) AND LOWER(artists.name) = LOWER(?)
         """
-        self.cursor.execute(query, (album,))
+        self.cursor.execute(query, (album, artist))
         result = self.cursor.fetchone()
         
         if result:
@@ -78,10 +78,9 @@ class MusicDatabaseQuery:
             return {k: v for k, v in links.items() if v}
         return None
 
-
     def get_track_links(self, album, track, services=None):
         """
-        Obtiene los links de servicios para una canción
+        Obtiene los links de servicios para una canción (case insensitive)
         
         :param album: Nombre del álbum
         :param track: Nombre de la canción
@@ -96,7 +95,7 @@ class MusicDatabaseQuery:
             song_links.lastfm_url
         FROM songs 
         JOIN song_links ON songs.id = song_links.song_id
-        WHERE songs.album = ? AND songs.title = ?
+        WHERE LOWER(songs.album) = LOWER(?) AND LOWER(songs.title) = LOWER(?)
         """
         self.cursor.execute(query, (album, track))
         result = self.cursor.fetchone()
@@ -119,7 +118,7 @@ class MusicDatabaseQuery:
 
     def get_album_wiki(self, artist, album):
         """
-        Obtiene el contenido de Wikipedia para un álbum
+        Obtiene el contenido de Wikipedia para un álbum (case insensitive)
         
         :param artist: Nombre del artista
         :param album: Nombre del álbum
@@ -129,35 +128,27 @@ class MusicDatabaseQuery:
         SELECT albums.wikipedia_content 
         FROM albums 
         JOIN artists ON albums.artist_id = artists.id
-        WHERE artists.name = ? AND albums.name = ?
+        WHERE LOWER(artists.name) = LOWER(?) AND LOWER(albums.name) = LOWER(?)
         """
         self.cursor.execute(query, (artist, album))
         result = self.cursor.fetchone()
         return result[0] if result else None
 
-    # Resto de métodos de la clase original...
-
-    def close(self):
-        """
-        Cierra la conexión con la base de datos
-        """
-        self.conn.close()
-
     def get_artist_mbid(self, artist_name):
         """
-        Obtiene el MBID de un artista
+        Obtiene el MBID de un artista (case insensitive)
         
         :param artist_name: Nombre del artista
         :return: MBID del artista o None si no se encuentra
         """
-        query = "SELECT mbid FROM artists WHERE name = ?"
+        query = "SELECT mbid FROM artists WHERE LOWER(name) = LOWER(?)"
         self.cursor.execute(query, (artist_name,))
         result = self.cursor.fetchone()
         return result[0] if result else None
 
     def get_artist_links(self, artist_name):
         """
-        Obtiene los links de servicios para un artista
+        Obtiene los links de servicios para un artista (case insensitive)
         
         :param artist_name: Nombre del artista
         :return: Diccionario con links de servicios
@@ -170,7 +161,7 @@ class MusicDatabaseQuery:
             discogs_url, 
             rateyourmusic_url,
             wikipedia_url
-        FROM artists WHERE name = ?
+        FROM artists WHERE LOWER(name) = LOWER(?)
         """
         self.cursor.execute(query, (artist_name,))
         result = self.cursor.fetchone()
@@ -189,19 +180,19 @@ class MusicDatabaseQuery:
 
     def get_artist_wiki_content(self, artist_name):
         """
-        Obtiene el contenido de Wikipedia para un artista
+        Obtiene el contenido de Wikipedia para un artista (case insensitive)
         
         :param artist_name: Nombre del artista
         :return: Contenido de Wikipedia o None
         """
-        query = "SELECT wikipedia_content FROM artists WHERE name = ?"
+        query = "SELECT wikipedia_content FROM artists WHERE LOWER(name) = LOWER(?)"
         self.cursor.execute(query, (artist_name,))
         result = self.cursor.fetchone()
         return result[0] if result else None
 
     def get_artist_albums(self, artist_name):
         """
-        Obtiene los álbumes de un artista
+        Obtiene los álbumes de un artista (case insensitive)
         
         :param artist_name: Nombre del artista
         :return: Lista de álbumes
@@ -210,19 +201,24 @@ class MusicDatabaseQuery:
         SELECT albums.name, albums.year, albums.genre 
         FROM albums 
         JOIN artists ON albums.artist_id = artists.id 
-        WHERE artists.name = ?
+        WHERE LOWER(artists.name) = LOWER(?)
         """
         self.cursor.execute(query, (artist_name,))
         return self.cursor.fetchall()
 
     def get_albums_by_label(self, label):
         """
-        Obtiene álbumes de un sello discográfico
+        Obtiene álbumes de un sello discográfico (case insensitive)
         
         :param label: Nombre del sello
         :return: Lista de álbumes
         """
-        query = "SELECT name, artist, year FROM albums WHERE label = ?"
+        query = """
+        SELECT albums.name, artists.name, albums.year 
+        FROM albums 
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE LOWER(albums.label) = LOWER(?)
+        """
         self.cursor.execute(query, (label,))
         return self.cursor.fetchall()
 
@@ -233,24 +229,34 @@ class MusicDatabaseQuery:
         :param year: Año de los álbumes
         :return: Lista de álbumes
         """
-        query = "SELECT name, artist, genre FROM albums WHERE year = ?"
+        query = """
+        SELECT albums.name, artists.name, albums.genre 
+        FROM albums 
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE albums.year = ?
+        """
         self.cursor.execute(query, (str(year),))
         return self.cursor.fetchall()
 
     def get_albums_by_genre(self, genre):
         """
-        Obtiene álbumes de un género específico
+        Obtiene álbumes de un género específico (case insensitive)
         
         :param genre: Género musical
         :return: Lista de álbumes
         """
-        query = "SELECT name, artist, year FROM albums WHERE genre = ?"
+        query = """
+        SELECT albums.name, artists.name, albums.year 
+        FROM albums 
+        JOIN artists ON albums.artist_id = artists.id
+        WHERE LOWER(albums.genre) = LOWER(?)
+        """
         self.cursor.execute(query, (genre,))
         return self.cursor.fetchall()
 
     def get_song_lyrics(self, song_title, artist_name=None):
         """
-        Obtiene la letra de una canción
+        Obtiene la letra de una canción (case insensitive)
         
         :param song_title: Título de la canción
         :param artist_name: Nombre del artista (opcional)
@@ -261,7 +267,7 @@ class MusicDatabaseQuery:
             SELECT lyrics.lyrics 
             FROM lyrics 
             JOIN songs ON lyrics.track_id = songs.id 
-            WHERE songs.title = ? AND songs.artist = ?
+            WHERE LOWER(songs.title) = LOWER(?) AND LOWER(songs.artist) = LOWER(?)
             """
             self.cursor.execute(query, (song_title, artist_name))
         else:
@@ -269,7 +275,7 @@ class MusicDatabaseQuery:
             SELECT lyrics.lyrics 
             FROM lyrics 
             JOIN songs ON lyrics.track_id = songs.id 
-            WHERE songs.title = ?
+            WHERE LOWER(songs.title) = LOWER(?)
             """
             self.cursor.execute(query, (song_title,))
         
@@ -278,7 +284,7 @@ class MusicDatabaseQuery:
 
     def get_artist_genres(self, artist_name):
         """
-        Obtiene los géneros de un artista
+        Obtiene los géneros de un artista (case insensitive)
         
         :param artist_name: Nombre del artista
         :return: Lista de géneros
@@ -286,7 +292,7 @@ class MusicDatabaseQuery:
         query = """
         SELECT DISTINCT genre 
         FROM songs 
-        WHERE artist = ?
+        WHERE LOWER(artist) = LOWER(?)
         """
         self.cursor.execute(query, (artist_name,))
         return [genre[0] for genre in self.cursor.fetchall() if genre[0]]
@@ -313,55 +319,61 @@ def main():
     parser.add_argument('--genre', help='Obtener álbumes de un género')
     parser.add_argument('--lyrics', action='store_true', help='Obtener letra de una canción')
     parser.add_argument('--artist-genres', action='store_true', help='Obtener géneros del artista')
+    parser.add_argument('--services', nargs='+', help='Servicios específicos para links')
 
     args = parser.parse_args()
 
     try:
         db = MusicDatabaseQuery(args.db)
-        # Nueva funcionalidad de obtención de MBID
+        
+        # Funcionalidad de obtención de MBID
         if args.mbid and args.artist and args.album:
             print(json.dumps(db.get_mbid_by_album_artist(args.artist, args.album)))
         
-        if args.mbid and args.album and args.song:
+        elif args.mbid and args.album and args.song:
             print(json.dumps(db.get_mbid_by_album_track(args.album, args.song)))
         
-        # Nueva funcionalidad de obtención de links
-        if args.links is not None and args.artist and args.album:
-            print(json.dumps(db.get_album_links(args.artist, args.album)))
-        
-        if args.links is not None and args.album and args.song:
-            print(json.dumps(db.get_track_links(args.album, args.song, args.links)))
-        
-        # Nueva funcionalidad de obtención de wiki de álbum
-        if args.wiki and args.artist and args.album:
-            print(db.get_album_wiki(args.artist, args.album))
-
-        if args.mbid and args.artist:
+        elif args.mbid and args.artist:
             print(json.dumps(db.get_artist_mbid(args.artist)))
         
-        if args.links and args.artist:
+        # Funcionalidad de obtención de links
+        elif args.links and args.artist and args.album:
+            print(json.dumps(db.get_album_links(args.artist, args.album)))
+        
+        elif args.links and args.album and args.song:
+            print(json.dumps(db.get_track_links(args.album, args.song, args.services)))
+        
+        elif args.links and args.artist:
             print(json.dumps(db.get_artist_links(args.artist)))
         
-        if args.wiki and args.artist:
+        # Funcionalidad de obtención de contenido wiki
+        elif args.wiki and args.artist and args.album:
+            print(db.get_album_wiki(args.artist, args.album))
+        
+        elif args.wiki and args.artist:
             print(db.get_artist_wiki_content(args.artist))
         
-        if args.artist_albums and args.artist:
+        # Otras consultas
+        elif args.artist_albums and args.artist:
             print(json.dumps(db.get_artist_albums(args.artist)))
         
-        if args.label:
+        elif args.label:
             print(json.dumps(db.get_albums_by_label(args.label)))
         
-        if args.year:
+        elif args.year:
             print(json.dumps(db.get_albums_by_year(args.year)))
         
-        if args.genre:
+        elif args.genre:
             print(json.dumps(db.get_albums_by_genre(args.genre)))
         
-        if args.lyrics and args.song:
+        elif args.lyrics and args.song:
             print(db.get_song_lyrics(args.song, args.artist))
         
-        if args.artist_genres and args.artist:
+        elif args.artist_genres and args.artist:
             print(json.dumps(db.get_artist_genres(args.artist)))
+        
+        else:
+            print("Error: Combinación de argumentos no válida")
 
         db.close()
 

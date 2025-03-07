@@ -2,7 +2,11 @@
   "temas": [
     "Tokyo Night",
     "Solarized Dark",
-    "Monokai"
+    "Monokai",
+    "Catppuccin",
+    "Dracula",
+    "Nord",
+    "Synthwave"
   ],
   "tema_seleccionado": "Tokyo Night",
   "logging": [
@@ -19,7 +23,7 @@
   "modules": [
     {
       "name": "Music Browser",
-      "path": "music_fuzzy/music_fuzzy_module.py",
+      "path": "modules/music_fuzzy_module.py",
       "args": {
         "db_path": "/home/huan/Scripts/MOODE.sqlite",
         "font_family": "Fira Code",
@@ -34,7 +38,7 @@
     },
     {
       "name": "Database Editor",
-      "path": "base_datos/editor_module.py",
+      "path": "modules/editor_module.py",
       "args": {
         "db_path": "/home/huan/Scripts/moode_a.sqlite",
         "temas": [
@@ -47,7 +51,7 @@
     },
     {
       "name": "Blogs Playlists",
-      "path": "menu_blogs/menu_blogs_module.py",
+      "path": "modules/menu_blogs_module.py",
       "args": {
         "pending_dir": "/home/huan/M\u00fasica/blogs_playlists/PENDIENTE",
         "listened_dir": "/home/huan/M\u00fasica/blogs_playlists/ESCUCHADO",
@@ -65,8 +69,68 @@
       }
     },
     {
+      "name": "Muspy",
+      "path": "modules/muspy_releases_module.py",
+      "args": {
+        "db_path": "/home/huan/Scripts/MOODE.sqlitea",
+        "query_db_script_path": "/home/huan/Scripts/menus/musica/base_datos/tools/consultar_items_db.py",
+        "search_mbid_script_path": "/home/huan/Scripts/menus/musica/base_datos/enlaces_artista_album.py",
+        "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
+        "muspy_username": "frodobolson@disroot.org",
+        "muspy_api_key": "UtVVzmeeoNWkshuhbbeNt9zHy9QdXi",
+        "lastfm_username": "paqueradejere",
+        "temas": [
+          "Tokyo Night",
+          "Solarized Dark",
+          "Monokai"
+        ],
+        "tema_seleccionado": "Monokai"
+      }
+    },
+    {
+      "name": "Enlaces",
+      "path": "modules/modulo_enlaces.py",
+      "args": {
+        "temas": [
+          "Tokyo Night",
+          "Solarized Dark",
+          "Monokai"
+        ],
+        "tema_seleccionado": "Tokyo Night"
+      }
+    },
+    {
+      "name": "Script Runner",
+      "path": "modules/scripts_module.py",
+      "args": {
+        "config_file": "/home/huan/Scripts/menus/musica/actualizaciones/scripts_config.json",
+        "scripts_section": "available_scripts",
+        "temas": [
+          "Tokyo Night",
+          "Solarized Dark",
+          "Monokai"
+        ],
+        "tema_seleccionado": "Tokyo Night"
+      }
+    },
+    {
+      "name": "Config Editor",
+      "path": "modules/config_editor_module.py",
+      "args": {
+        "config_path": "/home/huan/Scripts/menus/musica/config.json",
+        "temas": [
+          "Tokyo Night",
+          "Solarized Dark",
+          "Monokai"
+        ],
+        "tema_seleccionado": "Tokyo Night"
+      }
+    }
+  ],
+  "modulos_desactivados": [
+    {
       "name": "Spotify Playlists",
-      "path": "spotify/spotify_module.py",
+      "path": "modules/spotify_module.py",
       "args": {
         "client_id": "31f8f25e58cc4c7b8ec2ce40ebd773a4",
         "client_secret": "3463936083af4cef9b64ccab0bdebe96",
@@ -82,7 +146,7 @@
     },
     {
       "name": "Conciertos",
-      "path": "conciertos/conciertos_module.py",
+      "path": "modules/conciertos_module.py",
       "args": {
         "temas": [
           "Tokyo Night",
@@ -119,69 +183,11 @@
     },
     {
       "name": "Calendario Radicale",
-      "path": "calendario/calendar_module.py",
+      "path": "modules/calendar_module.py",
       "args": {
         "radicale_url": "https://radicale.pollete.duckdns.org",
         "username": "pollo",
         "password": "iT4wZKIZ4TXU3qtI0Nzy",
-        "temas": [
-          "Tokyo Night",
-          "Solarized Dark",
-          "Monokai"
-        ],
-        "tema_seleccionado": "Tokyo Night"
-      }
-    },
-    {
-      "name": "Muspy",
-      "path": "disco_nuevo/muspy_releases_module.py",
-      "args": {
-        "db_path": "/home/huan/Scripts/MOODE.sqlitea",
-        "query_db_script_path": "/home/huan/Scripts/menus/musica/base_datos/tools/consultar_items_db.py",
-        "search_mbid_script_path": "/home/huan/Scripts/menus/musica/base_datos/enlaces_artista_album.py",
-        "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
-        "muspy_username": "frodobolson@disroot.org",
-        "muspy_api_key": "UtVVzmeeoNWkshuhbbeNt9zHy9QdXi",
-        "lastfm_username": "paqueradejere",
-        "temas": [
-          "Tokyo Night",
-          "Solarized Dark",
-          "Monokai"
-        ],
-        "tema_seleccionado": "Monokai"
-      }
-    },
-    {
-      "name": "Enlaces",
-      "path": "modules/modulo_enlaces.py",
-      "args": {
-        "temas": [
-          "Tokyo Night",
-          "Solarized Dark",
-          "Monokai"
-        ],
-        "tema_seleccionado": "Tokyo Night"
-      }
-    },
-    {
-      "name": "Script Runner",
-      "path": "actualizaciones/scripts_module.py",
-      "args": {
-        "config_file": "/home/huan/Scripts/menus/musica/actualizaciones/scripts_config.json",
-        "scripts_section": "available_scripts",
-        "temas": [
-          "Tokyo Night",
-          "Solarized Dark",
-          "Monokai"
-        ],
-        "tema_seleccionado": "Tokyo Night"
-      }
-    },
-    {
-      "name": "Config Editor",
-      "path": "config_editor/config_editor_module.py",
-      "args": {
-        "config_path": "/home/huan/Scripts/menus/musica/config.json",
         "temas": [
           "Tokyo Night",
           "Solarized Dark",

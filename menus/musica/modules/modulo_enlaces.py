@@ -2,14 +2,28 @@ import sys
 import os
 import subprocess
 import json
+import webbrowser
 from base_module import BaseModule, THEMES
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton, 
                              QLabel, QLineEdit, QMessageBox, QApplication, QTableWidget, 
                              QTableWidgetItem, QHeaderView)
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtCore import pyqtSignal, Qt, QUrl
+from PyQt6.QtGui import QColor, QIcon, QDesktopServices
 import musicbrainzngs
 from datetime import datetime, date
+
+class LinkLabel(QPushButton):
+    """Custom QPushButton that acts as a hyperlink"""
+    def __init__(self, text, url, parent=None):
+        super().__init__(text, parent)
+        self.url = url
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("QPushButton { border: none; color: blue; text-decoration: underline; background-color: transparent; }")
+        self.clicked.connect(self.open_url)
+        
+    def open_url(self):
+        """Open the URL in the default web browser"""
+        QDesktopServices.openUrl(QUrl(self.url))
 
 class MusicBrainzReleasesModule(BaseModule):
     def __init__(self, parent=None, theme='Tokyo Night', *args, **kwargs):
@@ -25,6 +39,9 @@ class MusicBrainzReleasesModule(BaseModule):
 
         self.available_themes = kwargs.pop('temas', [])
         self.selected_theme = kwargs.pop('tema_seleccionado', theme)        
+        
+        # Define known services to look for in the links
+        self.known_services = ["spotify", "musicbrainz", "discogs", "deezer", "youtube", "tidal", "apple"]
         
         super().__init__(parent, theme)
 
@@ -46,15 +63,10 @@ class MusicBrainzReleasesModule(BaseModule):
 
         layout.addLayout(search_layout)
 
-        # Results table
+        # Results table - Dynamically determine column count based on basic columns + service columns
+        self.basic_columns = 6  # In DB, Checked, Title, Date, Type, Label
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(7)  # In DB, Checked, Title, Date, Type, Label, Links
-        self.results_table.setHorizontalHeaderLabels(["In DB", "Checked", "Title", "Date", "Type", "Label", "Links"])
-        header = self.results_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        # Make first two columns narrower
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        # Columns will be set dynamically when data is received
         layout.addWidget(self.results_table)
 
     def run_external_script(self, script_path, args):
@@ -177,19 +189,61 @@ class MusicBrainzReleasesModule(BaseModule):
             releases (list): List of release dictionaries
             db_albums (list): List of albums from local database
         """
-        # Clear existing table
-        self.results_table.setRowCount(0)
-
         if not releases:
             QMessageBox.information(self, "No Results", f"No releases found for {artist_name}")
             return
 
+        # Get all albums links to determine available service columns
+        all_services = set(self.known_services.copy())  # Start with known services
+        
+        # Collect all links first to determine which service columns to show
+        all_links = []
+        for release in releases:
+            # Check if album is in local database
+            in_db = False
+            for db_album in db_albums:
+                if release['title'] == db_album[0]:
+                    in_db = True
+                    break
+                    
+            # Get album links
+            album_links = self.get_album_links(artist_name, release['title']) if in_db else {}
+            all_links.append(album_links)
+            
+            # Collect all services that are present in any album
+            if album_links:
+                all_services.update(album_links.keys())
+        
+        # Filter to only include services that are actually present in the data
+        actual_services = [service for service in all_services 
+                          if any(service in links for links in all_links)]
+        
+        # Set column count: basic columns plus service columns
+        column_count = self.basic_columns + len(actual_services)
+        self.results_table.setColumnCount(column_count)
+        
+        # Set headers
+        headers = ["In DB", "Checked", "Title", "Date", "Type", "Label"] + [service.capitalize() for service in actual_services]
+        self.results_table.setHorizontalHeaderLabels(headers)
+        
+        # Configure column resizing
+        header = self.results_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # Make specific columns narrower
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # In DB
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Checked
+        
+        # Make service columns narrower
+        for i in range(self.basic_columns, column_count):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+        
         # Set number of rows
         self.results_table.setRowCount(len(releases))
-
+        
         # Current date for comparison
         today = date.today()
 
+        # Fill table with data
         for row, release in enumerate(releases):
             # Check if album is in local database
             in_db = False
@@ -202,24 +256,17 @@ class MusicBrainzReleasesModule(BaseModule):
             in_db_item = QTableWidgetItem()
             in_db_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             if in_db:
-                in_db_item.setBackground(QColor(200, 255, 200))
-                in_db_item.setIcon(QIcon.fromTheme("dialog-ok"))  # Requires system icon theme
+                #in_db_item.setBackground(QColor(200, 255, 200))
+                in_db_item.setText("✓")
+                in_db_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             # Get album links
-            album_links = self.get_album_links(artist_name, release['title']) if in_db else {}
-
-            # Create links item
-            links_item = QTableWidgetItem()
-            links_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            if album_links:
-                # Combine all links
-                link_text = " | ".join(f"{platform}: {url}" for platform, url in album_links.items())
-                links_item.setText(link_text)
+            album_links = all_links[row]
 
             # Checked column (empty for now, could be used for manual tracking)
             checked_item = QTableWidgetItem()
-            checked_item.setFlags(Qt.ItemFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled))
-
+            checked_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            
             # Title
             title_item = QTableWidgetItem(release.get('title', 'No Title'))
             
@@ -244,14 +291,21 @@ class MusicBrainzReleasesModule(BaseModule):
                 # Handle unexpected date formats
                 pass
 
-            # Add items to table
+            # Add basic items to table
             self.results_table.setItem(row, 0, in_db_item)
             self.results_table.setItem(row, 1, checked_item)
             self.results_table.setItem(row, 2, title_item)
             self.results_table.setItem(row, 3, date_item)
             self.results_table.setItem(row, 4, type_item)
             self.results_table.setItem(row, 5, label_item)
-            self.results_table.setItem(row, 6, links_item)
+            
+            # Add service link buttons
+            for col, service in enumerate(actual_services, start=self.basic_columns):
+                # Check if link exists for this service
+                if service in album_links:
+                    # Create link button and add to cell
+                    link_button = LinkLabel("Enlace", album_links[service])
+                    self.results_table.setCellWidget(row, col, link_button)
 
 def main():
     """Main function to run the application"""
