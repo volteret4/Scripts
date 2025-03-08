@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QMessageBox, QTableWidget, QTableView, QProgressBar, QFrame, QGroupBox
 from typing import Dict, Optional
+from pathlib import Path
 
 # Default themes
 THEMES = {
@@ -239,3 +240,18 @@ class BaseModule(QWidget):
         
         print(f"Método '{method_name}' no encontrado en '{module_name}'")
         return None
+
+
+        
+
+def find_project_root(marker_files=('requirements.txt', 'base_module.py', 'music_padre.py')):
+    """Busca la raíz del proyecto basándose en archivos distintivos."""
+    path = Path(__file__).resolve().parent  # Directorio donde está el módulo actual
+    while path != path.parent:
+        if any((path / marker).exists() for marker in marker_files):
+            return path
+        path = path.parent
+    return Path(__file__).resolve().parent.parent  # Fallback: asumir que estamos en un subdirectorio
+
+# Definir la raíz del proyecto y el directorio de datos
+PROJECT_ROOT = find_project_root()

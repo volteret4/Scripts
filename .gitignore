@@ -128,3 +128,9 @@ moode_nuevo.sqlite
 .cache/*
 .cache
 menus/musica/.content/artistas_img/
+moode.sqlite
+music_library_scan_errors.log
+MOODE.sqlitea
+moode_bak.sqlite
+menus/musica/.content/cache/*
+MOODE.sqlite

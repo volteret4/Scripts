@@ -1,6 +1,7 @@
 import sys
 import os
-from typing import Optional, List, Dict
+import re
+from typing import Optional, List, Dict, Tuple
 from pathlib import Path
 import sqlite3
 import json
@@ -18,6 +19,7 @@ from base_module import BaseModule, THEMES  # Importar la clase base
 import glob
 import random
 import urllib.parse
+import time
 
 reproductor = 'deadbeef'
 
@@ -53,9 +55,16 @@ class SearchParser:
             'am:': 'added_month', # Añadido en mes X del año Y
             'ay:': 'added_year'   # Añadido en año Z
         }
+        
+        # Caché simple para consultas frecuentes
+        self.cache = {}
+        self.cache_size = 20
 
-    def build_sql_conditions(self, parsed_query: Dict) -> tuple:
+    def build_sql_conditions(self, parsed_query: dict) -> tuple:
         """Construye las condiciones SQL y parámetros basados en la query parseada."""
+        if not parsed_query:
+            return [], []
+            
         conditions = []
         params = []
         
@@ -119,8 +128,12 @@ class SearchParser:
         
         return conditions, params
     
-    def parse_query(self, query: str) -> Dict:
+    def parse_query(self, query: str) -> dict:
         """Parsea la query y devuelve diccionario con filtros y término general."""
+        # Verificar caché
+        if query in self.cache:
+            return self.cache[query]
+            
         filters = {}
         general_terms = []
         current_term = ''
@@ -166,10 +179,18 @@ class SearchParser:
         if current_term.strip():
             general_terms.append(current_term.strip())
         
-        return {
+        result = {
             'filters': filters,
             'general': ' '.join(general_terms)
         }
+        
+        # Actualizar caché
+        if len(self.cache) >= self.cache_size:
+            # Eliminar el primero si está lleno
+            self.cache.pop(next(iter(self.cache)))
+        self.cache[query] = result
+        
+        return result
 
 class MusicBrowser(BaseModule):
 
@@ -553,8 +574,10 @@ class MusicBrowser(BaseModule):
             
             # Verificar si es un elemento de encabezado (artista/álbum) o una pista individual
             if hasattr(item_data, 'type') and item_data.type in ['artist', 'album']:
+                print(f"556:item data type es: {item_data.type}")
                 # Si es un encabezado, obtener todas las pistas asociadas
                 tracks = self.get_tracks_for_header(item_data)
+                print(f"559:tracks: {tracks}")
                 for track in tracks:
                     self.add_track_to_playlist(track)
             else:
@@ -572,7 +595,7 @@ class MusicBrowser(BaseModule):
             return
             
         # Para depuración
-        print(f"track_data: {track_data}, tipo: {type(track_data)}")
+        #print(f"track_data: {track_data}, tipo: {type(track_data)}")
         
         # Extraer información de la pista según el tipo de datos
         if isinstance(track_data, dict):
@@ -1249,7 +1272,12 @@ class MusicBrowser(BaseModule):
         query = self.search_box.text()
         parsed = self.search_parser.parse_query(query)
         
+        # Conectar a la base de datos
         conn = sqlite3.connect(self.db_path)
+        
+        # Habilitar escritura a memoria para mejorar rendimiento
+        conn.execute("PRAGMA temp_store = MEMORY")
+        
         c = conn.cursor()
         
         # Base SQL query con join a tabla artists, albums y lyrics para obtener letras y otra información
@@ -1300,13 +1328,25 @@ class MusicBrowser(BaseModule):
         # Add WHERE clause if there are conditions
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
+            print(f"SQL Condiciones: {conditions}")
+            print(f"SQL Parámetros: {params}")
         
         # Ordering
         sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
         
+        # Añadir un límite razonable para evitar cargar demasiados resultados
+        sql += " LIMIT 1000"
+        
         try:
+            # Iniciar temporizador
+            start_time = time.time()
+            
             c.execute(sql, params)
             results = c.fetchall()
+            
+            # Terminar temporizador
+            elapsed_time = time.time() - start_time
+            print(f"Consulta completada en {elapsed_time:.3f} segundos. {len(results)} resultados encontrados.")
             
             self.results_list.clear()
             current_album = None
@@ -1334,13 +1374,14 @@ class MusicBrowser(BaseModule):
                 item = GroupedListItem(display_text, paths=[row[1]])
                 item.setData(Qt.ItemDataRole.UserRole, row)
                 self.results_list.addItem(item)
-                
+                    
         except Exception as e:
             print(f"Error en la búsqueda: {e}")
             import traceback
             traceback.print_exc()
         finally:
             conn.close()
+
 
 
     def clear_details(self):

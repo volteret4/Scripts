@@ -35,8 +35,8 @@ class MusicLibraryManager:
         # Initialize database
         self.init_database()
 
-    def init_database(self):
-        """Initialize SQLite database with comprehensive tables."""
+    def init_database(self, create_indices=False):
+        """Initialize SQLite database with comprehensive tables and optionally create indices."""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
@@ -44,6 +44,7 @@ class MusicLibraryManager:
         c.execute("SELECT name FROM sqlite_master WHERE type='table'")
         existing_tables = [table[0] for table in c.fetchall()]
         
+
         # Songs table
         if 'songs' not in existing_tables:
             c.execute('''
@@ -153,6 +154,7 @@ class MusicLibraryManager:
                     genre TEXT,
                     total_tracks INTEGER,
                     album_art_path TEXT,
+                    folder_path TEXT, 
                     last_updated TIMESTAMP,
                     spotify_url TEXT,
                     spotify_id TEXT,
@@ -185,7 +187,8 @@ class MusicLibraryManager:
                 'links_updated': 'TIMESTAMP',
                 'wikipedia_url': 'TEXT',
                 'wikipedia_content': 'TEXT',
-                'wikipedia_updated': 'TIMESTAMP'
+                'wikipedia_updated': 'TIMESTAMP',
+                'folder_path': 'TEXT'
             }
             
             for col_name, col_type in new_album_columns.items():
@@ -240,6 +243,225 @@ class MusicLibraryManager:
         conn.commit()
         conn.close()
         
+
+    def create_indices(self):
+        """Crea índices optimizados para mejorar el rendimiento de consultas."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            self.logger.info("Creando índices para optimizar la base de datos...")
+            
+            # 1. Índices para búsquedas generales
+            indices_generales = [
+                "CREATE INDEX IF NOT EXISTS idx_songs_title ON songs(title)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs(artist)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_album_artist ON songs(album_artist)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs(genre)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_added_timestamp ON songs(added_timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_track_number ON songs(track_number)",
+                "CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(name)",
+                "CREATE INDEX IF NOT EXISTS idx_albums_name ON albums(name)",
+                "CREATE INDEX IF NOT EXISTS idx_albums_artist_id ON albums(artist_id)",
+                "CREATE INDEX IF NOT EXISTS idx_albums_year ON albums(year)"
+            ]
+            
+            # 2. Índices para búsquedas case-insensitive
+            indices_case_insensitive = [
+                "CREATE INDEX IF NOT EXISTS idx_songs_title_lower ON songs(LOWER(title))",
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist_lower ON songs(LOWER(artist))",
+                "CREATE INDEX IF NOT EXISTS idx_songs_album_lower ON songs(LOWER(album))",
+                "CREATE INDEX IF NOT EXISTS idx_artists_name_lower ON artists(LOWER(name))",
+                "CREATE INDEX IF NOT EXISTS idx_albums_name_lower ON albums(LOWER(name))",
+                "CREATE INDEX IF NOT EXISTS idx_albums_label_lower ON albums(LOWER(label))",
+                "CREATE INDEX IF NOT EXISTS idx_albums_genre_lower ON albums(LOWER(genre))"
+            ]
+            
+            # 3. Índices compuestos para consultas específicas
+            indices_compuestos = [
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist_album ON songs(artist, album)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_album_title ON songs(album, title)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_album_track ON songs(album, track_number)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist_title ON songs(artist, title)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_date_added ON songs(added_year, added_month, added_week)"
+            ]
+            
+            # 4. Índices para JOINs específicos
+            indices_joins = [
+                "CREATE INDEX IF NOT EXISTS idx_songs_id ON songs(id)",
+                "CREATE INDEX IF NOT EXISTS idx_lyrics_track_id ON lyrics(track_id)",
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist_album_join ON songs(artist, album)"
+            ]
+            
+            # 5. Índices para la consulta de búsqueda principal
+            indices_busqueda = [
+                "CREATE INDEX IF NOT EXISTS idx_songs_artist_album_track ON songs(artist, album, track_number)"
+            ]
+            
+            # 6. Índices para URLs y servicios externos
+            indices_urls = [
+                "CREATE INDEX IF NOT EXISTS idx_song_links_urls ON song_links(song_id, spotify_url, youtube_url, spotify_id, lastfm_url)"
+            ]
+            
+            # Crear todos los índices
+            indices_totales = indices_generales + indices_case_insensitive + indices_compuestos + indices_joins + indices_busqueda + indices_urls
+            
+            for index_query in indices_totales:
+                try:
+                    c.execute(index_query)
+                    conn.commit()
+                except sqlite3.OperationalError as e:
+                    # Algunos índices pueden fallar si la columna no existe todavía
+                    self.logger.warning(f"Índice no creado: {e}")
+            
+            # 7. Restricciones de clave foránea (si no existen ya)
+            try:
+                c.execute("PRAGMA foreign_keys = ON")
+                
+                # Verificar si ya existen las restricciones antes de añadirlas
+                c.execute("PRAGMA foreign_key_list(songs)")
+                if not c.fetchall():
+                    c.execute("ALTER TABLE songs ADD CONSTRAINT fk_songs_lyrics FOREIGN KEY (lyrics_id) REFERENCES lyrics(id)")
+                
+                c.execute("PRAGMA foreign_key_list(lyrics)")
+                if not c.fetchall():
+                    c.execute("ALTER TABLE lyrics ADD CONSTRAINT fk_lyrics_songs FOREIGN KEY (track_id) REFERENCES songs(id)")
+                
+                c.execute("PRAGMA foreign_key_list(albums)")
+                if not c.fetchall():
+                    c.execute("ALTER TABLE albums ADD CONSTRAINT fk_albums_artists FOREIGN KEY (artist_id) REFERENCES artists(id)")
+                
+                c.execute("PRAGMA foreign_key_list(song_links)")
+                if not c.fetchall():
+                    c.execute("ALTER TABLE song_links ADD CONSTRAINT fk_song_links_songs FOREIGN KEY (song_id) REFERENCES songs(id)")
+            
+            except sqlite3.OperationalError as e:
+                self.logger.warning(f"No se pudieron crear restricciones de clave foránea: {e}")
+                
+            # 8. Intentar crear tablas FTS (Full-Text Search) si están soportadas
+            try:
+                c.execute("DROP TABLE IF EXISTS songs_fts")
+                c.execute("CREATE VIRTUAL TABLE songs_fts USING fts5(title, artist, album, genre, content=songs)")
+                
+                c.execute("DROP TABLE IF EXISTS lyrics_fts")
+                c.execute("CREATE VIRTUAL TABLE lyrics_fts USING fts5(lyrics, content=lyrics)")
+                
+                self.logger.info("Tablas de búsqueda de texto completo creadas exitosamente")
+            except sqlite3.OperationalError as e:
+                self.logger.warning(f"No se pudieron crear tablas FTS: {e}")
+            
+            # 9. Actualizar estadísticas del optimizador
+            c.execute("ANALYZE")
+            
+            self.logger.info("Creación de índices completada")
+        
+        except Exception as e:
+            self.logger.error(f"Error al crear índices: {str(e)}")
+        
+        finally:
+            conn.close()
+
+
+    def optimize_database(self):
+        """Aplica configuraciones de rendimiento a la base de datos SQLite."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            self.logger.info("Aplicando optimizaciones a la base de datos...")
+            
+            # Configuraciones de rendimiento
+            pragmas = [
+                "PRAGMA journal_mode = WAL",  # Write-Ahead Logging para mejor concurrencia
+                "PRAGMA synchronous = NORMAL", # Balance entre rendimiento y seguridad
+                "PRAGMA cache_size = -8000",   # Usar aproximadamente 8MB de caché (valor negativo para KB)
+                "PRAGMA temp_store = MEMORY",  # Almacenar tablas temporales en memoria
+                "PRAGMA foreign_keys = ON"     # Habilitar claves foráneas
+            ]
+            
+            for pragma in pragmas:
+                c.execute(pragma)
+                
+            # Verificar que se aplicó el modo WAL
+            c.execute("PRAGMA journal_mode")
+            journal_mode = c.fetchone()[0]
+            self.logger.info(f"Modo de journal establecido a: {journal_mode}")
+            
+            # Ejecutar VACUUM para compactar la base de datos
+            c.execute("VACUUM")
+            
+            self.logger.info("Optimizaciones de la base de datos aplicadas correctamente")
+        
+        except Exception as e:
+            self.logger.error(f"Error al optimizar la base de datos: {str(e)}")
+        
+        finally:
+            conn.close()
+
+
+    def update_schema(self):
+        """Actualiza el esquema de la base de datos con todas las tablas e índices."""
+        # Primero inicializar la base de datos (tablas)
+        self.init_database()
+        
+        # Luego aplicar optimizaciones
+        self.optimize_database()
+        
+        # Finalmente crear índices
+        self.create_indices()
+        
+        self.logger.info("Actualización de esquema completada")
+
+
+    def quick_scan_library(self):
+        """
+        Realiza un escaneo rápido para identificar álbumes ausentes y
+        actualizar la base de datos de manera eficiente.
+        """
+        start_time = datetime.now()
+        self.logger.info("Iniciando escaneo rápido de la biblioteca...")
+        
+        # Encontrar álbumes ausentes
+        missing_album_ids = self.find_missing_albums()
+        
+        if missing_album_ids:
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            
+            try:
+                # Marcar los álbumes como eliminados o eliminarlos
+                # Opción 1: Eliminar los álbumes ausentes
+                for album_id in missing_album_ids:
+                    # También puedes eliminar las canciones relacionadas
+                    c.execute("SELECT id FROM songs WHERE album IN (SELECT name FROM albums WHERE id = ?)", (album_id,))
+                    song_ids = [row[0] for row in c.fetchall()]
+                    
+                    for song_id in song_ids:
+                        c.execute("DELETE FROM song_links WHERE song_id = ?", (song_id,))
+                        c.execute("DELETE FROM lyrics WHERE track_id = ?", (song_id,))
+                    
+                    c.execute("DELETE FROM songs WHERE album IN (SELECT name FROM albums WHERE id = ?)", (album_id,))
+                    c.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+                
+                # Opción 2: Alternativamente, puedes marcarlos como eliminados sin eliminarlos
+                # c.execute("UPDATE albums SET is_deleted = 1 WHERE id IN ({})".format(','.join('?' * len(missing_album_ids))), missing_album_ids)
+                
+                conn.commit()
+                self.logger.info(f"Se han eliminado {len(missing_album_ids)} álbumes ausentes de la base de datos")
+                
+            except Exception as e:
+                self.logger.error(f"Error al actualizar álbumes ausentes: {str(e)}")
+            
+            finally:
+                conn.close()
+        
+        # Posiblemente escanear solo las carpetas nuevas
+        # Esta sería una mejora futura para solo procesar carpetas que no están en la DB
+        
+        self.logger.info(f"Escaneo rápido completado en {(datetime.now() - start_time).total_seconds():.2f} segundos")
+
+
     def get_audio_metadata(self, file_path: Path) -> Optional[Dict]:
         """Extract comprehensive audio metadata including replay gain."""
         try:
@@ -337,6 +559,72 @@ class MusicLibraryManager:
         except Exception as e:
             self.logger.error(f"Metadata extraction error for {file_path}: {str(e)}")
             return None
+
+
+    def find_album_folders(self):
+        """
+        Encuentra todas las carpetas que contienen archivos FLAC u otros formatos soportados.
+        
+        Returns:
+            set: Conjunto de rutas de carpetas que contienen archivos de audio soportados
+        """
+        album_folders = set()
+        
+        self.logger.info("Buscando carpetas con archivos de audio...")
+        start_time = datetime.now()
+        
+        for extension in self.supported_formats:
+            for file_path in self.root_path.rglob(f'*{extension}'):
+                album_folders.add(str(file_path.parent.resolve()))
+        
+        self.logger.info(f"Se encontraron {len(album_folders)} carpetas en {(datetime.now() - start_time).total_seconds():.2f} segundos")
+        return album_folders
+
+    def find_missing_albums(self):
+        """
+        Identifica álbumes que ya no existen en el sistema de archivos.
+        
+        Returns:
+            list: Lista de IDs de álbumes que ya no existen
+        """
+        # Obtener todas las carpetas con archivos de audio
+        album_folders = self.find_album_folders()
+        
+        # Método 1: Comparación directa con la base de datos (consulta por consulta)
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        missing_album_ids = []
+        
+        try:
+            # Opción 1: Para bases de datos pequeñas, verificar directamente
+            c.execute("SELECT id, folder_path FROM albums WHERE folder_path IS NOT NULL")
+            db_albums = c.fetchall()
+            
+            if len(db_albums) < 5000:  # Un límite arbitrario para bases de datos pequeñas
+                for album_id, folder_path in db_albums:
+                    if folder_path and folder_path not in album_folders:
+                        missing_album_ids.append(album_id)
+            else:
+                # Opción 2: Para bases de datos grandes, usar un enfoque de conjunto
+                # Guardar todos los IDs y paths en un diccionario para búsqueda rápida
+                album_dict = {folder_path: album_id for album_id, folder_path in db_albums if folder_path}
+                
+                # Encontrar las rutas que no existen en album_folders
+                missing_paths = set(album_dict.keys()) - album_folders
+                
+                # Obtener los IDs correspondientes
+                missing_album_ids = [album_dict[path] for path in missing_paths]
+            
+            self.logger.info(f"Se encontraron {len(missing_album_ids)} álbumes ausentes en la biblioteca")
+            
+        except Exception as e:
+            self.logger.error(f"Error al buscar álbumes ausentes: {str(e)}")
+        
+        finally:
+            conn.close()
+        
+        return missing_album_ids
 
 
     def _extract_float_tag(self, audio, tag_name):
@@ -786,13 +1074,27 @@ if __name__ == "__main__":
     parser.add_argument('db_path', help='Path to SQLite database')
     parser.add_argument('--force-update', action='store_true', help='Force update all files')
     parser.add_argument('--update-replay-gain', action='store_true', help='Update replay gain information only')
+    parser.add_argument('--optimize', action='store_true', help='Create indices and optimize database')
+    parser.add_argument('--update-schema', action='store_true', help='Update database schema with all tables and indices')
+    parser.add_argument('--quick-scan', action='store_true', help='Perform a quick scan based on album folders')
 
     args = parser.parse_args()
     
-    manager = MusicLibraryManager(args.db_path, args.root_path)
+    manager = MusicLibraryManager(args.root_path, args.db_path)
     
+    if args.update_schema:
+        manager.update_schema()
+    
+    if args.optimize:
+        manager.optimize_database()
+        manager.create_indices()
+        
     if args.update_replay_gain:
         manager.update_replay_gain_only()
     
+    if args.quick_scan:
+        manager.quick_scan_library()
     
-    manager.scan_library(force_update=args.force_update)
+    # Escanear la biblioteca siempre como último paso
+    if not args.update_replay_gain and not args.optimize and not args.update_schema and not args.quick_scan:
+        manager.scan_library(force_update=args.force_update)
