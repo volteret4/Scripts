@@ -1,0 +1,562 @@
+[
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741391603",
+            "#text": "07 Mar 2025, 23:53"
+        },
+        "mbid": "2e6028ac-7c67-46f8-acc9-8458c1fdd2f2",
+        "name": "Sohn",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Sohn",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741391314",
+            "#text": "07 Mar 2025, 23:48"
+        },
+        "mbid": "610fd66a-2d08-40d4-b81c-23665deef825",
+        "name": "Mortem Cellula",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Mortem+Cellula",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741391055",
+            "#text": "07 Mar 2025, 23:44"
+        },
+        "mbid": "b76d9124-2ef9-47b1-a5e9-5d85d094d175",
+        "name": "Errorist",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Errorist",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741390713",
+            "#text": "07 Mar 2025, 23:38"
+        },
+        "mbid": "9ee17ce7-2d44-4281-a840-af6ba69e368d",
+        "name": "Anomal Beta",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Anomal+Beta",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741390300",
+            "#text": "07 Mar 2025, 23:31"
+        },
+        "mbid": "013a8054-5c78-4673-98f8-eeb5ed904bae",
+        "name": "Kuru",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Kuru",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741389873",
+            "#text": "07 Mar 2025, 23:24"
+        },
+        "mbid": "2fb96b4f-9ccf-4296-b5c0-6d9268cc27ec",
+        "name": "Unwelt",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Unwelt",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741389388",
+            "#text": "07 Mar 2025, 23:16"
+        },
+        "mbid": "90907d49-5723-4aba-895a-e8c95799ff20",
+        "name": "Boom To The Moon",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Boom+To+The+Moon",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741388997",
+            "#text": "07 Mar 2025, 23:09"
+        },
+        "mbid": "b87b5e82-3453-45b5-b702-26a8cff63f3b",
+        "name": "Terraformink",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Terraformink",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741388726",
+            "#text": "07 Mar 2025, 23:05"
+        },
+        "mbid": "11b10bea-a68b-44b5-9e57-dc7085ff6b71",
+        "name": "Katharsis",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Katharsis",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    },
+    {
+        "artist": {
+            "url": "https://www.last.fm/music/Vril",
+            "name": "Vril",
+            "image": [
+                {
+                    "size": "small",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/34s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "medium",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/64s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "large",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
+                },
+                {
+                    "size": "extralarge",
+                    "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"
+                }
+            ],
+            "mbid": ""
+        },
+        "date": {
+            "uts": "1741387835",
+            "#text": "07 Mar 2025, 22:50"
+        },
+        "mbid": "",
+        "name": "Zūkunftsstrāße",
+        "image": [
+            {
+                "size": "small",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/34s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "medium",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/64s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "large",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/174s/aee67ff3c60794437d2a94dbc390af09.png"
+            },
+            {
+                "size": "extralarge",
+                "#text": "https://lastfm.freetls.fastly.net/i/u/300x300/aee67ff3c60794437d2a94dbc390af09.png"
+            }
+        ],
+        "url": "https://www.last.fm/music/Vril/_/Z%C5%ABkunftsstr%C4%81%C3%9Fe",
+        "streamable": "0",
+        "album": {
+            "mbid": "bc7908bf-560d-4afb-8ea7-4762ca0f7af4",
+            "#text": "Animist"
+        },
+        "loved": "0"
+    }
+]
