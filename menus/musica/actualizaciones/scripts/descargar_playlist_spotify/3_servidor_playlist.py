@@ -8,7 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import time
 import logging
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 import logging.handlers
 
 
@@ -44,6 +44,15 @@ class TorrentProcessor:
         except Exception as e:
             logger.error(f"Error cargando el archivo JSON: {e}")
             self.canciones = []
+
+    def normalizar_texto(self, texto):
+        """Normaliza el texto para facilitar comparaciones quitando años y texto entre paréntesis."""
+        if not texto:
+            return ""
+        # Eliminar años y cualquier texto entre paréntesis
+        texto = re.sub(r'\(\d{4}.*?\)', '', texto)
+        texto = re.sub(r'\(\s*\)', '', texto)  # Eliminar paréntesis vacíos restantes
+        return texto.strip().lower()
             
     def process_download(self, album, ruta):
         logger.info(f"Procesando descarga: Album '{album}' en ruta '{ruta}'")
@@ -55,14 +64,45 @@ class TorrentProcessor:
         if not os.path.exists(ruta_completa):
             logger.error(f"La ruta de descarga '{ruta_completa}' no existe")
             return False
-            
-        # Buscar todas las canciones que pertenecen a este álbum
-        canciones_album = [cancion for cancion in self.canciones if cancion.get('album') == album]
         
-        if not canciones_album:
-            logger.warning(f"No se encontraron canciones para el álbum '{album}' en el JSON")
-            return False
+        # Extraer artista y álbum del nombre de la ruta
+        # Formato esperado: "Artista - Album" o variaciones
+        ruta_parts = ruta.split(' - ', 1)
+        artista_ruta = ruta_parts[0] if len(ruta_parts) > 0 else ""
+        album_ruta = ruta_parts[1] if len(ruta_parts) > 1 else ruta
+        
+        # Normalizar nombres para facilitar la comparación
+        artista_ruta_norm = self.normalizar_texto(artista_ruta)
+        album_ruta_norm = self.normalizar_texto(album_ruta)
+        album_param_norm = self.normalizar_texto(album)
+        
+        logger.info(f"Información normalizada: Artista '{artista_ruta_norm}', Album ruta '{album_ruta_norm}', Album param '{album_param_norm}'")
+        
+        # Buscar canciones que coincidan con el artista y álbum normalizados
+        canciones_coincidentes = []
+        for cancion in self.canciones:
+            artista_json_norm = self.normalizar_texto(cancion.get('artista', ''))
+            album_json_norm = self.normalizar_texto(cancion.get('album', ''))
             
+            # Verificar si hay coincidencia con la información normalizada
+            if (artista_json_norm == artista_ruta_norm and 
+                (album_json_norm == album_ruta_norm or album_json_norm in album_ruta_norm or album_ruta_norm in album_json_norm)):
+                canciones_coincidentes.append(cancion)
+        
+        # Si no encontramos coincidencias, intentamos solo con el álbum proporcionado como parámetro
+        if not canciones_coincidentes and album:
+            logger.info(f"No se encontraron coincidencias exactas. Intentando con el álbum proporcionado: '{album}'")
+            for cancion in self.canciones:
+                album_json_norm = self.normalizar_texto(cancion.get('album', ''))
+                if album_json_norm == album_param_norm or album_json_norm in album_param_norm or album_param_norm in album_json_norm:
+                    canciones_coincidentes.append(cancion)
+        
+        if not canciones_coincidentes:
+            logger.warning(f"No se encontraron canciones que coincidan con Artista='{artista_ruta}', Album='{album_ruta}' en el JSON")
+            return False
+        
+        logger.info(f"Se encontraron {len(canciones_coincidentes)} canciones coincidentes en el JSON")
+        
         # Obtener archivos de música de la carpeta descargada
         archivos_musica = []
         for root, dirs, files in os.walk(ruta_completa):
@@ -73,26 +113,24 @@ class TorrentProcessor:
         if not archivos_musica:
             logger.warning(f"No se encontraron archivos de música en '{ruta_completa}'")
             return False
-            
+        
         logger.info(f"Se encontraron {len(archivos_musica)} archivos de música")
         
         # Para cada canción en el JSON, buscar un archivo correspondiente
         canciones_procesadas = 0
-        for cancion_info in canciones_album:
+        for cancion_info in canciones_coincidentes:
             nombre_cancion = cancion_info.get('cancion')
             if not nombre_cancion:
                 continue
-                
-            # Patrón para buscar la canción - ignoramos números y caracteres especiales
-            # Buscamos el nombre de la canción como una substring del nombre de archivo
+            
+            # Patrón para buscar la canción - buscamos el nombre como substring
             patron = re.compile(re.escape(nombre_cancion), re.IGNORECASE)
             
             for archivo in archivos_musica:
                 nombre_archivo = os.path.basename(archivo)
                 if patron.search(nombre_archivo):
-                    # Destino para la copia
-                    artista = cancion_info.get('artista', 'Desconocido')
-                    album_dir = os.path.join(self.output_path, artista, album)
+                    # Usar la ruta como carpeta destino
+                    album_dir = os.path.join(self.output_path, ruta)
                     
                     # Crear carpetas si no existen
                     os.makedirs(album_dir, exist_ok=True)
@@ -110,6 +148,16 @@ class TorrentProcessor:
                         logger.error(f"Error copiando '{archivo}': {e}")
         
         logger.info(f"Procesamiento completado. {canciones_procesadas} canciones copiadas")
+        
+        # Si se procesaron canciones correctamente, eliminar la carpeta original
+        if canciones_procesadas > 0:
+            try:
+                logger.info(f"Eliminando carpeta de descarga original: {ruta_completa}")
+                shutil.rmtree(ruta_completa)
+                logger.info(f"Carpeta eliminada correctamente: {ruta_completa}")
+            except Exception as e:
+                logger.error(f"Error eliminando carpeta de descarga original '{ruta_completa}': {e}")
+        
         return canciones_procesadas > 0
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -129,60 +177,105 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         logger.info(f"Recibida solicitud POST desde {self.client_address}")
         logger.info(f"Headers: {dict(self.headers)}")
+        
         try:
-            if self.path == '/download-complete':
+            if self.path.startswith('/download-complete'):
+                # Procesar tanto el cuerpo JSON como los parámetros de URL
+                album = None
+                ruta = None
+                
+                # Verificar si hay parámetros en la URL
+                parsed_url = urlparse(self.path)
+                if parsed_url.query:
+                    query_params = parse_qs(parsed_url.query)
+                    logger.info(f"Parámetros URL recibidos: {query_params}")
+                    album = query_params.get('album', [''])[0]
+                    ruta = query_params.get('ruta', [''])[0]
+                
+                # Verificar si hay cuerpo de solicitud
                 content_length = int(self.headers.get('Content-Length', 0))
                 if content_length > 0:
                     post_data = self.rfile.read(content_length).decode('utf-8')
+                    logger.info(f"Datos POST recibidos (raw): {post_data}")
+                    
+                    # Intentar procesar como JSON
                     try:
                         data = json.loads(post_data)
-                        logger.info(f"Datos POST recibidos: {data}")
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Error decodificando JSON: {e}. Datos recibidos: {post_data}")
-                        self.send_response(400)
-                        self.send_header('Content-type', 'text/plain')
-                        self.end_headers()
-                        self.wfile.write(b'Error: JSON invalido')
-                        return
-                    
-                    album = data.get('album')
-                    ruta = data.get('ruta')
-                    
-                    if album and ruta:
-                        logger.info(f"Recibida notificación: Album '{album}', Ruta '{ruta}'")
-                        
-                        if self.processor:
-                            success = self.processor.process_download(album, ruta)
-                            self.__class__.increment_count()
-                            
-                            if success:
-                                self.send_response(200)
-                                self.send_header('Content-type', 'text/plain')
-                                self.end_headers()
-                                self.wfile.write(b'Procesamiento completado')
-                                return
-                        
-                        # Si llegamos aquí, algo falló
-                        self.send_response(500)
-                        self.send_header('Content-type', 'text/plain')
-                        self.end_headers()
-                        self.wfile.write(b'Error procesando la descarga')
-                        return
+                        logger.info(f"Datos POST procesados como JSON: {data}")
+                        # Priorizar datos del cuerpo sobre los de la URL
+                        if data.get('album'):
+                            album = data.get('album')
+                        if data.get('ruta'):
+                            ruta = data.get('ruta')
+                    except json.JSONDecodeError:
+                        # Si no es JSON válido, intentar procesar como form-urlencoded
+                        try:
+                            form_data = parse_qs(post_data)
+                            logger.info(f"Datos POST procesados como form-urlencoded: {form_data}")
+                            # Priorizar datos del cuerpo sobre los de la URL
+                            if form_data.get('album'):
+                                album = form_data.get('album')[0]
+                            if form_data.get('ruta'):
+                                ruta = form_data.get('ruta')[0]
+                        except Exception as e:
+                            logger.warning(f"No se pudo procesar el cuerpo como form-urlencoded: {e}")
                 
-                # Si llegamos aquí, los datos son incorrectos
+                # Si no hay datos suficientes, intentar extraer información del nombre del torrent
+                if not album or not ruta:
+                    logger.info("Intentando extraer información del nombre del torrent desde los encabezados...")
+                    
+                    # Buscar en cabeceras específicas de qBittorrent
+                    torrent_name = self.headers.get('X-Torrent-Name') or self.headers.get('X-Torrent-Hash')
+                    
+                    if torrent_name:
+                        logger.info(f"Nombre del torrent encontrado: {torrent_name}")
+                        # Si no tenemos ruta, usamos el nombre del torrent
+                        if not ruta:
+                            ruta = torrent_name
+                        
+                        # Si no tenemos álbum, intentamos extraerlo del nombre
+                        if not album:
+                            # Suponemos que el formato es "Artista - Album"
+                            parts = torrent_name.split(' - ', 1)
+                            if len(parts) > 1:
+                                album = parts[1]
+                            else:
+                                album = torrent_name
+                
+                # Procesar la descarga si tenemos suficiente información
+                if album and ruta:
+                    logger.info(f"Procesando con: Album '{album}', Ruta '{ruta}'")
+                    
+                    if self.processor:
+                        success = self.processor.process_download(album, ruta)
+                        self.__class__.increment_count()
+                        
+                        if success:
+                            self.send_response(200)
+                            self.send_header('Content-type', 'text/plain')
+                            self.end_headers()
+                            self.wfile.write(b'Procesamiento completado')
+                            return
+                    
+                    # Si llegamos aquí, el procesamiento falló
+                    self.send_response(500)
+                    self.send_header('Content-type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b'Error procesando la descarga')
+                    return
+                
+                # Datos insuficientes
+                logger.warning(f"Datos insuficientes: album='{album}', ruta='{ruta}'")
                 self.send_response(400)
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
-                self.wfile.write(b'Datos incorrectos')
+                self.wfile.write(b'Datos insuficientes para procesar la descarga')
+            elif self.path.startswith('/status'):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b'Servidor activo')
             else:
-                # Agregamos soporte para una ruta de verificación simple
-                if self.path == '/status':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/plain')
-                    self.end_headers()
-                    self.wfile.write(b'Servidor activo')
-                    return
-                
                 self.send_response(404)
                 self.send_header('Content-type', 'text/plain')
                 self.end_headers()
@@ -265,15 +358,15 @@ def main():
     parser.add_argument('--temp_server_port', type=int, default=8584, 
                         help='Puerto del servidor (por defecto: 8584)')
     parser.add_argument('--carpeta-descargas-qbitorrent',
-     help='Carpeta descargas de qbitorrent, donde descarga tus cositas')
+                        help='Carpeta descargas de qbitorrent, donde descarga tus cositas')
 
     args = parser.parse_args()
     
     # Configuración por defecto
     config = {
         "json_file": ".content/playlist_songs.json",
-        "path_destino_flac": "./output",
-        "carpeta_descargas_qbitorrent": "./downloads",
+        "path_destino_flac": "./canciones",
+        "carpeta_descargas_qbitorrent": "/mnt/NFS/lidarr/torrents_backup",
         "temp_server_port": 8584,
         "host": "0.0.0.0"
     }

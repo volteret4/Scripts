@@ -3,7 +3,7 @@
 - qbitorrent con watchfolder e inicio automático
 - modifica
 - script descarga_finalizada.sh
-- python venv con spotipy
+- python venv con spotipy, tabulate, bencodepy
 
 
 #### Activar watchfolder en qbittorrent
@@ -112,7 +112,7 @@ Si fallara al usar mi python_venv por lo que sea, puedes hacer con el lo que qui
 ```bash
 mkdir python_venv
 python -m venv python_venv
-pip install spotipy 
+pip install spotipy tabulate bencodepy
 # pip install json creo que viene por defecto
 ```
 
