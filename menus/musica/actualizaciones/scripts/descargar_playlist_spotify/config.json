@@ -12,9 +12,9 @@
     "spotify_client_secret": "***ELIMINADO***",
     "json_file": ".content/playlist_songs.json",
     "debug": false,
-    "lidarr_url": "http://192.168.1.133:8686",
+    "lidarr_url": "http://100.90.91.96:8686",
     "lidarr_api_key": "***ELIMINADO***",
-    "jackett_url": "http://192.168.1.133:9117",
+    "jackett_url": "http://100.90.91.96:9117",
     "jackett_api_key": "***ELIMINADO***",
     "skip_torrents": false,
     "temp_server_port": "8584"

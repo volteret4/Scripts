@@ -315,6 +315,7 @@ def copy_file(source_path, destination_folder):
         print(f"Error al copiar {source_path}: {e}")
         return False
 
+
 def launch_torrent_script(config_data):
     """
     Lanza el script de descarga de torrents como un módulo importado
@@ -325,7 +326,7 @@ def launch_torrent_script(config_data):
         "--modo", config_data['modo'],
         "--carpeta-torrents-temporales", config_data['carpeta_torrents_temporales'],
         "--carpeta-watchfolder", config_data['carpeta_watchfolder'],
-        "--carpeta-descargas-qbitorrent", config_data['carpeta_descargas_qbitorrent'],  # This is the problematic line
+        "--carpeta-descargas-qbitorrent", config_data['carpeta_descargas_qbitorrent'],
         "--flac",  # This flag doesn't need a value
         "--json-file", config_data['json_file'],
         "--output-path", config_data['path_destino_flac'],
@@ -422,12 +423,12 @@ def main():
     db_path = config['db_path']
     debug = config.get('debug', False)
     json_file = config.get('json_file', 'playlist_songs.json')
-    path_destino_flac = config.get('path_destino_flac', './canciones')
+    path_destino_flac_base = config.get('path_destino_flac', './canciones')
     modo = config.get('modo', 'interactivo')
     carpeta_torrents_temporales = config.get('carpeta_torrents_temporales', './torrents')
     carpeta_watchfolder = config.get('carpeta_watchfolder', './torrents_final')
     carpeta_descargas_qbitorrent = config.get('carpeta_descargas_qbitorrent')
-    output_path = config.get('output_path', path_destino_flac)
+    output_path = config.get('output_path', path_destino_flac_base)
     skip_torrents = config.get('skip_torrents', False)
     LIDARR_URL = config.get('lidarr_url', 'http://192.168.1.133:8686')
     LIDARR_API_KEY = config['lidarr_api_key']
@@ -444,6 +445,7 @@ def main():
     
     # Determinar la playlist a utilizar (prioridad: usuario > url > id)
     playlist_id = None
+    playlist_name = None
     
     # Opción 1: Usuario proporcionado - mostrar lista y pedir selección
     if 'spotify_user' in config and config['spotify_user']:
@@ -463,7 +465,8 @@ def main():
                 choice = int(input("\nSelecciona el número de la playlist que deseas usar: "))
                 if 1 <= choice <= len(playlists):
                     playlist_id = playlists[choice-1]['id']
-                    print(f"Seleccionaste: {playlists[choice-1]['name']} (ID: {playlist_id})")
+                    playlist_name = playlists[choice-1]['name']
+                    print(f"Seleccionaste: {playlist_name} (ID: {playlist_id})")
                     break
                 else:
                     print(f"Por favor, elige un número entre 1 y {len(playlists)}")
@@ -477,16 +480,45 @@ def main():
             print(f"No se pudo extraer un ID de playlist válido de la URL: {config['playlist_url']}")
             return None
         print(f"Usando playlist ID {playlist_id} extraído de la URL")
+        # Obtener el nombre de la playlist
+        try:
+            playlist_info = spotify.playlist(playlist_id)
+            playlist_name = playlist_info['name']
+            print(f"Nombre de la playlist: {playlist_name}")
+        except Exception as e:
+            print(f"Error al obtener el nombre de la playlist: {e}")
+            playlist_name = f"playlist_{playlist_id}"
     
     # Opción 3: ID proporcionado directamente
     elif 'playlist_id' in config and config['playlist_id']:
         playlist_id = config['playlist_id']
         print(f"Usando playlist ID proporcionado: {playlist_id}")
+        # Obtener el nombre de la playlist
+        try:
+            playlist_info = spotify.playlist(playlist_id)
+            playlist_name = playlist_info['name']
+            print(f"Nombre de la playlist: {playlist_name}")
+        except Exception as e:
+            print(f"Error al obtener el nombre de la playlist: {e}")
+            playlist_name = f"playlist_{playlist_id}"
     
     # Si no se pudo determinar un playlist_id, salir
     if not playlist_id:
         print("Error: No se pudo determinar un ID de playlist. Por favor proporciona un usuario, URL o ID de playlist.")
         return None
+    
+    # Sanitizar el nombre de la playlist para usarlo como directorio
+    if playlist_name:
+        # Eliminar caracteres no válidos para nombres de directorios
+        sanitized_name = re.sub(r'[\\/*?:"<>|]', '', playlist_name)
+        # Reemplazar espacios con guiones bajos
+        sanitized_name = sanitized_name.replace(' ', '_')
+        # Crear la ruta completa
+        path_destino_flac = os.path.join(path_destino_flac_base, sanitized_name)
+    else:
+        path_destino_flac = path_destino_flac_base
+    
+    print(f"Ruta de destino para los archivos: {path_destino_flac}")
     
     # Obtener información de las canciones de la playlist
     print(f"Obteniendo datos de la playlist {playlist_id}...")
@@ -503,10 +535,13 @@ def main():
     print(f"Información guardada en {json_file}")
     
     # Procesar cada canción
-    # Procesar cada canción
     copied_tracks = []
     failed_tracks = []
     copied_count = 0
+
+    # Crear directorio de destino si no existe
+    if not os.path.exists(path_destino_flac):
+        os.makedirs(path_destino_flac)
 
     for track in tracks:
         artista = track['artista']
@@ -590,12 +625,12 @@ def main():
         'carpeta_watchfolder': carpeta_watchfolder,
         'carpeta_descargas_qbitorrent': carpeta_descargas_qbitorrent,
         'modo': modo,
-        'path_destino_flac': path_destino_flac,
+        'path_destino_flac': path_destino_flac,  # Ahora incluye el nombre de la playlist
         'json_file': json_file,
-        'lidarr_url': LIDARR_URL,           # Add this line
-        'lidarr_api_key': LIDARR_API_KEY,   # Add this line
-        'jackett_url': JACKETT_URL,         # Add this line
-        'jackett_api_key': JACKETT_API_KEY,  # Add this line
+        'lidarr_url': LIDARR_URL,
+        'lidarr_api_key': LIDARR_API_KEY,
+        'jackett_url': JACKETT_URL,
+        'jackett_api_key': JACKETT_API_KEY,
         'temp_server_port': temp_server_port
     }
     
@@ -610,6 +645,7 @@ def main():
     
     return config_data
 
+    
 # Ejemplo de archivo de configuración JSON:
 """
 {

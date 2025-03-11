@@ -19,20 +19,21 @@ import argparse
 from datetime import datetime
 import subprocess
 
+
 def load_config(config_file):
     """Load configuration from a JSON file."""
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
-        print(f"Configuration loaded from {config_file}")
+        print(f"\nConfiguration loaded from {config_file}")
         return config
     except Exception as e:
-        print(f"Error loading configuration file: {e}")
+        print(f"\nError loading configuration file: {e}")
         sys.exit(1)
 
 def buscar_en_lidarr(artista, album, lidarr_url, lidarr_api_key):
     """Busca el artista y álbum en Lidarr para obtener detalles."""
-    print(f"Buscando información para '{artista} - {album}' en Lidarr...")
+    print(f"\nBuscando información para '{artista} - {album}' en Lidarr...")
     
     # Primero buscar el artista
     url = f"{lidarr_url}/api/v1/artist/lookup"
@@ -140,10 +141,10 @@ def buscar_en_jackett(artista, album, jackett_url, jackett_api_key, indexador="r
         return resultados
         
     except requests.exceptions.RequestException as e:
-        print(f"Error al comunicarse con Jackett: {e}")
+        print(f"\nError al comunicarse con Jackett: {e}")
         return []
     except Exception as e:
-        print(f"Error al procesar respuesta de Jackett: {e}")
+        print(f"\nError al procesar respuesta de Jackett: {e}")
         return []
 
 def formatear_tamaño(bytes):
@@ -191,11 +192,11 @@ def leer_json_file(json_file):
             data = json.load(f)
         return data
     except Exception as e:
-        print(f"Error al leer el archivo JSON: {e}")
+        print(f"\nError al leer el archivo JSON: {e}")
         sys.exit(1)
 
 def actualizar_json_file(json_file, discos_descargados):
-    """Actualiza el archivo JSON para marcar qué discos se han descargado."""
+    """Actualiza el archivo JSON para marcar qué discos se han descargado y guardar el nombre del torrent."""
     try:
         # Leer el archivo actual
         discos = leer_json_file(json_file)
@@ -206,16 +207,19 @@ def actualizar_json_file(json_file, discos_descargados):
             clave = f"{disco.get('artista', '')}-{disco.get('album', '')}"
             if clave in discos_descargados:
                 disco['descargado'] = True
+                # Guardar el nombre del torrent sin extensión
+                if 'torrent_name' in discos_descargados[clave]:
+                    disco['torrent_name'] = discos_descargados[clave]['torrent_name']
                 contador_descargados += 1
         
         # Guardar el archivo actualizado
         with open(json_file, 'w', encoding='utf-8') as f:
             json.dump(discos, f, indent=2, ensure_ascii=False)
         
-        print(f"Archivo JSON actualizado. {contador_descargados} discos marcados como descargados.")
+        print(f"\nArchivo JSON actualizado. {contador_descargados} discos marcados como descargados con nombre de torrent.")
         return contador_descargados
     except Exception as e:
-        print(f"Error al actualizar el archivo JSON: {e}")
+        print(f"\nError al actualizar el archivo JSON: {e}")
         return 0
 
 def iniciar_script_fondo(num_torrents, output_path, json_file, temp_server_port):
@@ -237,20 +241,20 @@ def iniciar_script_fondo(num_torrents, output_path, json_file, temp_server_port)
             "--temp_server_port", str(temp_server_port)
         ]
         
-        print(f"Ejecutando script con comando: {' '.join(cmd)}")
+        print(f"\nEjecutando script con comando: {' '.join(cmd)}")
         
         # Usar run en lugar de Popen para ver la salida en tiempo real
         return subprocess.run(cmd, check=True)
         
     except Exception as e:
-        print(f"Error al iniciar el script: {e}")
+        print(f"\nError al iniciar el script: {e}")
         return None
 
 
 def modo_interactivo(resultados):
     """Permite al usuario elegir cuál de los torrents descargar."""
     if not resultados:
-        print("No hay resultados para seleccionar.")
+        print("\nNo hay resultados para seleccionar.")
         return None
     
     # Ordenar primero por coincidencia exacta y luego por número de semillas (descendente)
@@ -279,7 +283,7 @@ def modo_interactivo(resultados):
 def modo_automatico(resultados):
     """Elige automáticamente el torrent con preferencia por coincidencia exacta y luego por número de seeders."""
     if not resultados:
-        print("No hay resultados disponibles.")
+        print("\nNo hay resultados disponibles.")
         return None
     
     # Primero buscar coincidencias exactas
@@ -288,15 +292,15 @@ def modo_automatico(resultados):
     # Si hay coincidencias exactas, elegir la que tenga más semillas
     if coincidencias_exactas:
         mejor_torrent = sorted(coincidencias_exactas, key=lambda x: x.get("semillas", 0), reverse=True)[0]
-        print("Seleccionado torrent con coincidencia exacta de artista-album:")
+        print("\nSeleccionado torrent con coincidencia exacta de artista-album:")
     else:
         # Si no hay coincidencias exactas, elegir el que tenga más semillas
         mejor_torrent = sorted(resultados, key=lambda x: x.get("semillas", 0), reverse=True)[0]
-        print("No hay coincidencias exactas, seleccionando torrent con más semillas:")
+        print("\nNo hay coincidencias exactas, seleccionando torrent con más semillas:")
     
-    print(f"Título: {mejor_torrent['titulo']}")
-    print(f"Semillas: {mejor_torrent.get('semillas', 'Desconocido')}")
-    print(f"Tamaño: {formatear_tamaño(mejor_torrent.get('tamaño', 0))}")
+    print(f"\nTítulo: {mejor_torrent['titulo']}")
+    print(f"\Semillas: {mejor_torrent.get('semillas', 'Desconocido')}")
+    print(f"\Tamaño: {formatear_tamaño(mejor_torrent.get('tamaño', 0))}")
     
     return mejor_torrent
 
@@ -311,7 +315,7 @@ def descargar_torrent(torrent, carpeta_torrents_temporales):
     
     # Verifica que carpeta_torrents_temporales sea válida
     if not carpeta_torrents_temporales:
-        print("ERROR: carpeta_torrents_temporales es None o vacía")
+        print("\n\nERROR: carpeta_torrents_temporales es None o vacía")
         return None
         
     # Crear carpeta de destino si no existe
@@ -320,7 +324,7 @@ def descargar_torrent(torrent, carpeta_torrents_temporales):
             os.makedirs(carpeta_torrents_temporales)
             print(f"Carpeta creada: {carpeta_torrents_temporales}")
     except Exception as e:
-        print(f"ERROR al crear carpeta de torrents: {e}")
+        print(f"\n\nERROR al crear carpeta de torrents: {e}")
         return None
     
     try:
@@ -328,61 +332,62 @@ def descargar_torrent(torrent, carpeta_torrents_temporales):
         import urllib.request
         nombre_archivo = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_torrent.torrent"
         ruta_archivo = os.path.join(carpeta_torrents_temporales, nombre_archivo)
-        print(f"Intentando descargar a: {ruta_archivo}")
+        print(f"\nIntentando descargar a: {ruta_archivo}")
         
         # Añadir más información para depurar
-        print(f"URL del torrent: {torrent['enlace']}")
+        print(f"\nURL del torrent: {torrent['enlace']}")
         
         # Intentar descargar con más control de errores
         try:
             urllib.request.urlretrieve(torrent['enlace'], ruta_archivo)
-            print(f"Torrent descargado como: {ruta_archivo}")
+            print(f"\nTorrent descargado como: {ruta_archivo}")
         except Exception as e:
-            print(f"ERROR durante la descarga: {e}")
+            print(f"\nERROR durante la descarga: {e}")
             return None
             
         # Verificar que el archivo realmente existe y tiene tamaño
         if os.path.exists(ruta_archivo):
             tamaño = os.path.getsize(ruta_archivo)
-            print(f"Verificado: El archivo existe en {ruta_archivo} (Tamaño: {tamaño} bytes)")
+            print(f"\nVerificado: El archivo existe en {ruta_archivo} (Tamaño: {tamaño} bytes)")
             if tamaño == 0:
-                print("ADVERTENCIA: El archivo descargado tiene 0 bytes")
+                print("\n\nADVERTENCIA: El archivo descargado tiene 0 bytes")
                 return None
             return ruta_archivo
         else:
-            print(f"ERROR: El archivo no existe en {ruta_archivo} después de la descarga")
+            print(f"\n\n\nERROR: El archivo no existe en {ruta_archivo} después de la descarga")
             return None
     except Exception as e:
-        print(f"Error al descargar el torrent: {e}")
+        print(f"\nError al descargar el torrent: {e}")
         return None
 
-def copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder):
-    """Copia todos los torrents descargados a una carpeta específica."""
+def copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder, artista_album_mapping=None):
+    """Copia todos los torrents descargados a una carpeta específica y devuelve un diccionario con los nombres de torrents."""
     
-    print(f"watchfolder: {carpeta_watchfolder}")
+    print(f"\nwatchfolder: {carpeta_watchfolder}")
+    resultados = {}
 
     if not torrents_descargados:
-        print("No hay torrents para copiar.")
-        return
+        print("\nNo hay torrents para copiar.")
+        return resultados
     
     if not carpeta_watchfolder:
-        print("Error: No se ha especificado una carpeta de destino.")
-        return
+        print("\nError: No se ha especificado una carpeta de destino.")
+        return resultados
     
     # Crear carpeta de destino si no existe
     try:
         if not os.path.exists(carpeta_watchfolder):
             os.makedirs(carpeta_watchfolder)
-            print(f"Carpeta creada: {carpeta_watchfolder}")
+            print(f"\nCarpeta creada: {carpeta_watchfolder}")
         elif not os.path.isdir(carpeta_watchfolder):
-            print(f"Error: La ruta {carpeta_watchfolder} existe pero no es un directorio.")
-            return
+            print(f"\nError: La ruta {carpeta_watchfolder} existe pero no es un directorio.")
+            return resultados
         elif not os.access(carpeta_watchfolder, os.W_OK):
-            print(f"Error: No tienes permisos de escritura en {carpeta_watchfolder}")
-            return
+            print(f"\nError: No tienes permisos de escritura en {carpeta_watchfolder}")
+            return resultados
     except Exception as e:
-        print(f"Error al crear/verificar la carpeta de destino: {e}")
-        return
+        print(f"\nError al crear/verificar la carpeta de destino: {e}")
+        return resultados
     
     import shutil
     copiados = 0
@@ -401,16 +406,27 @@ def copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder):
                     nuevo_nombre = f"{nombre_base}_{timestamp}{extension}"
                     destino = os.path.join(carpeta_watchfolder, nuevo_nombre)
                     print(f"Usando nombre alternativo: {nuevo_nombre}")
+                    nombre_archivo = nuevo_nombre
                 
                 shutil.copy2(torrent_path, destino)
                 copiados += 1
                 print(f"[{i}/{len(torrents_descargados)}] Copiado: {nombre_archivo} -> {destino}")
+                
+                # Obtener el nombre del torrent sin extensión para el JSON
+                nombre_sin_extension, _ = os.path.splitext(nombre_archivo)
+                
+                # Si tenemos el mapeo de artista-album, guardar el nombre del torrent
+                if artista_album_mapping and i-1 < len(artista_album_mapping):
+                    clave = artista_album_mapping[i-1]
+                    if clave not in resultados:
+                        resultados[clave] = {'torrent_name': nombre_sin_extension}
             else:
                 print(f"[{i}/{len(torrents_descargados)}] Archivo no encontrado: {torrent_path}")
         except Exception as e:
             print(f"[{i}/{len(torrents_descargados)}] Error al copiar {torrent_path}: {e}")
     
     print(f"Se han copiado {copiados} de {len(torrents_descargados)} torrents a {carpeta_watchfolder}")
+    return resultados
 
 def main():
     parser = argparse.ArgumentParser(description='Buscar torrents de música por artista y álbum')
@@ -441,6 +457,8 @@ def main():
     torrents_descargados = []
     # Diccionario para seguir qué discos se han descargado (clave: "artista-album")
     discos_descargados = {}
+    # Lista para mantener el mapeo entre los torrents y las entradas del JSON
+    artista_album_mapping = []
 
     # Variables de configuración con valores predeterminados
     config = {
@@ -531,34 +549,34 @@ def main():
 
     # Verificar si se proporciona la información necesaria
     if not ((config.get("artista") and config.get("album")) or config.get("json_file")):
-        print("Debes proporcionar tanto el artista como el álbum, o un archivo JSON con la lista de discos.")
+        print("\n\nDebes proporcionar tanto el artista como el álbum, o un archivo JSON con la lista de discos.")
         parser.print_help()
         sys.exit(1)
     
     # Procesamiento según el modo de entrada (argumentos o archivo JSON)
     if config.get("json_file") and not (config.get("artista") and config.get("album")):
         discos = leer_json_file(config["json_file"])
-        print(f"Leyendo {len(discos)} discos del archivo JSON.")
+        print(f"\nLeyendo {len(discos)} discos del archivo JSON.")
         
         for i, disco in enumerate(discos, 1):
             print(f"\n[{i}/{len(discos)}] Procesando: {disco.get('artista', '')} - {disco.get('album', '')}")
             
-            # CAMBIO: Aquí verificamos que el disco tenga los campos necesarios
+            # Aquí verificamos que el disco tenga los campos necesarios
             artista = disco.get('artista', '')
             album = disco.get('album', '')
             
             # Ignora campos extra que no necesita este script
             ignored_fields = [key for key in disco if key not in ['artista', 'album']]
             if ignored_fields:
-                print(f"Ignorando campos adicionales en el disco: {', '.join(ignored_fields)}")
+                print(f"\nIgnorando campos adicionales en el disco: {', '.join(ignored_fields)}")
             
             if not artista or not album:
-                print("Error: Falta información de artista o álbum en el disco.")
+                print("\nError: Falta información de artista o álbum en el disco.")
                 continue
             
             # Saltar descarga de torrents si se especifica en la configuración
             if config.get("skip_torrents", False):
-                print("Saltando descarga de torrents según configuración.")
+                print("\nSaltando descarga de torrents según configuración.")
                 continue
                 
             # Buscar información en Lidarr
@@ -594,10 +612,11 @@ def main():
                 if ruta_torrent:
                     # Añadir explícitamente a la lista
                     torrents_descargados.append(ruta_torrent)
-                    # Marcar el disco como descargado
+                    # Guardar el mapeo para posterior actualización del JSON
                     disco_key = f"{artista}-{album}"
+                    artista_album_mapping.append(disco_key)
                     discos_descargados[disco_key] = True
-                    print(f"Torrent añadido a la lista. Total: {len(torrents_descargados)}")
+                    print(f"\nTorrent añadido a la lista. Total: {len(torrents_descargados)}")
     
     
     else:
@@ -615,7 +634,7 @@ def main():
         
         # Si se encontró información en Lidarr, usar esos términos para buscar
         if artista_info and album_info:
-            print(f"Información encontrada en Lidarr: {artista_info['artistName']} - {album_info['title']} ({album_info.get('releaseDate', '').split('T')[0]})")
+            print(f"\nInformación encontrada en Lidarr: {artista_info['artistName']} - {album_info['title']} ({album_info.get('releaseDate', '').split('T')[0]})")
             busqueda_artista = artista_info['artistName']
             busqueda_album = album_info['title']
         else:
@@ -660,17 +679,36 @@ def main():
             print(f"\nCopiando todos los torrents a la carpeta watchfolder: {config['carpeta_watchfolder']}")
             carpeta_watchfolder = config.get('carpeta_watchfolder')
             print(f"timaginas {carpeta_watchfolder}")
-            copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder)
+            # Pasar el mapeo a la función de copiar torrents
+            resultados_torrents = copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder, artista_album_mapping)
+            
+            # Actualizar el diccionario de discos_descargados con los nombres de los torrents
+            for clave, info in resultados_torrents.items():
+                if clave in discos_descargados:
+                    discos_descargados[clave] = info
     
-    # Iniciar script de fondo con el número de torrents descargados
-    if config.get("json_file") and num_torrents > 0:
-        proceso_fondo = iniciar_script_fondo(num_torrents, config["carpeta_watchfolder"], config["json_file"], config["temp_server_port"])
-
+    # Actualizar el archivo JSON si es necesario
+    if config.get("json_file") and discos_descargados:
+        actualizar_json_file(config["json_file"], discos_descargados)
+    
+    if torrents_descargados and config.get("output_path"):
+        print("\nIniciando el script 3_servidor_playlist.py para procesar los torrents...")
+        temp_server_port = config.get("temp_server_port", 8584)
+        proceso_fondo = iniciar_script_fondo(
+            num_torrents=len(torrents_descargados),
+            output_path=config.get("output_path"),
+            json_file=config.get("json_file"),
+            temp_server_port=temp_server_port
+        )
+    
+    
     # Terminar el script mostrando información del proceso en segundo plano
     if 'proceso_fondo' in locals() and proceso_fondo:
         print("\nEl script principal ha finalizado pero el script de fondo continúa ejecutándose.")
-        print(f"PID del script de fondo: {proceso_fondo.pid}")
         print(f"Número de torrents enviados al script de fondo: {num_torrents}")
+    else:
+        print("No se pudo iniciar el script 3_servidor_playlist.py")
+
 
 if __name__ == "__main__":
     main()
