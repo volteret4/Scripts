@@ -12,3 +12,4 @@
 2025-03-04 15:21:15,430 - WARNING - Your application has reached a rate/request limit. Retry will occur after: None
 2025-03-04 20:14:23,870 - WARNING - Spotify search error with query 'track:Familiar artist:Nils Frahm': HTTPSConnectionPool(host='api.spotify.com', port=443): Read timed out. (read timeout=5)
 2025-03-04 21:23:43,472 - WARNING - Spotify search error with query 'track:The Sun Will Burn Out artist:Someday I': HTTPSConnectionPool(host='api.spotify.com', port=443): Read timed out. (read timeout=5)
+2025-03-10 16:03:58,497 - ERROR - Failed to configure Spotify client: No client_id. Pass it or set a SPOTIPY_CLIENT_ID environment variable.

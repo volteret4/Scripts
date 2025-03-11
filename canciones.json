@@ -1,0 +1,14 @@
+{
+  "processed": 18000,
+  "skipped": 633,
+  "updated": 17367,
+  "failed": 0,
+  "by_service": {
+    "youtube": 7233,
+    "spotify": 15332,
+    "bandcamp": 10792
+  },
+  "start_time": "2025-03-10T16:50:50.518639",
+  "end_time": "2025-03-10T20:38:27.449508",
+  "last_processed_id": 18911
+}
