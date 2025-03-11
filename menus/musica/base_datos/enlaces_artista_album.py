@@ -259,6 +259,12 @@ class MusicLinksManager:
     def update_song_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """
         Actualiza los enlaces externos para canciones
+        
+        Args:
+            days_threshold: Umbral de días para filtrar registros
+            force_update: Forzar actualización de todos los registros
+            recent_only: Si es True, actualiza solo registros recientes; si es False, actualiza los antiguos
+            missing_only: Si es True, actualiza solo registros con enlaces faltantes
         """
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -267,13 +273,36 @@ class MusicLinksManager:
         if force_update:
             c.execute("SELECT id, title, artist, album FROM songs")
         elif missing_only:
+            # Verificar qué columnas existen en la tabla song_links
+            c.execute("PRAGMA table_info(song_links)")
+            link_columns = {col[1] for col in c.fetchall()}
+            
+            # Construir condiciones para enlaces faltantes
+            missing_conditions = []
+            if 'spotify_url' in link_columns:
+                missing_conditions.append("song_links.spotify_url IS NULL")
+            if 'youtube_url' in link_columns:
+                missing_conditions.append("song_links.youtube_url IS NULL")
+            if 'musicbrainz_url' in link_columns:
+                missing_conditions.append("song_links.musicbrainz_url IS NULL")
+            
             # Buscar canciones sin enlaces en song_links
-            c.execute("""
-                SELECT songs.id, songs.title, songs.artist, songs.album 
-                FROM songs 
-                LEFT JOIN song_links ON songs.id = song_links.song_id 
-                WHERE song_links.id IS NULL
-            """)
+            if missing_conditions:
+                query = f"""
+                    SELECT songs.id, songs.title, songs.artist, songs.album 
+                    FROM songs 
+                    LEFT JOIN song_links ON songs.id = song_links.song_id 
+                    WHERE song_links.id IS NULL OR ({' OR '.join(missing_conditions)})
+                """
+                c.execute(query)
+            else:
+                # Si no hay columnas de enlaces definidas, obtener canciones sin registro en song_links
+                c.execute("""
+                    SELECT songs.id, songs.title, songs.artist, songs.album 
+                    FROM songs 
+                    LEFT JOIN song_links ON songs.id = song_links.song_id 
+                    WHERE song_links.id IS NULL
+                """)
         else:
             # Lógica para seleccionar canciones basada en fecha
             if recent_only:
@@ -302,48 +331,59 @@ class MusicLinksManager:
             c.execute("SELECT id FROM song_links WHERE song_id = ?", (song_id,))
             song_link_record = c.fetchone()
             
-            links = {
-                'spotify_url': self._get_spotify_track_url(artist, title, album) if self.spotify else None,
-                'spotify_id': None,  # Se puede poblar con datos de Spotify
-                'youtube_url': self._get_youtube_track_url(artist, title) if self.youtube else None,
-                'musicbrainz_url': self._get_musicbrainz_recording_url(artist, title, album) if 'musicbrainz' not in self.disabled_services else None,
-                'musicbrainz_recording_id': None,
-                'lastfm_url': self._get_lastfm_track_url(artist, title) if 'lastfm' not in self.disabled_services else None,
-                'links_updated': datetime.now()
-            }
+            # Verificar qué servicios están habilitados y qué columnas existen
+            c.execute("PRAGMA table_info(song_links)")
+            available_columns = {col[1] for col in c.fetchall()}
+            
+            links = {}
+            
+            # Solo agregar enlaces si las columnas existen y los servicios están habilitados
+            if 'spotify_url' in available_columns and self.spotify:
+                links['spotify_url'] = self._get_spotify_track_url(artist, title, album)
+            
+            if 'spotify_id' in available_columns and self.spotify:
+                links['spotify_id'] = self._get_spotify_track_id(artist, title, album) if hasattr(self, '_get_spotify_track_id') else None
+            
+            if 'youtube_url' in available_columns and self.youtube:
+                links['youtube_url'] = self._get_youtube_track_url(artist, title)
+            
+            if 'musicbrainz_url' in available_columns and 'musicbrainz' not in self.disabled_services:
+                links['musicbrainz_url'] = self._get_musicbrainz_recording_url(artist, title, album)
+            
+            if 'musicbrainz_recording_id' in available_columns and 'musicbrainz' not in self.disabled_services:
+                links['musicbrainz_recording_id'] = self._get_musicbrainz_recording_mbid(artist, title, album)
+            
+            # Agregar timestamp de actualización
+            links['links_updated'] = datetime.now()
             
             if song_link_record:
-                # Actualizar registro existente
-                update_query = """
-                    UPDATE song_links SET 
-                    spotify_url = ?, spotify_id = ?,
-                    youtube_url = ?, 
-                    musicbrainz_url = ?, musicbrainz_recording_id = ?,
-                    lastfm_url = ?, links_updated = ?
+                # Construir la consulta de actualización dinámica basada en las columnas disponibles
+                update_fields = ", ".join([f"{key} = ?" for key in links.keys()])
+                update_query = f"""
+                    UPDATE song_links SET {update_fields}
                     WHERE song_id = ?
                 """
-                c.execute(update_query, (
-                    links['spotify_url'], links['spotify_id'], 
-                    links['youtube_url'], 
-                    links['musicbrainz_url'], links['musicbrainz_recording_id'],
-                    links['lastfm_url'], links['links_updated'], 
-                    song_id
-                ))
+                
+                # Preparar los valores para la consulta, incluyendo el song_id al final
+                update_values = list(links.values())
+                update_values.append(song_id)
+                
+                c.execute(update_query, update_values)
             else:
-                # Insertar nuevo registro
-                insert_query = """
+                # Construir la consulta de inserción dinámica basada en las columnas disponibles
+                columns = ['song_id'] + list(links.keys())
+                placeholders = ",".join(["?"] * (len(columns)))
+                
+                insert_query = f"""
                     INSERT INTO song_links (
-                        song_id, spotify_url, spotify_id, 
-                        youtube_url, musicbrainz_url, musicbrainz_recording_id,
-                        lastfm_url, links_updated
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        {", ".join(columns)}
+                    ) VALUES ({placeholders})
                 """
-                c.execute(insert_query, (
-                    song_id, links['spotify_url'], links['spotify_id'], 
-                    links['youtube_url'], 
-                    links['musicbrainz_url'], links['musicbrainz_recording_id'],
-                    links['lastfm_url'], links['links_updated']
-                ))
+                
+                # Preparar los valores para la consulta, incluyendo el song_id al principio
+                insert_values = [song_id] + list(links.values())
+                
+                c.execute(insert_query, insert_values)
             
             conn.commit()
             self._rate_limit_pause()
@@ -352,7 +392,41 @@ class MusicLinksManager:
         self.logger.info(f"Updated links for {total_songs} songs")
 
 
-    
+    def _name_similarity_score(self, name1, name2):
+        """
+        Calcula un puntaje de similitud entre dos nombres de pistas
+        
+        Args:
+            name1: Primer nombre de pista
+            name2: Segundo nombre de pista
+        
+        Returns:
+            Float entre 0 y 1, donde 1 es coincidencia perfecta
+        """
+        # Normalizar nombres: quitar caracteres especiales, convertir a minúsculas
+        import re
+        import difflib
+        
+        def normalize(name):
+            # Eliminar caracteres entre paréntesis y corchetes (remix, versión, etc.)
+            name = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', name)
+            # Convertir a minúsculas y eliminar caracteres especiales
+            name = re.sub(r'[^\w\s]', '', name.lower())
+            # Eliminar palabras comunes que no aportan al significado
+            common_words = {'the', 'a', 'an', 'feat', 'featuring', 'ft', 'prod', 'by'}
+            return ' '.join(word for word in name.split() if word not in common_words).strip()
+        
+        norm1 = normalize(name1)
+        norm2 = normalize(name2)
+        
+        # Si alguno está vacío después de normalizar, usar los nombres originales
+        if not norm1 or not norm2:
+            norm1 = name1.lower()
+            norm2 = name2.lower()
+        
+        # Calcular similitud usando difflib
+        sequence_matcher = difflib.SequenceMatcher(None, norm1, norm2)
+        return sequence_matcher.ratio()
 
     def update_artist_links(self, days_threshold=30, force_update=False, recent_only=True, missing_only=False):
         """

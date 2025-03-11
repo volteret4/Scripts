@@ -1,0 +1,6 @@
+2025-03-11 18:56:23,416 - WARNING - La carpeta de destino '/mnt/NFS/lidarr/torrents_backup/watch_torrents' no existe. Intentando crearla...
+2025-03-11 18:56:23,416 - ERROR - Error creando carpeta de destino: [Errno 13] Permission denied: '/mnt/NFS/lidarr/torrents_backup'
+2025-03-11 19:00:40,448 - INFO - Cargado archivo de canciones con 2 entradas
+2025-03-11 19:00:40,449 - INFO - Servidor iniciado en 0.0.0.0:8584
+2025-03-11 19:35:50,985 - INFO - Recibida señal de interrupción. Cerrando servidor...
+2025-03-11 19:35:50,985 - INFO - Servidor cerrado

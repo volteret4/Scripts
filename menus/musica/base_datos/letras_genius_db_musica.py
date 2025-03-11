@@ -65,19 +65,19 @@ class MultiLyricsManager:
                     id INTEGER PRIMARY KEY,
                     track_id INTEGER UNIQUE,
                     lyrics TEXT,
-                    source TEXT,
+                    source TEXT DEFAULT 'Genius',
                     last_updated TIMESTAMP,
                     FOREIGN KEY(track_id) REFERENCES songs(id)
                 )
             ''')
             self.logger.info("Tabla 'lyrics' creada exitosamente")
         
-        # Verificar si la columna lyrics_id existe en la tabla songs
+        # Verificar si la columna has_lyrics existe en la tabla songs
         c.execute("PRAGMA table_info(songs)")
         columns = {col[1] for col in c.fetchall()}
-        if 'lyrics_id' not in columns:
-            c.execute("ALTER TABLE songs ADD COLUMN lyrics_id INTEGER")
-            self.logger.info("Columna 'lyrics_id' añadida a la tabla 'songs'")
+        if 'has_lyrics' not in columns:
+            c.execute("ALTER TABLE songs ADD COLUMN has_lyrics INTEGER DEFAULT 0")
+            self.logger.info("Columna 'has_lyrics' añadida a la tabla 'songs'")
         
         conn.commit()
         conn.close()
@@ -260,17 +260,22 @@ class MultiLyricsManager:
         if force_update:
             # Usamos los datos directos de la tabla songs
             c.execute("""
-                SELECT id, artist, title 
-                FROM songs
-                WHERE artist IS NOT NULL AND title IS NOT NULL
+                SELECT s.id, s.artist, s.title 
+                FROM songs s
+                LEFT JOIN artists a ON s.artist = a.name
+                WHERE s.artist IS NOT NULL AND s.title IS NOT NULL
+                ORDER BY a.total_albums DESC, s.added_timestamp DESC
             """)
         else:
             # Obtener solo canciones sin letras
             c.execute("""
-                SELECT songs.id, songs.artist, songs.title 
-                FROM songs 
-                LEFT JOIN lyrics ON songs.id = lyrics.track_id 
-                WHERE lyrics.id IS NULL AND songs.artist IS NOT NULL AND songs.title IS NOT NULL
+                SELECT s.id, s.artist, s.title 
+                FROM songs s 
+                LEFT JOIN lyrics l ON s.id = l.track_id 
+                LEFT JOIN artists a ON s.artist = a.name
+                WHERE (l.id IS NULL OR s.has_lyrics = 0) 
+                AND s.artist IS NOT NULL AND s.title IS NOT NULL
+                ORDER BY a.total_albums DESC, s.added_timestamp DESC
             """)
         
         songs = c.fetchall()
@@ -346,11 +351,26 @@ class MultiLyricsManager:
                             VALUES (?, ?, ?, ?)
                         """, (song_id, lyrics, source, datetime.now()))
                         
-                        # Actualizar referencia en songs
-                        c.execute("""
-                            UPDATE songs SET lyrics_id = (SELECT id FROM lyrics WHERE track_id = ?) 
-                            WHERE id = ?
-                        """, (song_id, song_id))
+                        # Obtener el ID de la letra insertada
+                        c.execute("SELECT id FROM lyrics WHERE track_id = ?", (song_id,))
+                        lyrics_id_result = c.fetchone()
+                        if lyrics_id_result:
+                            lyrics_id = lyrics_id_result[0]
+                            
+                            # Actualizar referencia en songs y marcar que tiene letras
+                            c.execute("""
+                                UPDATE songs SET lyrics_id = ?, has_lyrics = 1
+                                WHERE id = ?
+                            """, (lyrics_id, song_id))
+                        
+                        # Actualizar índice FTS de lyrics si existe
+                        try:
+                            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lyrics_fts'")
+                            if c.fetchone():
+                                c.execute("INSERT OR REPLACE INTO lyrics_fts(docid, lyrics) VALUES(?, ?)",
+                                    (song_id, lyrics))
+                        except sqlite3.Error as e:
+                            self.logger.warning(f"Error actualizando FTS: {str(e)}")
                         
                         conn.commit()
                         success += 1

@@ -15,9 +15,9 @@ from collections import Counter
 
 def parse_arguments():
     """Configura y parsea los argumentos de línea de comandos"""
-    parser = argparse.ArgumentParser(description='Descarga imágenes únicas de artistas desde Last.fm, Spotify y Google.')
-    parser.add_argument('--db', '-d', required=True, help='Ruta al archivo de la base de datos SQLite')
-    parser.add_argument('--output', '-o', required=True, help='Carpeta donde se guardarán las imágenes')
+    parser = argparse.ArgumentParser(description='Descarga imágenes únicas de artistas desde Last.fm, Spotify y Google o elimina duplicados.')
+    parser.add_argument('--db', '-d', help='Ruta al archivo de la base de datos SQLite')
+    parser.add_argument('--output', '-o', help='Carpeta donde se guardarán las imágenes')
     parser.add_argument('--max-images', '-m', type=int, default=3, help='Número máximo de imágenes por artista (por defecto: 3)')
     parser.add_argument('--spotify-client-id', help='Spotify Client ID')
     parser.add_argument('--spotify-client-secret', help='Spotify Client Secret')
@@ -26,6 +26,7 @@ def parse_arguments():
                         help='Umbral para considerar dos imágenes como similares (0-1, por defecto: 0.85)')
     parser.add_argument('--force-all', '-f', action='store_true', 
                         help='Procesar todos los artistas, incluso los que ya tienen imágenes')
+    parser.add_argument('--clean-duplicates', '-c', help='Eliminar imágenes duplicadas de la carpeta especificada')
     return parser.parse_args()
 
 def get_artist_data_from_db(db_path):
@@ -220,11 +221,14 @@ def download_and_check_image(url, artist_name, image_number, output_dir, existin
         print(f"Error descargando/verificando imagen {image_number} para {artist_name}: {str(e)}")
         return None, False
 
-def search_lastfm_images(artist_name, max_images=3, api_key=None, mbid=None):
-    """Busca imágenes del artista en Last.fm, usando MBID si está disponible"""
+def search_lastfm_images(artist_name, max_images=3, api_key=None, mbid=None, existing_hashes=None, output_dir=None, threshold=0.85):
+    """Busca imágenes del artista en Last.fm, usando MBID si está disponible y descarga solo imágenes únicas"""
     if not api_key:
         print(f"Error: No se proporcionó API key para Last.fm")
         return []
+    
+    if existing_hashes is None:
+        existing_hashes = []
         
     base_url = "http://ws.audioscrobbler.com/2.0/"
     
@@ -241,7 +245,9 @@ def search_lastfm_images(artist_name, max_images=3, api_key=None, mbid=None):
     else:
         params["artist"] = artist_name
     
-    image_urls = []
+    downloaded_images = []
+    downloaded_hashes = list(existing_hashes)  # Copiar la lista para no modificar la original
+    
     try:
         response = requests.get(base_url, params=params)
         response.raise_for_status()
@@ -257,33 +263,54 @@ def search_lastfm_images(artist_name, max_images=3, api_key=None, mbid=None):
                     not "/noimage/" in image["#text"] and
                     not "placeholder" in image["#text"].lower()):
                     
-                    image_urls.append(image["#text"])
-                    break
+                    # Descargar y verificar que no es un duplicado
+                    img_hash, success = download_and_check_image(
+                        image["#text"], artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                        output_dir, downloaded_hashes, threshold
+                    )
+                    
+                    if success and img_hash:
+                        downloaded_images.append((image["#text"], img_hash))
+                        downloaded_hashes.append(img_hash)
+                        
+                        if len(downloaded_images) >= max_images:
+                            break
         
-        # Tratamos de obtener más imágenes con el método artist.getImages
-        params["method"] = "artist.getImages"
-        response = requests.get(base_url, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            if "images" in data and "image" in data["images"]:
-                for i, img_data in enumerate(data["images"]["image"]):
-                    if i >= max_images - len(image_urls):
-                        break
-                    if "sizes" in img_data and "size" in img_data["sizes"]:
-                        for size in img_data["sizes"]["size"]:
-                            if (size["name"] == "original" and 
-                                size["#text"] and 
-                                not size["#text"].endswith("/2a96cbd8b46e442fc41c2b86b821562f.png") and
-                                not "/noimage/" in size["#text"] and
-                                not "placeholder" in size["#text"].lower()):
-                                
-                                image_urls.append(size["#text"])
-                                break
+        # Si no tenemos suficientes imágenes, intentar con getImages
+        if len(downloaded_images) < max_images:
+            params["method"] = "artist.getImages"
+            response = requests.get(base_url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                if "images" in data and "image" in data["images"]:
+                    for img_data in data["images"]["image"]:
+                        if len(downloaded_images) >= max_images:
+                            break
+                        if "sizes" in img_data and "size" in img_data["sizes"]:
+                            for size in img_data["sizes"]["size"]:
+                                if (size["name"] == "original" and 
+                                    size["#text"] and 
+                                    not size["#text"].endswith("/2a96cbd8b46e442fc41c2b86b821562f.png") and
+                                    not "/noimage/" in size["#text"] and
+                                    not "placeholder" in size["#text"].lower()):
+                                    
+                                    # Descargar y verificar que no es un duplicado
+                                    img_hash, success = download_and_check_image(
+                                        size["#text"], artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                                        output_dir, downloaded_hashes, threshold
+                                    )
+                                    
+                                    if success and img_hash:
+                                        downloaded_images.append((size["#text"], img_hash))
+                                        downloaded_hashes.append(img_hash)
+                                        
+                                        if len(downloaded_images) >= max_images:
+                                            break
     except Exception as e:
         print(f"Error buscando en Last.fm para {artist_name}: {str(e)}")
     
     # Si no obtuvimos suficientes imágenes y usamos MBID, intentar con el nombre
-    if len(image_urls) < max_images and mbid:
+    if len(downloaded_images) < max_images and mbid:
         try:
             params = {
                 "method": "artist.getinfo",
@@ -298,24 +325,39 @@ def search_lastfm_images(artist_name, max_images=3, api_key=None, mbid=None):
             
             if "artist" in data and "image" in data["artist"]:
                 for image in data["artist"]["image"]:
+                    if len(downloaded_images) >= max_images:
+                        break
+                    
                     if (image["size"] == "extralarge" and 
                         image["#text"] and 
                         not image["#text"].endswith("/2a96cbd8b46e442fc41c2b86b821562f.png") and
                         not "/noimage/" in image["#text"] and
-                        not "placeholder" in image["#text"].lower() and
-                        image["#text"] not in image_urls):
+                        not "placeholder" in image["#text"].lower()):
                         
-                        image_urls.append(image["#text"])
-                        if len(image_urls) >= max_images:
-                            break
+                        # Verificar que no es una URL ya procesada
+                        if not any(url == image["#text"] for url, _ in downloaded_images):
+                            # Descargar y verificar que no es un duplicado
+                            img_hash, success = download_and_check_image(
+                                image["#text"], artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                                output_dir, downloaded_hashes, threshold
+                            )
+                            
+                            if success and img_hash:
+                                downloaded_images.append((image["#text"], img_hash))
+                                downloaded_hashes.append(img_hash)
         except Exception as e:
             print(f"Error en segundo intento de Last.fm para {artist_name}: {str(e)}")
     
-    return image_urls[:max_images]
+    return downloaded_images
 
-def search_spotify_images(artist_name, spotify_id, sp, max_images=3):
-    """Busca imágenes del artista en Spotify usando spotipy"""
-    image_urls = []
+
+def search_spotify_images(artist_name, spotify_id, sp, max_images=3, existing_hashes=None, output_dir=None, threshold=0.85):
+    """Busca imágenes del artista en Spotify usando spotipy y descarga solo imágenes únicas"""
+    if existing_hashes is None:
+        existing_hashes = []
+        
+    downloaded_images = []
+    downloaded_hashes = list(existing_hashes)  # Copiar la lista para no modificar la original
     
     try:
         # Primero intentamos usar el ID si está disponible
@@ -325,20 +367,34 @@ def search_spotify_images(artist_name, spotify_id, sp, max_images=3):
                 if artist_data and "images" in artist_data and artist_data["images"]:
                     # Ordenar por tamaño y tomar las más grandes
                     sorted_images = sorted(artist_data["images"], key=lambda x: x.get("width", 0) * x.get("height", 0), reverse=True)
-                    for img in sorted_images[:max_images]:
+                    for img in sorted_images:
+                        if len(downloaded_images) >= max_images:
+                            break
+                            
                         if "url" in img:
-                            image_urls.append(img["url"])
+                            # Descargar y verificar que no es un duplicado
+                            img_hash, success = download_and_check_image(
+                                img["url"], artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                                output_dir, downloaded_hashes, threshold
+                            )
+                            
+                            if success and img_hash:
+                                downloaded_images.append((img["url"], img_hash))
+                                downloaded_hashes.append(img_hash)
             except Exception as inner_e:
                 print(f"Error con Spotify ID para {artist_name}: {str(inner_e)}")
         
         # Si no tenemos suficientes imágenes, hacer una búsqueda por nombre
-        if len(image_urls) < max_images:
+        if len(downloaded_images) < max_images:
             # Limpiar el nombre del artista para mejor coincidencia
             clean_name = clean_artist_name(artist_name)
             results = sp.search(q=f"artist:{clean_name}", type="artist", limit=5)
             
             if results and "artists" in results and "items" in results["artists"]:
                 for artist in results["artists"]["items"]:
+                    if len(downloaded_images) >= max_images:
+                        break
+                        
                     # Verificar si el nombre coincide
                     if (artist["name"].lower() == clean_name.lower() or 
                         clean_name.lower() in artist["name"].lower() or
@@ -348,15 +404,31 @@ def search_spotify_images(artist_name, spotify_id, sp, max_images=3):
                             # Ordenar por tamaño y tomar las más grandes
                             sorted_images = sorted(artist["images"], key=lambda x: x.get("width", 0) * x.get("height", 0), reverse=True)
                             for img in sorted_images:
-                                if "url" in img and len(image_urls) < max_images and img["url"] not in image_urls:
-                                    image_urls.append(img["url"])
+                                if len(downloaded_images) >= max_images:
+                                    break
+                                    
+                                if "url" in img:
+                                    # Verificar que no es una URL ya procesada
+                                    if not any(url == img["url"] for url, _ in downloaded_images):
+                                        # Descargar y verificar que no es un duplicado
+                                        img_hash, success = download_and_check_image(
+                                            img["url"], artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                                            output_dir, downloaded_hashes, threshold
+                                        )
+                                        
+                                        if success and img_hash:
+                                            downloaded_images.append((img["url"], img_hash))
+                                            downloaded_hashes.append(img_hash)
     except Exception as e:
         print(f"Error buscando en Spotify para {artist_name}: {str(e)}")
     
-    return image_urls[:max_images]
+    return downloaded_images
 
-def search_google_images(artist_name, max_images=3):
-    """Busca imágenes del artista en Google"""
+def search_google_images(artist_name, max_images=3, existing_hashes=None, output_dir=None, threshold=0.85):
+    """Busca imágenes del artista en Google y descarga solo imágenes únicas"""
+    if existing_hashes is None:
+        existing_hashes = []
+        
     # Limpiar el nombre del artista para mejor búsqueda
     clean_name = clean_artist_name(artist_name)
     search_url = f"https://www.google.com/search?q={quote_plus(clean_name)}+musician+artist+photo&tbm=isch"
@@ -364,7 +436,9 @@ def search_google_images(artist_name, max_images=3):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
-    image_urls = []
+    downloaded_images = []
+    downloaded_hashes = list(existing_hashes)  # Copiar la lista para no modificar la original
+    
     try:
         response = requests.get(search_url, headers=headers)
         response.raise_for_status()
@@ -374,17 +448,129 @@ def search_google_images(artist_name, max_images=3):
         
         # Saltamos la primera imagen que suele ser el logo de Google
         for img in image_tags[1:]:
+            if len(downloaded_images) >= max_images:
+                break
+                
             src = img.get('src')
-            if src and src.startswith('http') and len(image_urls) < max_images:
-                image_urls.append(src)
+            if src and src.startswith('http'):
+                # Verificar que no es una URL ya procesada
+                if not any(url == src for url, _ in downloaded_images):
+                    # Descargar y verificar que no es un duplicado
+                    img_hash, success = download_and_check_image(
+                        src, artist_name, len(downloaded_images) + len(existing_hashes) + 1, 
+                        output_dir, downloaded_hashes, threshold
+                    )
+                    
+                    if success and img_hash:
+                        downloaded_images.append((src, img_hash))
+                        downloaded_hashes.append(img_hash)
     except Exception as e:
         print(f"Error buscando en Google para {artist_name}: {str(e)}")
     
-    return image_urls[:max_images]
+    return downloaded_images
+
+
+def find_and_remove_duplicates(folder_path, similarity_threshold=0.85):
+    """Encuentra y elimina imágenes duplicadas en la carpeta especificada"""
+    print(f"Buscando imágenes duplicadas en {folder_path}...")
+    
+    # Verificar que la carpeta existe
+    if not os.path.exists(folder_path):
+        print(f"Error: La carpeta {folder_path} no existe")
+        return
+    
+    # Obtener lista de todas las imágenes
+    image_files = []
+    for file in os.listdir(folder_path):
+        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+            image_files.append(file)
+    
+    if not image_files:
+        print("No se encontraron imágenes en la carpeta")
+        return
+    
+    print(f"Encontradas {len(image_files)} imágenes. Calculando hashes...")
+    
+    # Calcular hash de cada imagen
+    image_hashes = {}
+    for file in image_files:
+        file_path = os.path.join(folder_path, file)
+        try:
+            with open(file_path, 'rb') as f:
+                img_data = f.read()
+                img_hash = calculate_image_hash(img_data)
+                image_hashes[file] = img_hash
+        except Exception as e:
+            print(f"Error procesando {file}: {str(e)}")
+    
+    print("Comparando imágenes para encontrar duplicados...")
+    
+    # Agrupar imágenes por similitud
+    duplicates = []
+    processed = set()
+    
+    for file1 in image_files:
+        if file1 in processed:
+            continue
+            
+        group = [file1]
+        processed.add(file1)
+        
+        for file2 in image_files:
+            if file2 == file1 or file2 in processed:
+                continue
+                
+            # Calcular similitud
+            max_distance = 64  # Máxima distancia posible (64 bits)
+            distance = hamming_distance(image_hashes[file1], image_hashes[file2])
+            similarity = 1 - (distance / max_distance)
+            
+            if similarity >= similarity_threshold:
+                group.append(file2)
+                processed.add(file2)
+        
+        if len(group) > 1:
+            duplicates.append(group)
+    
+    # Eliminar duplicados (preservando una imagen de cada grupo)
+    total_removed = 0
+    for group in duplicates:
+        print(f"Grupo de imágenes similares:")
+        for idx, file in enumerate(group):
+            file_path = os.path.join(folder_path, file)
+            file_size = os.path.getsize(file_path) / 1024  # KB
+            print(f"  {idx+1}. {file} ({file_size:.1f} KB)")
+        
+        # Preservar la primera imagen (potencialmente la de mejor calidad o más grande)
+        keep = group[0]
+        remove = group[1:]
+        
+        print(f"  Manteniendo: {keep}")
+        print(f"  Eliminando: {', '.join(remove)}")
+        
+        for file in remove:
+            try:
+                os.remove(os.path.join(folder_path, file))
+                total_removed += 1
+            except Exception as e:
+                print(f"  Error al eliminar {file}: {str(e)}")
+    
+    print(f"\nProceso completado. Se eliminaron {total_removed} imágenes duplicadas.")
+    if total_removed == 0 and not duplicates:
+        print("No se encontraron imágenes duplicadas.")
+
+
 
 def main():
     """Función principal del script"""
     args = parse_arguments()
+    
+    # Verificar si se debe ejecutar el modo de limpieza de duplicados
+    if args.clean_duplicates:
+        find_and_remove_duplicates(args.clean_duplicates, args.similarity_threshold)
+        return
+        
+    # El resto de la función main original se mantiene igual
     lastfm_apikey = args.lastfm_apikey
 
     # Verificar que la base de datos existe
@@ -437,7 +623,7 @@ def main():
     for artist_name, artist_info in artists_data.items():
         existing_images = check_existing_images(args.output, artist_name)
         
-        if existing_images >= args.max_images:
+        if existing_images >= args.max_images and not args.force_all:
             stats['with_max_images'] += 1
             print(f"✅ {artist_name}: Ya tiene {existing_images}/{args.max_images} imágenes")
         else:
@@ -473,46 +659,49 @@ def main():
         # Número de imágenes que necesitamos encontrar
         needed_images = args.max_images - existing_count
         total_downloaded = existing_count
-        collected_urls = []
         
-        # 1. Recopilar URLs de Last.fm
+        # 1. Buscar y descargar imágenes de Last.fm
         print(f"Buscando imágenes de {artist} en Last.fm...")
-        lastfm_urls = search_lastfm_images(artist, needed_images * 2, lastfm_apikey, mbid)
-        collected_urls.extend(lastfm_urls)
+        lastfm_downloads = search_lastfm_images(
+            artist, needed_images, lastfm_apikey, mbid, 
+            image_hashes, args.output, args.similarity_threshold
+        )
         
-        # 2. Recopilar URLs de Spotify si está configurado
-        if spotify_enabled:
-            print(f"Buscando imágenes de {artist} en Spotify...")
-            spotify_urls_list = search_spotify_images(artist, spotify_id, sp, needed_images * 2)
-            collected_urls.extend(spotify_urls_list)
+        # Actualizar contadores y hashes
+        total_downloaded += len(lastfm_downloads)
+        for _, img_hash in lastfm_downloads:
+            image_hashes.append(img_hash)
         
-        # 3. Recopilar URLs de Google si aún no tenemos suficientes
-        if len(collected_urls) < needed_images * 2:
-            print(f"Buscando imágenes de {artist} en Google...")
-            google_urls = search_google_images(artist, needed_images * 3)
-            collected_urls.extend(google_urls)
-        
-        # Eliminar URLs duplicadas preservando el orden
-        unique_urls = []
-        for url in collected_urls:
-            if url not in unique_urls:
-                unique_urls.append(url)
-        
-        # Procesar URLs y descargar imágenes únicas
-        for url in unique_urls:
-            if total_downloaded >= args.max_images:
-                break
+        # Verificar si ya tenemos suficientes imágenes
+        if total_downloaded >= args.max_images:
+            print(f"✅ Se completaron las {args.max_images} imágenes para {artist} usando Last.fm")
+        else:
+            # 2. Buscar y descargar imágenes de Spotify si está configurado
+            if spotify_enabled:
+                print(f"Buscando imágenes de {artist} en Spotify...")
+                spotify_downloads = search_spotify_images(
+                    artist, spotify_id, sp, args.max_images - total_downloaded,
+                    image_hashes, args.output, args.similarity_threshold
+                )
                 
-            img_hash, success = download_and_check_image(
-                url, artist, total_downloaded + 1, args.output, 
-                image_hashes, args.similarity_threshold
-            )
+                # Actualizar contadores y hashes
+                total_downloaded += len(spotify_downloads)
+                for _, img_hash in spotify_downloads:
+                    image_hashes.append(img_hash)
             
-            if success and img_hash:
-                image_hashes.append(img_hash)
-                total_downloaded += 1
-            
-            time.sleep(0.5)  # Breve pausa entre descargas
+            # Verificar si ya tenemos suficientes imágenes
+            if total_downloaded >= args.max_images:
+                print(f"✅ Se completaron las {args.max_images} imágenes para {artist} usando Last.fm y Spotify")
+            else:
+                # 3. Buscar y descargar imágenes de Google como último recurso
+                print(f"Buscando imágenes de {artist} en Google...")
+                google_downloads = search_google_images(
+                    artist, args.max_images - total_downloaded,
+                    image_hashes, args.output, args.similarity_threshold
+                )
+                
+                # Actualizar contadores
+                total_downloaded += len(google_downloads)
         
         # Actualizar estadísticas
         stats['processed'] += 1

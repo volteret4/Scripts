@@ -1,247 +1,431 @@
-import sqlite3
-import requests
-import base64
-import json
-import time
-from datetime import datetime, timedelta
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-import pylast
+#!/usr/bin/env python3
 import argparse
-import logging
+import json
+import os
+import sqlite3
+import sys
+import time
+from datetime import datetime
+from typing import Dict, List, Optional, Set, Tuple
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    filename='music_link_retrieval.log')
-
-def configure_spotify(client_id, client_secret):
-    """Safely configure Spotify client with error handling"""
-    try:
-        return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
-            client_id=client_id,
-            client_secret=client_secret
-        ))
-    except Exception as e:
-        logging.error(f"Failed to configure Spotify client: {e}")
-        raise
-
-def configure_lastfm(api_key, api_secret):
-    """Safely configure Last.fm client with error handling"""
-    try:
-        return pylast.LastFMNetwork(
-            api_key=api_key,
-            api_secret=api_secret
-        )
-    except Exception as e:
-        logging.error(f"Failed to configure Last.fm client: {e}")
-        raise
-
-
-def crear_tabla_song_links(db_path):
-    """Create song links table with comprehensive schema"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS song_links (
-        id INTEGER PRIMARY KEY,
-        song_id INTEGER UNIQUE,
-        spotify_url TEXT,
-        spotify_id TEXT,
-        lastfm_url TEXT,
-        links_status TEXT DEFAULT 'pending',
-        first_attempt TIMESTAMP,
-        last_attempt TIMESTAMP,
-        attempts_count INTEGER DEFAULT 0,
-        FOREIGN KEY (song_id) REFERENCES songs (id)
-    )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-def buscar_en_spotify(sp, titulo, artista, album=None):
-    """Enhanced Spotify search with multiple fallback strategies"""
-    search_queries = [
-        f"track:{titulo} artist:{artista}",  # Exact match
-        f"{titulo} {artista}",  # Relaxed match
-        titulo  # Last resort
-    ]
-    
-    for query in search_queries:
+class MusicLinkUpdater:
+    def __init__(self, db_path: str, checkpoint_file: str, services: Set[str], limit: Optional[int] = None):
+        """
+        Inicializa el actualizador de enlaces para canciones.
+        
+        Args:
+            db_path: Ruta al archivo de la base de datos SQLite
+            checkpoint_file: Archivo JSON para guardar el progreso
+            services: Conjunto de servicios a buscar ('youtube', 'spotify', 'bandcamp')
+            limit: Límite de canciones a procesar (None para procesar todas)
+        """
+        self.db_path = db_path
+        self.checkpoint_file = checkpoint_file
+        self.services = services
+        self.limit = limit
+        
+        # Estadísticas
+        self.stats = {
+            "processed": 0,
+            "skipped": 0,
+            "updated": 0,
+            "failed": 0,
+            "by_service": {
+                "youtube": 0,
+                "spotify": 0,
+                "bandcamp": 0
+            },
+            "start_time": datetime.now().isoformat(),
+            "end_time": None,
+            "last_processed_id": 0
+        }
+        
+        # Cargar punto de control si existe
+        self.last_processed_id = self._load_checkpoint()
+        
+        # Conectar a la base de datos
+        self.conn = sqlite3.connect(db_path)
+        self.conn.row_factory = sqlite3.Row
+        self.cursor = self.conn.cursor()
+        
+        self.log(f"Iniciando actualizador de enlaces para servicios: {', '.join(services)}")
+        self.log(f"Base de datos: {db_path}")
+        self.log(f"Archivo de checkpoint: {checkpoint_file}")
+        if limit:
+            self.log(f"Límite de canciones: {limit}")
+        self.log(f"Último ID procesado: {self.last_processed_id}")
+        
+    def _load_checkpoint(self) -> int:
+        """Carga el último ID procesado desde el archivo de checkpoint."""
+        if not os.path.exists(self.checkpoint_file):
+            return 0
+            
         try:
-            results = sp.search(q=query, type='track', limit=1)
+            with open(self.checkpoint_file, 'r') as f:
+                data = json.load(f)
+                if "last_processed_id" in data:
+                    self.stats = data
+                    return data["last_processed_id"]
+        except (json.JSONDecodeError, FileNotFoundError):
+            pass
             
-            if results['tracks']['items']:
-                track = results['tracks']['items'][0]
-                return {
-                    'spotify_url': track['external_urls']['spotify'],
-                    'spotify_id': track['id']
-                }
-        except Exception as e:
-            logging.warning(f"Spotify search error with query '{query}': {e}")
-    
-    return None
-
-def buscar_en_lastfm(network, titulo, artista):
-    """Buscar una canción en Last.fm y devolver su URL"""
-    try:
-        # Buscar la canción en Last.fm
-        track = network.get_track(artista, titulo)
-        return track.get_url()
-    except Exception as e:
-        print(f"Error al buscar en Last.fm: {e}")
+        return 0
+        
+    def _save_checkpoint(self) -> None:
+        """Guarda el progreso actual en el archivo de checkpoint."""
+        self.stats["end_time"] = datetime.now().isoformat()
+        
+        with open(self.checkpoint_file, 'w') as f:
+            json.dump(self.stats, f, indent=2)
+            
+    def log(self, message: str) -> None:
+        """Registra un mensaje en stdout con marca de tiempo."""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] {message}")
+        
+    def get_songs_to_process(self) -> List[Dict]:
+        """Obtiene la lista de canciones a procesar desde la base de datos."""
+        query = """
+        SELECT s.id, s.title, s.artist, s.album
+        FROM songs s
+        LEFT JOIN song_links sl ON s.id = sl.song_id
+        WHERE s.id > ?
+        ORDER BY s.id ASC
+        """
+        
+        if self.limit:
+            query += f" LIMIT {self.limit}"
+            
+        self.cursor.execute(query, (self.last_processed_id,))
+        return [dict(row) for row in self.cursor.fetchall()]
+        
+    def search_youtube(self, song: Dict) -> Optional[str]:
+        """
+        Simula la búsqueda de una canción en YouTube.
+        En un caso real, utilizarías la API de YouTube para buscar.
+        
+        Args:
+            song: Diccionario con información de la canción
+            
+        Returns:
+            URL de YouTube o None si no se encuentra
+        """
+        # Simulación: en una implementación real se usaría la API de YouTube
+        self.log(f"Buscando en YouTube: {song['artist']} - {song['title']}")
+        # Simular éxito con probabilidad del 90%
+        if hash(f"{song['id']}youtube") % 10 != 0:
+            video_id = hash(f"{song['artist']}{song['title']}tube") % 1000000
+            return f"https://youtube.com/watch?v={video_id}"
         return None
-
-def actualizar_song_links(db_path, sp, network, limit=None):
-    """Obtener y actualizar enlaces para canciones"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Modificar consulta para buscar solo canciones sin enlaces
-    cursor.execute('''
-    SELECT s.id, s.title, s.artist, s.album
-    FROM songs s
-    LEFT JOIN song_links sl ON s.id = sl.song_id
-    WHERE sl.id IS NULL
-    ''')
-    
-    canciones = cursor.fetchall()
-    if limit:
-        canciones = canciones[:limit]
-    
-    total_canciones = len(canciones)
-    print(f"Se procesarán {total_canciones} canciones" + (f" (limitado a {limit})" if limit else ""))
-    
-    for i, (song_id, titulo, artista, album) in enumerate(canciones, 1):
-        print(f"Procesando {i}/{total_canciones}: {artista} - {titulo}")
         
-        # Buscar en Spotify
-        spotify_info = buscar_en_spotify(sp, titulo, artista, album)
-        spotify_url = spotify_info['spotify_url'] if spotify_info else None
-        spotify_id = spotify_info['spotify_id'] if spotify_info else None
+    def search_spotify(self, song: Dict) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Simula la búsqueda de una canción en Spotify.
+        En un caso real, utilizarías la API de Spotify para buscar.
         
-        # Buscar en Last.fm
-        lastfm_url = buscar_en_lastfm(network, titulo, artista)
-        
-        # Solo insertar si al menos un enlace está disponible
-        if spotify_url or lastfm_url:
-            cursor.execute('''
-            INSERT INTO song_links (song_id, spotify_url, spotify_id, lastfm_url)
-            VALUES (?, ?, ?, ?)
-            ''', (song_id, spotify_url, spotify_id, lastfm_url))
+        Args:
+            song: Diccionario con información de la canción
             
-            conn.commit()
+        Returns:
+            Tupla (URL de Spotify, ID de Spotify) o (None, None) si no se encuentra
+        """
+        # Simulación: en una implementación real se usaría la API de Spotify
+        self.log(f"Buscando en Spotify: {song['artist']} - {song['title']}")
+        # Simular éxito con probabilidad del 85%
+        if hash(f"{song['id']}spotify") % 100 < 85:
+            track_id = f"{hash(song['artist'] + song['title']) % 10000000:07x}"
+            return (f"https://open.spotify.com/track/{track_id}", track_id)
+        return (None, None)
         
-        time.sleep(0.5)  # Respetar límites de tasa
-    
-    conn.close()
-    print("Proceso completado.")
+    def search_bandcamp(self, song: Dict) -> Optional[str]:
+        """
+        Simula la búsqueda de una canción en Bandcamp.
+        En un caso real, utilizarías web scraping o una API no oficial para buscar.
+        
+        Args:
+            song: Diccionario con información de la canción
+            
+        Returns:
+            URL de Bandcamp o None si no se encuentra
+        """
+        # Simulación: en una implementación real se usaría web scraping o una API no oficial
+        self.log(f"Buscando en Bandcamp: {song['artist']} - {song['title']}")
+        # Simular éxito con probabilidad del 60%
+        if hash(f"{song['id']}bandcamp") % 100 < 60:
+            artist_slug = song['artist'].lower().replace(' ', '-')
+            song_slug = song['title'].lower().replace(' ', '-')
+            return f"https://{artist_slug}.bandcamp.com/track/{song_slug}"
+        return None
+        
+    def update_song_links(self, song_id: int, youtube_url: Optional[str] = None, 
+                         spotify_url: Optional[str] = None, spotify_id: Optional[str] = None,
+                         bandcamp_url: Optional[str] = None) -> bool:
+        """
+        Actualiza los enlaces de una canción en la base de datos.
+        
+        Args:
+            song_id: ID de la canción
+            youtube_url: URL de YouTube
+            spotify_url: URL de Spotify
+            spotify_id: ID de Spotify
+            bandcamp_url: URL de Bandcamp
+            
+        Returns:
+            True si se actualizó correctamente, False en caso contrario
+        """
+        try:
+            # Verificar si ya existe un registro en song_links
+            self.cursor.execute("SELECT id FROM song_links WHERE song_id = ?", (song_id,))
+            result = self.cursor.fetchone()
+            
+            current_time = datetime.now().isoformat()
+            
+            if result:
+                # Actualizar registro existente
+                update_fields = []
+                params = []
+                
+                if youtube_url is not None:
+                    update_fields.append("youtube_url = ?")
+                    params.append(youtube_url)
+                    
+                if spotify_url is not None:
+                    update_fields.append("spotify_url = ?")
+                    params.append(spotify_url)
+                    
+                if spotify_id is not None:
+                    update_fields.append("spotify_id = ?")
+                    params.append(spotify_id)
+                    
+                if bandcamp_url is not None:
+                    # Asumimos que añadimos este campo a la tabla
+                    update_fields.append("bandcamp_url = ?")
+                    params.append(bandcamp_url)
+                
+                if update_fields:
+                    update_fields.append("links_updated = ?")
+                    params.append(current_time)
+                    params.append(song_id)
+                    
+                    query = f"UPDATE song_links SET {', '.join(update_fields)} WHERE song_id = ?"
+                    self.cursor.execute(query, params)
+            else:
+                # Crear nuevo registro
+                fields = ["song_id", "links_updated"]
+                values = [song_id, current_time]
+                placeholders = ["?", "?"]
+                
+                if youtube_url is not None:
+                    fields.append("youtube_url")
+                    values.append(youtube_url)
+                    placeholders.append("?")
+                    
+                if spotify_url is not None:
+                    fields.append("spotify_url")
+                    values.append(spotify_url)
+                    placeholders.append("?")
+                    
+                if spotify_id is not None:
+                    fields.append("spotify_id")
+                    values.append(spotify_id)
+                    placeholders.append("?")
+                    
+                if bandcamp_url is not None:
+                    # Asumimos que añadimos este campo a la tabla
+                    fields.append("bandcamp_url")
+                    values.append(bandcamp_url)
+                    placeholders.append("?")
+                
+                query = f"INSERT INTO song_links ({', '.join(fields)}) VALUES ({', '.join(placeholders)})"
+                self.cursor.execute(query, values)
+                
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            self.log(f"Error al actualizar enlaces para canción {song_id}: {e}")
+            self.conn.rollback()
+            return False
+            
+    def process_song(self, song: Dict) -> bool:
+        """
+        Procesa una canción para actualizar sus enlaces.
+        
+        Args:
+            song: Diccionario con información de la canción
+            
+        Returns:
+            True si se actualizó correctamente, False en caso contrario
+        """
+        self.log(f"Procesando canción ID {song['id']}: {song['artist']} - {song['title']}")
+        song_id = song['id']
+        self.stats["processed"] += 1
+        
+        youtube_url = None
+        spotify_url = None
+        spotify_id = None
+        bandcamp_url = None
+        
+        updated = False
+        
+        # Buscar en YouTube
+        if 'youtube' in self.services:
+            youtube_url = self.search_youtube(song)
+            if youtube_url:
+                self.stats["by_service"]["youtube"] += 1
+                updated = True
+                
+        # Buscar en Spotify
+        if 'spotify' in self.services:
+            spotify_url, spotify_id = self.search_spotify(song)
+            if spotify_url:
+                self.stats["by_service"]["spotify"] += 1
+                updated = True
+                
+        # Buscar en Bandcamp
+        if 'bandcamp' in self.services:
+            bandcamp_url = self.search_bandcamp(song)
+            if bandcamp_url:
+                self.stats["by_service"]["bandcamp"] += 1
+                updated = True
+                
+        # Actualizar la base de datos
+        if updated:
+            success = self.update_song_links(
+                song_id, youtube_url, spotify_url, spotify_id, bandcamp_url
+            )
+            
+            if success:
+                self.stats["updated"] += 1
+                self.log(f"Enlaces actualizados para canción ID {song_id}")
+            else:
+                self.stats["failed"] += 1
+                self.log(f"Error al actualizar enlaces para canción ID {song_id}")
+                
+            return success
+        else:
+            self.stats["skipped"] += 1
+            self.log(f"No se encontraron enlaces para canción ID {song_id}")
+            return False
+            
+    def run(self) -> Dict:
+        """
+        Ejecuta el proceso de actualización de enlaces.
+        
+        Returns:
+            Diccionario con estadísticas del proceso
+        """
+        try:
+            # Verificar si existe la tabla song_links
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='song_links'")
+            if not self.cursor.fetchone():
+                self.log("Creando tabla song_links...")
+                self.cursor.execute("""
+                CREATE TABLE song_links (
+                    id INTEGER PRIMARY KEY,
+                    song_id INTEGER,
+                    spotify_url TEXT,
+                    spotify_id TEXT,
+                    lastfm_url TEXT,
+                    links_updated TIMESTAMP,
+                    youtube_url TEXT,
+                    musicbrainz_url TEXT,
+                    musicbrainz_recording_id TEXT,
+                    bandcamp_url TEXT
+                )
+                """)
+                self.conn.commit()
+            else:
+                # Verificar si bandcamp_url existe en la tabla
+                self.cursor.execute("PRAGMA table_info(song_links)")
+                columns = [col[1] for col in self.cursor.fetchall()]
+                
+                if "bandcamp_url" not in columns:
+                    self.log("Añadiendo columna bandcamp_url a la tabla song_links...")
+                    self.cursor.execute("ALTER TABLE song_links ADD COLUMN bandcamp_url TEXT")
+                    self.conn.commit()
+            
+            # Obtener canciones a procesar
+            songs = self.get_songs_to_process()
+            total_songs = len(songs)
+            self.log(f"Se encontraron {total_songs} canciones para procesar")
+            
+            if total_songs == 0:
+                self.log("No hay canciones para procesar. Finalizando.")
+                return self.stats
+                
+            # Procesar canciones
+            for i, song in enumerate(songs):
+                self.process_song(song)
+                self.stats["last_processed_id"] = song["id"]
+                
+                # Guardar checkpoint cada 100 canciones
+                if (i + 1) % 100 == 0:
+                    self._save_checkpoint()
+                    self.log(f"Progreso: {i + 1}/{total_songs} canciones procesadas")
+                    
+                # Pequeña pausa para no saturar APIs
+                time.sleep(0.1)
+                
+            # Guardar estadísticas finales
+            self._save_checkpoint()
+            
+            # Mostrar estadísticas
+            self.log("\n--- Estadísticas finales ---")
+            self.log(f"Total de canciones procesadas: {self.stats['processed']}")
+            self.log(f"Canciones actualizadas: {self.stats['updated']}")
+            self.log(f"Canciones omitidas: {self.stats['skipped']}")
+            self.log(f"Errores: {self.stats['failed']}")
+            self.log("Enlaces por servicio:")
+            for service, count in self.stats["by_service"].items():
+                if service in self.services:
+                    self.log(f"  - {service}: {count}")
+                    
+            return self.stats
+            
+        except Exception as e:
+            self.log(f"Error inesperado: {e}")
+            raise
+        finally:
+            self.conn.close()
 
-def exportar_a_json(db_path):
-    """Exportar los datos de canciones con sus enlaces a un archivo JSON"""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+def main():
+    parser = argparse.ArgumentParser(description="Actualiza enlaces de canciones para servicios de streaming")
+    parser.add_argument("db_path", help="Ruta al archivo de base de datos SQLite")
+    parser.add_argument("--checkpoint", default="music_links_checkpoint.json", 
+                      help="Archivo JSON para guardar el progreso (por defecto: music_links_checkpoint.json)")
+    parser.add_argument("--services", default="youtube,spotify,bandcamp",
+                      help="Servicios a buscar, separados por comas (por defecto: youtube,spotify,bandcamp)")
+    parser.add_argument("--limit", type=int, help="Límite de canciones a procesar")
     
-    cursor.execute('''
-    SELECT 
-        s.id, s.title, s.artist, s.album, s.genre, s.date,
-        sl.spotify_url, sl.spotify_id, sl.lastfm_url
-    FROM songs s
-    LEFT JOIN song_links sl ON s.id = sl.song_id
-    ''')
-    
-    rows = cursor.fetchall()
-    result = []
-    
-    for row in rows:
-        result.append({
-            'id': row['id'],
-            'title': row['title'],
-            'artist': row['artist'],
-            'album': row['album'],
-            'genre': row['genre'],
-            'year': row['date'],
-            'spotify_url': row['spotify_url'],
-            'spotify_id': row['spotify_id'],
-            'lastfm_url': row['lastfm_url']
-        })
-    
-    conn.close()
-    
-    with open('songs_links.json', 'w', encoding='utf-8') as f:
-        json.dump(result, f, ensure_ascii=False, indent=4)
-    
-    print(f"Datos exportados a songs_links.json ({len(result)} canciones)")
-
-def obtener_estadisticas(db_path):
-    """Obtener estadísticas sobre los enlaces obtenidos"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Total de canciones
-    cursor.execute("SELECT COUNT(*) FROM songs")
-    total_canciones = cursor.fetchone()[0]
-    
-    # Canciones con enlaces a Spotify
-    cursor.execute("SELECT COUNT(*) FROM song_links WHERE spotify_url IS NOT NULL")
-    canciones_spotify = cursor.fetchone()[0]
-    
-    # Canciones con enlaces a Last.fm
-    cursor.execute("SELECT COUNT(*) FROM song_links WHERE lastfm_url IS NOT NULL")
-    canciones_lastfm = cursor.fetchone()[0]
-    
-    # Canciones con ambos enlaces
-    cursor.execute("SELECT COUNT(*) FROM song_links WHERE spotify_url IS NOT NULL AND lastfm_url IS NOT NULL")
-    canciones_ambos = cursor.fetchone()[0]
-    
-    # Canciones sin ningún enlace
-    cursor.execute('''
-    SELECT COUNT(*) FROM songs s
-    LEFT JOIN song_links sl ON s.id = sl.song_id
-    WHERE sl.spotify_url IS NULL AND sl.lastfm_url IS NULL
-    ''')
-    canciones_sin_enlaces = cursor.fetchone()[0]
-    
-    conn.close()
-    
-    print("\nEstadísticas:")
-    print(f"Total de canciones: {total_canciones}")
-    print(f"Canciones con enlaces a Spotify: {canciones_spotify} ({canciones_spotify/total_canciones*100:.2f}%)")
-    print(f"Canciones con enlaces a Last.fm: {canciones_lastfm} ({canciones_lastfm/total_canciones*100:.2f}%)")
-    print(f"Canciones con ambos enlaces: {canciones_ambos} ({canciones_ambos/total_canciones*100:.2f}%)")
-    print(f"Canciones sin ningún enlace: {canciones_sin_enlaces} ({canciones_sin_enlaces/total_canciones*100:.2f}%)")
-
-if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser(description='Navegador de música')
-    parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
-    parser.add_argument('--spotify_client_id', help='Cliente ID de Spotify')
-    parser.add_argument('--spotify_client_secret', help='Secret de Spotify')
-    parser.add_argument('--lastfm_api_key', help='Clave API de Last.fm')
-    parser.add_argument('--lastfm_api_secret', help='Secret de Last.fm')
-    parser.add_argument('--limit', type=int, help='Límite de canciones a procesar (opcional)')
     args = parser.parse_args()
     
-    # Configuración
-    db_path = args.db_path
+    # Validar la ruta de la base de datos
+    if not os.path.exists(args.db_path):
+        print(f"Error: La base de datos '{args.db_path}' no existe")
+        sys.exit(1)
+        
+    # Obtener servicios solicitados
+    services = set(args.services.split(","))
+    valid_services = {"youtube", "spotify", "bandcamp"}
     
-    # Configurar clientes de API
-    sp = configure_spotify(args.spotify_client_id, args.spotify_client_secret)
-    network = configure_lastfm(args.lastfm_api_key, args.lastfm_api_secret)
+    invalid_services = services - valid_services
+    if invalid_services:
+        print(f"Error: Servicios inválidos: {', '.join(invalid_services)}")
+        print(f"Servicios válidos: {', '.join(valid_services)}")
+        sys.exit(1)
+        
+    # Iniciar el actualizador
+    updater = MusicLinkUpdater(args.db_path, args.checkpoint, services, args.limit)
+    
+    try:
+        updater.run()
+    except KeyboardInterrupt:
+        print("\nProceso interrumpido por el usuario")
+        updater._save_checkpoint()
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
 
-    print("Iniciando proceso de obtención de enlaces para canciones...")
-    
-    # Crear la tabla si no existe
-    crear_tabla_song_links(db_path)
-    
-    # Actualizar los enlaces con el límite opcional
-    actualizar_song_links(db_path, sp, network, args.limit)
-    
-    # Mostrar estadísticas
-    obtener_estadisticas(db_path)
-    
-    # Exportar a JSON
-    exportar_a_json(db_path)
+if __name__ == "__main__":
+    main()

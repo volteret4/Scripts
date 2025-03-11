@@ -196,6 +196,19 @@ class MusicBrowser(BaseModule):
 
     def __init__(self, parent=None, theme='Tokyo Night', **kwargs):
         # Extraer los argumentos específicos de MusicBrowser
+        """
+        Inicializa el módulo de exploración de música.
+
+        Args:
+            parent (QWidget, optional): Widget padre. Defaults to None.
+            theme (str, optional): Tema de la interfaz. Defaults to 'Tokyo Night'.
+            db_path (str, optional): Ruta al archivo de la base de datos de
+                música. Defaults to ''.
+            font_family (str, optional): Familia de fuente para la interfaz.
+                Defaults to 'Inter'.
+            artist_images_dir (str, optional): Directorio para las imágenes de
+                artistas. Defaults to ''.
+        """
         self.db_path = kwargs.pop('db_path', '')
         self.font_family = kwargs.pop('font_family', 'Inter')
         self.artist_images_dir = kwargs.pop('artist_images_dir', '')
@@ -1269,6 +1282,20 @@ class MusicBrowser(BaseModule):
             print(f"Error: {e}")
 
     def search(self):
+        """
+        Realiza una búsqueda en la base de datos según la consulta escrita en la caja de texto.
+        
+        Primero se intenta buscar en la tabla FTS (si se han proporcionado términos de texto libre).
+        Si no se encuentran resultados, se vuelve a realizar la búsqueda en la tabla de canciones
+        pero esta vez con condiciones específicas para cada campo.
+        
+        Se utiliza la clase SearchParser para construir las condiciones SQL y parámetros necesarios
+        para la consulta.
+        
+        Se ordenan los resultados por artista, álbum y número de pista.
+        
+        Se limita el número de resultados a 1000 para evitar sobrecargar la interfaz.
+        """
         query = self.search_box.text()
         parsed = self.search_parser.parse_query(query)
         
@@ -1280,7 +1307,10 @@ class MusicBrowser(BaseModule):
         
         c = conn.cursor()
         
-        # Base SQL query con join a tabla artists, albums y lyrics para obtener letras y otra información
+        # Determinar si hay términos de búsqueda de texto libre
+        has_fts_terms = any(term['type'] == 'text' for term in parsed) if isinstance(parsed, list) else False
+        
+        # Preparar SQL base
         sql = """
             SELECT DISTINCT 
                 s.id,
@@ -1315,23 +1345,65 @@ class MusicBrowser(BaseModule):
                 alb.wikipedia_content AS album_wikipedia_content,
                 lyr.lyrics,
                 lyr.source AS lyrics_source
-            FROM songs s
-            LEFT JOIN artists art ON s.artist = art.name
-            LEFT JOIN albums alb ON s.album = alb.name 
-            LEFT JOIN artists album_artist ON alb.artist_id = album_artist.id AND s.artist = album_artist.name
-            LEFT JOIN lyrics lyr ON s.id = lyr.track_id
         """
         
-        # Use build_sql_conditions from SearchParser
-        conditions, params = self.search_parser.build_sql_conditions(parsed)
+        # Si tenemos términos de búsqueda de texto, usar las tablas FTS
+        if has_fts_terms:
+            # Extraer términos de texto libre
+            text_terms = [term['value'] for term in parsed if term['type'] == 'text']
+            fts_query = ' '.join(text_terms)
+            
+            # Modificar SQL para incluir búsqueda FTS usando JOIN
+            sql += """
+                FROM songs s
+                JOIN song_fts ON song_fts.id = s.id AND song_fts MATCH ?
+                LEFT JOIN artists art ON s.artist = art.name
+                LEFT JOIN albums alb ON s.album = alb.name 
+                LEFT JOIN artists album_artist ON alb.artist_id = album_artist.id AND s.artist = album_artist.name
+                LEFT JOIN lyrics lyr ON s.id = lyr.track_id
+            """
+            params = [fts_query]
+            
+            # Separar términos que no son de texto para condiciones adicionales
+            non_text_terms = [term for term in parsed if term['type'] != 'text']
+            
+            # Añadir condiciones para términos que no son de texto
+            if non_text_terms:
+                # Modificar parsed para solo incluir términos que no son de texto
+                conditions, additional_params = self.search_parser.build_sql_conditions(non_text_terms)
+                if conditions:
+                    sql += " WHERE " + " AND ".join(conditions)
+                    params.extend(additional_params)
+        else:
+            # Usar la consulta tradicional para términos específicos
+            sql += """
+                FROM songs s
+                LEFT JOIN artists art ON s.artist = art.name
+                LEFT JOIN albums alb ON s.album = alb.name 
+                LEFT JOIN artists album_artist ON alb.artist_id = album_artist.id AND s.artist = album_artist.name
+                LEFT JOIN lyrics lyr ON s.id = lyr.track_id
+            """
+            
+            # Usar build_sql_conditions desde SearchParser
+            conditions, params = self.search_parser.build_sql_conditions(parsed)
+            
+            # Añadir cláusula WHERE si hay condiciones
+            if conditions:
+                sql += " WHERE " + " AND ".join(conditions)
         
-        # Add WHERE clause if there are conditions
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
-            print(f"SQL Condiciones: {conditions}")
-            print(f"SQL Parámetros: {params}")
+        # Búsqueda en letras si está habilitada
+        if hasattr(self, 'search_lyrics') and self.search_lyrics and has_fts_terms:
+            # Si ya tenemos condiciones WHERE
+            if 'WHERE' in sql:
+                sql = sql.replace('JOIN song_fts ON song_fts.id = s.id AND song_fts MATCH ?',
+                                'JOIN song_fts ON song_fts.id = s.id AND (song_fts MATCH ? OR EXISTS (SELECT 1 FROM lyrics_fts WHERE lyrics_fts.rowid = lyr.id AND lyrics_fts MATCH ?))')
+                # Añadir el parámetro de búsqueda de letras
+                params.insert(1, fts_query)  # Insertamos el mismo parámetro de búsqueda de nuevo
+            else:
+                sql += " WHERE EXISTS (SELECT 1 FROM lyrics_fts WHERE lyrics_fts.rowid = lyr.id AND lyrics_fts MATCH ?)"
+                params.append(fts_query)
         
-        # Ordering
+        # Ordenamiento
         sql += " ORDER BY s.artist, s.album, CAST(s.track_number AS INTEGER)"
         
         # Añadir un límite razonable para evitar cargar demasiados resultados
@@ -1340,6 +1412,9 @@ class MusicBrowser(BaseModule):
         try:
             # Iniciar temporizador
             start_time = time.time()
+            
+            print(f"Ejecutando SQL: {sql}")
+            print(f"Con parámetros: {params}")
             
             c.execute(sql, params)
             results = c.fetchall()

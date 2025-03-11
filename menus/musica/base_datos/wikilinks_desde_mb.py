@@ -201,7 +201,120 @@ def get_wikipedia_content(url):
     except Exception as e:
         print(f"Error al obtener contenido de Wikipedia: {e}")
         return None
+def get_song_details(conn, song_id):
+    """Obtiene los detalles completos de una canción incluyendo letras y enlaces externos"""
+    cursor = conn.cursor()
+    
+    # Consulta principal para obtener datos de la canción
+    cursor.execute("""
+        SELECT s.id, s.title, s.artist, s.album, s.genre, s.date, s.album_year, 
+               s.track_number, s.duration, s.file_path, s.bitrate, s.has_lyrics,
+               s.replay_gain, s.replay_gain_track_gain, s.replay_gain_album_gain,
+               s.artist_origin, s.album_art_path_denorm
+        FROM songs s
+        WHERE s.id = ?
+    """, (song_id,))
+    
+    song = cursor.fetchone()
+    
+    if not song:
+        return None
+    
+    # Convertimos a diccionario para facilitar agregar datos adicionales
+    column_names = [description[0] for description in cursor.description]
+    song_dict = dict(zip(column_names, song))
+    
+    # Obtener letras si las hay
+    if song_dict['has_lyrics']:
+        cursor.execute("""
+            SELECT lyrics, source, last_updated
+            FROM lyrics
+            WHERE track_id = ?
+        """, (song_id,))
+        
+        lyrics_data = cursor.fetchone()
+        if lyrics_data:
+            song_dict['lyrics_text'] = lyrics_data[0]
+            song_dict['lyrics_source'] = lyrics_data[1]
+            song_dict['lyrics_updated'] = lyrics_data[2]
+    
+    # Obtener enlaces externos
+    cursor.execute("""
+        SELECT spotify_url, spotify_id, youtube_url, lastfm_url, 
+               musicbrainz_url, musicbrainz_recording_id
+        FROM song_links
+        WHERE song_id = ?
+    """, (song_id,))
+    
+    links = cursor.fetchone()
+    if links:
+        column_names = [description[0] for description in cursor.description]
+        links_dict = dict(zip(column_names, links))
+        song_dict.update(links_dict)
+    
+    # Obtener información del artista incluyendo datos de Wikipedia
+    cursor.execute("""
+        SELECT id, bio, tags, origin, formed_year, wikipedia_url, 
+               wikipedia_updated
+        FROM artists
+        WHERE name = ?
+    """, (song_dict['artist'],))
+    
+    artist_data = cursor.fetchone()
+    if artist_data:
+        column_names = [description[0] for description in cursor.description]
+        artist_dict = dict(zip(column_names, artist_data))
+        
+        # Solo añadimos un extracto del contenido de Wikipedia si existe
+        if artist_dict.get('wikipedia_url'):
+            cursor.execute("""
+                SELECT wikipedia_content
+                FROM artists
+                WHERE id = ?
+            """, (artist_dict['id'],))
+            
+            wiki_content = cursor.fetchone()
+            if wiki_content and wiki_content[0]:
+                # Limitamos a 500 caracteres para el extracto
+                artist_dict['wikipedia_extract'] = wiki_content[0][:500] + '...' if len(wiki_content[0]) > 500 else wiki_content[0]
+        
+        # Añadimos los datos del artista bajo una clave separada
+        song_dict['artist_info'] = artist_dict
+    
+    # Obtener información del álbum incluyendo datos de Wikipedia
+    cursor.execute("""
+        SELECT id, year, label, genre, total_tracks, album_art_path, 
+               wikipedia_url, wikipedia_updated
+        FROM albums
+        WHERE name = ? AND artist_id = (
+            SELECT id FROM artists WHERE name = ?
+        )
+    """, (song_dict['album'], song_dict['artist']))
+    
+    album_data = cursor.fetchone()
+    if album_data:
+        column_names = [description[0] for description in cursor.description]
+        album_dict = dict(zip(column_names, album_data))
+        
+        # Solo añadimos un extracto del contenido de Wikipedia si existe
+        if album_dict.get('wikipedia_url'):
+            cursor.execute("""
+                SELECT wikipedia_content
+                FROM albums
+                WHERE id = ?
+            """, (album_dict['id'],))
+            
+            wiki_content = cursor.fetchone()
+            if wiki_content and wiki_content[0]:
+                # Limitamos a 500 caracteres para el extracto
+                album_dict['wikipedia_extract'] = wiki_content[0][:500] + '...' if len(wiki_content[0]) > 500 else wiki_content[0]
+        
+        # Añadimos los datos del álbum bajo una clave separada
+        song_dict['album_info'] = album_dict
+    
+    return song_dict
 
+    
 def get_artist_albums(db_path, artist_id):
     """Obtiene los álbumes asociados a un artista"""
     conn = sqlite3.connect(db_path)
