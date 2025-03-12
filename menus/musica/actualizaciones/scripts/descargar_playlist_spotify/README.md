@@ -53,9 +53,10 @@ O esto al docker run
 # Uso
 
 
-## Uso manual para pobres
+## Uso manual
 
-Recomendado la primera vez, con esa cara que tienes. Así podrás ver el log, sino lanzará el proceso de fondo
+Recomendado la primera vez, con esa cara que tienes. Así podrás ver el log, sino lanzará el proceso de fondo, Edita lo recomendado en Pesadilla desde la pagina el [enlace](https://www.youtube.com/watch?v=oHg5SJYRHA0) al fondo de la página.
+
 
 ```bash
 bash setup.sh --manual
@@ -70,7 +71,7 @@ bash setup.sh --automatico
 
 
 
-## Uso manual para tiesos
+## Pesadilla
 
 #### 1. Edita el archivo config.json:
 
@@ -105,9 +106,12 @@ El resto son opcionales:
 source /storage/polladas/moode/script/python_venv
 ```
 
+
 Si fallara al usar mi python_venv por lo que sea, puedes hacer con el lo que quieras, es una copia del mio.
 
+
 ##### 2.A Si prefieres crear uno nuevo (opcional):
+
 
 ```bash
 mkdir python_venv
@@ -124,21 +128,22 @@ pip install spotipy tabulate bencodepy
 python "/storage/popollo/scripts/descargar_playlist_spotify/1_mover_canciones_playlist_spotify.py" --config_file "/storage/popollo/scripts/config.json"
 ```
 
-O puedes usar el alias `popollo`
+Puedes pasar el `--config-file` y los argumentos que quieras que estos deberían prevalecer sobre los del json. Por ejemplo, si usas `--playlist_id` o `--playlist_url` así evitarías la selección de playlists del usuario especificado en el config.json
 
 
-O lanzarlo con comandos
+O puedes usar el alias `popollo` que ya te hace cd al directorio y lanza el comando anterior... ¿Dónde cojones guardas los alias? ya tienes tareal
+
+
+O lanzarlo con todos los argumentos del config.json... ni me molesto en explicar
 ...
 
 
-O lanzarlo solo, te pedirá lo necesario
-...
 
 
-
-
-> Te recomendaría un docker de airsonic usando este docker_compose y con una app en el movil tienes acceso a los archivos descargados....
+> Te recomendaría porque soy un pesao un docker de airsonic usando este docker_compose por ejemplo y con una app en el movil tienes acceso a los archivos descargados....
 > https://docs.linuxserver.io/images/docker-airsonic-advanced/
+
+
 
 ```yml
 services:
