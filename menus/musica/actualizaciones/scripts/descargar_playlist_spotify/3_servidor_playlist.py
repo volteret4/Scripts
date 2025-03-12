@@ -39,11 +39,43 @@ class TorrentProcessor:
     def load_canciones(self):
         try:
             with open(self.json_file, 'r', encoding='utf-8') as f:
-                self.canciones = json.load(f)
+                datos = json.load(f)
+            
+            # Convertir el nuevo formato a un formato compatible
+            self.canciones = []
+            self.formato_agrupado = True
+            
+            # Detectar automáticamente el formato
+            if datos and isinstance(datos, list):
+                # Verificar si es el nuevo formato agrupado
+                if "canciones" in datos[0]:
+                    logger.info("Detectado formato JSON agrupado por artista/álbum")
+                    self.formato_agrupado = True
+                    
+                    # Para cada grupo, expandir las canciones
+                    for grupo in datos:
+                        artista = grupo.get('artista', '')
+                        album = grupo.get('album', '')
+                        canciones_lista = grupo.get('canciones', [])
+                        
+                        # Convertir cada canción en un objeto individual
+                        for nombre_cancion in canciones_lista:
+                            self.canciones.append({
+                                'artista': artista,
+                                'album': album,
+                                'cancion': nombre_cancion
+                            })
+                else:
+                    # Formato antiguo (lista de canciones individuales)
+                    logger.info("Detectado formato JSON de canciones individuales")
+                    self.formato_agrupado = False
+                    self.canciones = datos
+            
             logger.info(f"Cargado archivo de canciones con {len(self.canciones)} entradas")
         except Exception as e:
             logger.error(f"Error cargando el archivo JSON: {e}")
             self.canciones = []
+            self.formato_agrupado = False
 
     def normalizar_texto(self, texto):
         """Normaliza el texto para facilitar comparaciones quitando años y texto entre paréntesis."""
@@ -54,6 +86,7 @@ class TorrentProcessor:
         texto = re.sub(r'\(\s*\)', '', texto)  # Eliminar paréntesis vacíos restantes
         return texto.strip().lower()
             
+  
     def process_download(self, album, ruta):
         logger.info(f"Procesando descarga: Album '{album}' en ruta '{ruta}'")
         
@@ -123,11 +156,15 @@ class TorrentProcessor:
             if not nombre_cancion:
                 continue
             
-            # Patrón para buscar la canción - buscamos el nombre como substring
-            patron = re.compile(re.escape(nombre_cancion), re.IGNORECASE)
+            # Patrón para buscar la canción - buscamos el nombre como substring más flexible
+            # Convertimos espacios en \s+ para hacer más flexible la búsqueda
+            pattern_str = re.escape(nombre_cancion).replace(r'\ ', r'\s+')
+            patron = re.compile(pattern_str, re.IGNORECASE)
             
-            for archivo in archivos_musica:
+            encontrado = False
+            for archivo in archivos_musica[:]:  # Trabajamos con una copia para poder eliminar elementos
                 nombre_archivo = os.path.basename(archivo)
+                
                 if patron.search(nombre_archivo):
                     # Usar la ruta como carpeta destino
                     album_dir = os.path.join(self.output_path, ruta)
@@ -143,9 +180,14 @@ class TorrentProcessor:
                         shutil.copy2(archivo, destino)
                         logger.info(f"Copiado: '{nombre_archivo}' a '{destino}'")
                         canciones_procesadas += 1
+                        archivos_musica.remove(archivo)  # Eliminar de la lista para que no se use para otra canción
+                        encontrado = True
                         break  # Pasar a la siguiente canción
                     except Exception as e:
                         logger.error(f"Error copiando '{archivo}': {e}")
+            
+            if not encontrado:
+                logger.warning(f"No se encontró archivo para la canción '{nombre_cancion}'")
         
         logger.info(f"Procesamiento completado. {canciones_procesadas} canciones copiadas")
         
@@ -349,6 +391,8 @@ def main():
                         help='Ruta al archivo JSON de configuración')
     parser.add_argument('--numero-torrents', type=int, default=0, 
                         help='Número de torrents a procesar antes de detener el servidor (0 para infinito)')
+    parser.add_argument('--numero-canciones', type=int, default=0, 
+                        help='Número de canciones en el playlist.')
     parser.add_argument('--json-file', 
                         help='Ruta al archivo JSON con la lista de canciones')
     parser.add_argument('--output-path', 

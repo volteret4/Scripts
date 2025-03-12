@@ -233,6 +233,36 @@ def get_spotify_playlist_tracks(playlist_id, sp):
         print(f"Error al obtener canciones de la playlist {playlist_id}: {e}")
         return []
 
+
+
+def organize_tracks_by_album_artist(tracks):
+    """
+    Organiza las canciones agrupándolas por artista y álbum
+    """
+    # Crear diccionario para agrupar
+    grouped = {}
+    
+    for track in tracks:
+        artista = track['artista']
+        album = track['album']
+        key = f"{artista}|{album}"
+        
+        if key not in grouped:
+            grouped[key] = {
+                'artista': artista,
+                'album': album,
+                'canciones': []
+            }
+        
+        grouped[key]['canciones'].append(track['cancion'])
+    
+    # Convertir a lista
+    result = []
+    for group in grouped.values():
+        result.append(group)
+    
+    return result
+
 def get_file_path(artista, album, cancion, db_path):
     """
     Ejecuta el script externo para obtener la ruta del archivo
@@ -542,6 +572,9 @@ def main():
     # Crear directorio de destino si no existe
     if not os.path.exists(path_destino_flac):
         os.makedirs(path_destino_flac)
+    
+    # Convertir tracks a agrupados por álbum y artista para mejor procesamiento
+    original_tracks = tracks.copy()  # Guarda una copia de la lista original para referencia
 
     for track in tracks:
         artista = track['artista']
@@ -608,15 +641,19 @@ def main():
         else:
             failed_tracks.append(track)
 
-    # Guardar solo las canciones fallidas en el JSON
+        # IMPORTANTE: Organizar las canciones fallidas por álbum y artista antes de guardar en JSON
+    organized_failed_tracks = organize_tracks_by_album_artist(failed_tracks)
+    
+    # Guardar solo las canciones fallidas en el JSON, agrupadas por álbum y artista
     with open(json_file, 'w', encoding='utf-8') as f:
-        json.dump(failed_tracks, f, ensure_ascii=False, indent=4)
+        json.dump(organized_failed_tracks, f, ensure_ascii=False, indent=4)
 
     print(f"\nResumen:")
-    print(f"Total de canciones en la playlist: {len(tracks)}")
+    print(f"Total de canciones en la playlist: {len(original_tracks)}")
     print(f"Canciones copiadas con éxito: {len(copied_tracks)}")
     print(f"Canciones copiadas con éxito (count): {copied_count}")
     print(f"Canciones no encontradas o con error: {len(failed_tracks)}")
+    print(f"Grupos de álbum/artista en el JSON actualizado: {len(organized_failed_tracks)}")
     print(f"JSON actualizado con las canciones pendientes: {json_file}")
     
     # Preparar los datos de configuración para el script de torrents
