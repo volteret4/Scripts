@@ -88,11 +88,44 @@ class LastFMModule(BaseModule):
         self.song_info_layout.addWidget(self.song_duration)
         self.song_info_layout.addWidget(self.song_playcount)
         
-        # Añadir botón para ver letras
+        # Crear un separador horizontal
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        self.song_info_layout.addWidget(separator)
+        
+        # Sección de botones para información adicional
+        self.info_buttons_layout = QVBoxLayout()
+        
+        # Título para la sección
+        info_title = QLabel("Información Adicional")
+        info_title.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.info_buttons_layout.addWidget(info_title)
+        
+        # Layout para organizar botones en fila
+        buttons_row = QHBoxLayout()
+        
+        # Botón para ver letras
         self.lyrics_button = QPushButton("Ver Letras")
         self.lyrics_button.setEnabled(False)  # Deshabilitar hasta que haya una canción con letras
         self.lyrics_button.clicked.connect(lambda: self.show_lyrics(self.current_song.get('song_id')))
-        self.song_info_layout.addWidget(self.lyrics_button)
+        buttons_row.addWidget(self.lyrics_button)
+        
+        # Botón para info de artista en Wikipedia
+        self.artist_wiki_button = QPushButton("Info del Artista")
+        self.artist_wiki_button.setEnabled(False)  # Deshabilitar hasta que haya datos disponibles
+        self.artist_wiki_button.clicked.connect(lambda: self.display_artist_info(self.current_song.get('artist_details', {})))
+        buttons_row.addWidget(self.artist_wiki_button)
+        
+        # Botón para info de álbum en Wikipedia
+        self.album_wiki_button = QPushButton("Info del Álbum")
+        self.album_wiki_button.setEnabled(False)  # Deshabilitar hasta que haya datos disponibles
+        self.album_wiki_button.clicked.connect(lambda: self.display_album_info(self.current_song.get('album_details', {})))
+        buttons_row.addWidget(self.album_wiki_button)
+        
+        # Añadir el layout de botones al layout de info
+        self.info_buttons_layout.addLayout(buttons_row)
+        self.song_info_layout.addLayout(self.info_buttons_layout)
         
         left_layout.addLayout(self.song_info_layout)
         left_layout.addStretch()
@@ -130,6 +163,8 @@ class LastFMModule(BaseModule):
         
         # Añadir el splitter al layout principal
         self.layout().addWidget(self.splitter)
+        
+
     
 
     
@@ -669,12 +704,29 @@ class LastFMModule(BaseModule):
             if 'has_lyrics' in self.current_song and self.current_song['has_lyrics']:
                 lyrics_button = QPushButton("Ver Letras")
                 lyrics_button.clicked.connect(lambda: self.show_lyrics(self.current_song.get('song_id')))
+                
+    
                 links_layout.addWidget(lyrics_button)
             
             info_layout.addWidget(links_widget)
             
             # Información del Artista
             if 'artist_details' in self.current_song:
+
+                # Actualizar botones de información adicional
+                has_artist_info = 'artist_details' in self.current_song and (
+                    self.current_song['artist_details'].get('wikipedia_content', '-') != '-' or
+                    self.current_song['artist_details'].get('bio', '-') != '-'
+                )
+                has_album_info = 'album_details' in self.current_song and (
+                    self.current_song['album_details'].get('wikipedia_content', '-') != '-'
+                )
+                if has_artist_info:
+                    self.artist_wiki_button.setEnabled(has_artist_info)
+                
+                if has_album_info:
+                    self.album_wiki_button.setEnabled(has_album_info)
+
                 separator3 = QFrame()
                 separator3.setFrameShape(QFrame.Shape.HLine)
                 separator3.setFrameShadow(QFrame.Shadow.Sunken)
@@ -941,73 +993,67 @@ class LastFMModule(BaseModule):
         # Mostrar el diálogo
         dialog.exec()
 
-    def display_album_info(self, album_data):
-        """Muestra la información completa del álbum en una ventana de diálogo."""
-        from PyQt6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout, QHBoxLayout, QPushButton
+    def display_artist_info(self, artist_data):
+        """Muestra la información del artista en una ventana o panel"""
+        # Aquí implementarías cómo mostrar la información obtenida
+        # Por ejemplo, podrías crear una nueva ventana o diálogo
+        
+        from PyQt6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout
         
         # Crear un diálogo para mostrar la información
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"Información del Álbum: {album_data.get('name', album_data.get('album', '-'))}")
+        dialog.setWindowTitle(f"Información del Artista")
         dialog.resize(800, 600)
         
         # Crear un explorador de texto para mostrar la información
         text_browser = QTextBrowser()
-        text_browser.setOpenExternalLinks(True)
         
         # Formatear la información como HTML
-        html_content = f"<h1>{album_data.get('name', album_data.get('album', '-'))}</h1>"
+        html_content = "<h1>Información del Artista</h1>"
         
-        # Información básica
-        html_content += "<h2>Información Básica</h2>"
-        html_content += "<ul>"
-        if album_data.get('year', '-') != '-':
-            html_content += f"<li><b>Año:</b> {album_data['year']}</li>"
-        if album_data.get('label', '-') != '-':
-            html_content += f"<li><b>Sello:</b> {album_data['label']}</li>"
-        if album_data.get('genre', '-') != '-':
-            html_content += f"<li><b>Género:</b> {album_data['genre']}</li>"
-        if album_data.get('total_tracks', '-') != '-':
-            html_content += f"<li><b>Total de pistas:</b> {album_data['total_tracks']}</li>"
-        html_content += "</ul>"
+        # Añadir enlaces
+        if "links" in artist_data:
+            html_content += "<h2>Enlaces</h2><ul>"
+            for platform, url in artist_data["links"].items():
+                html_content += f"<li><a href='{url}'>{platform.capitalize()}</a></li>"
+            html_content += "</ul>"
         
-        # Contenido de Wikipedia
-        if album_data.get('wikipedia_content', '-') != '-':
-            html_content += "<h2>De Wikipedia</h2>"
-            html_content += f"<p>{album_data['wikipedia_content']}</p>"
+        # Añadir información de Wikipedia si está disponible
+        if "wikipedia_content" in artist_data and artist_data["wikipedia_content"]:
+            html_content += "<h2>Biografía</h2>"
+            html_content += f"<p>{artist_data['wikipedia_content'][:500]}...</p>"
         
-        # Enlaces
-        html_content += "<h2>Enlaces</h2><ul>"
-        for link_type in ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 'rateyourmusic_url', 'discogs_url']:
-            if link_type in album_data and album_data[link_type] != '-':
-                platform_name = link_type.split('_')[0].capitalize()
-                html_content += f"<li><a href='{album_data[link_type]}'>{platform_name}</a></li>"
-        html_content += "</ul>"
+        # Mostrar álbumes
+        if "albums" in artist_data and artist_data["albums"]:
+            html_content += "<h2>Álbumes</h2><ul>"
+            for album in artist_data["albums"]:
+                html_content += f"<li><b>{album['name']}</b> ({album['year']}) - {album['genre']}</li>"
+            html_content += "</ul>"
         
         # Establecer el contenido HTML
         text_browser.setHtml(html_content)
         
-        # Botones de navegación
-        button_layout = QHBoxLayout()
-        close_button = QPushButton("Cerrar")
-        close_button.clicked.connect(dialog.accept)
-        button_layout.addStretch()
-        button_layout.addWidget(close_button)
-        
         # Configurar el layout
         layout = QVBoxLayout()
         layout.addWidget(text_browser)
-        layout.addLayout(button_layout)
         dialog.setLayout(layout)
         
         # Mostrar el diálogo
         dialog.exec()
 
-
-
     def open_url(self, url):
         """Abre una URL en el navegador predeterminado."""
-        if url and url != '-':
-            QDesktopServices.openUrl(QUrl(url))
+        if not url or url == '-':
+            return
+            
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"Error al abrir URL {url}: {e}")
+
+
+
 
     
     # GESTIÓN DE SCROBBLES
@@ -1140,64 +1186,7 @@ class LastFMModule(BaseModule):
             # Llamar al método para cambiar a la pestaña Music Browser
             self.switch_tab("Music Browser", "set_search_text", f"t:{track_data.get('title')}")
 
-    def display_artist_info(self, artist_data):
-        """Muestra la información del artista en una ventana o panel"""
-        # Aquí implementarías cómo mostrar la información obtenida
-        # Por ejemplo, podrías crear una nueva ventana o diálogo
-        
-        from PyQt6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout
-        
-        # Crear un diálogo para mostrar la información
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Información del Artista")
-        dialog.resize(800, 600)
-        
-        # Crear un explorador de texto para mostrar la información
-        text_browser = QTextBrowser()
-        
-        # Formatear la información como HTML
-        html_content = "<h1>Información del Artista</h1>"
-        
-        # Añadir enlaces
-        if "links" in artist_data:
-            html_content += "<h2>Enlaces</h2><ul>"
-            for platform, url in artist_data["links"].items():
-                html_content += f"<li><a href='{url}'>{platform.capitalize()}</a></li>"
-            html_content += "</ul>"
-        
-        # Añadir información de Wikipedia si está disponible
-        if "wikipedia_content" in artist_data and artist_data["wikipedia_content"]:
-            html_content += "<h2>Biografía</h2>"
-            html_content += f"<p>{artist_data['wikipedia_content'][:500]}...</p>"
-        
-        # Mostrar álbumes
-        if "albums" in artist_data and artist_data["albums"]:
-            html_content += "<h2>Álbumes</h2><ul>"
-            for album in artist_data["albums"]:
-                html_content += f"<li><b>{album['name']}</b> ({album['year']}) - {album['genre']}</li>"
-            html_content += "</ul>"
-        
-        # Establecer el contenido HTML
-        text_browser.setHtml(html_content)
-        
-        # Configurar el layout
-        layout = QVBoxLayout()
-        layout.addWidget(text_browser)
-        dialog.setLayout(layout)
-        
-        # Mostrar el diálogo
-        dialog.exec()
 
-    def open_url(self, url):
-        """Abre una URL en el navegador predeterminado."""
-        if not url or url == '-':
-            return
-            
-        try:
-            import webbrowser
-            webbrowser.open(url)
-        except Exception as e:
-            print(f"Error al abrir URL {url}: {e}")
 
 
 
