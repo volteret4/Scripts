@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QTableView, QHeaderView, QLabel, QSplitter, QFrame,
-                            QScrollArea)
+                            QScrollArea, QDialog, QGridLayout, QTextEdit)
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal, QSortFilterProxyModel, QTimer, QUrl
 from PyQt6.QtGui import QFont, QColor, QDesktopServices
 
@@ -70,7 +70,7 @@ class LastFMModule(BaseModule):
         left_layout = QVBoxLayout(self.left_panel)
         
         # Título
-        self.current_title = QLabel("Canción Actual")
+        self.current_title = QLabel("Última canción")
         self.current_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         left_layout.addWidget(self.current_title)
         
@@ -85,6 +85,8 @@ class LastFMModule(BaseModule):
         self.song_info_layout.addWidget(self.song_title)
         self.song_info_layout.addWidget(self.song_artist)
         self.song_info_layout.addWidget(self.song_album)
+        if 'genre' in self.current_song:
+            tech_layout.addWidget(QLabel(f"Género: {self.current_song.get('genre', '-')}"))
         self.song_info_layout.addWidget(self.song_duration)
         self.song_info_layout.addWidget(self.song_playcount)
         
@@ -165,7 +167,457 @@ class LastFMModule(BaseModule):
         self.layout().addWidget(self.splitter)
         
 
-    
+         # ACTUALIZACIÓN DE LA INTERFAZ
+    def update_ui(self):
+        """Actualiza los elementos de la interfaz con los datos cargados, incluyendo información extendida
+        de artista, álbum y enlaces a servicios."""
+        # Limpiar el panel izquierdo antes de reconstruirlo
+        if hasattr(self, 'song_info_scroll_area'):
+            self.song_info_scroll_area.deleteLater()
+        
+        # Crear un área de desplazamiento para el panel izquierdo
+        self.song_info_scroll_area = QScrollArea()
+        self.song_info_scroll_area.setWidgetResizable(True)
+        self.song_info_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.song_info_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.song_info_scroll_area.setFrameShape(QFrame.Shape.NoFrame)  # Elimina el borde
+        
+        # Contenedor para toda la información
+        info_container = QWidget()
+        info_layout = QVBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Sección básica de información de canción
+        basic_info_widget = QWidget()
+        basic_info_layout = QVBoxLayout(basic_info_widget)
+        
+        # Título de la sección
+        self.current_title = QLabel("Canción Actual")
+        self.current_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        basic_info_layout.addWidget(self.current_title)
+        
+        # Información básica
+        self.song_title = QLabel(f"Título: {self.current_song['title']}")
+        self.song_artist = QLabel(f"Artista: {self.current_song['artist']}")
+        self.song_album = QLabel(f"Álbum: {self.current_song['album']}")
+        self.song_duration = QLabel(f"Duración: {self.current_song['duration']}")
+        self.song_playcount = QLabel(f"Reproducciones: {self.current_song['play_count']}")
+        
+        basic_info_layout.addWidget(self.song_title)
+        basic_info_layout.addWidget(self.song_artist)
+        basic_info_layout.addWidget(self.song_album)
+        basic_info_layout.addWidget(self.song_duration)
+        basic_info_layout.addWidget(self.song_playcount)
+        
+        # Advertencia si no está en la base de datos
+        if not self.current_song.get('in_database', False):
+            warning_style = "background-color: rgba(255, 255, 0, 0.3); padding: 5px; border-radius: 3px;"
+            self.song_title.setStyleSheet(warning_style)
+            self.song_artist.setStyleSheet(warning_style)
+            self.song_album.setStyleSheet(warning_style)
+            
+            self.db_warning_label = QLabel("⚠️ Datos no encontrados en la base de datos")
+            self.db_warning_label.setStyleSheet("color: #B7950B; font-weight: bold;")
+            basic_info_layout.insertWidget(1, self.db_warning_label)
+        
+        info_layout.addWidget(basic_info_widget)
+        
+        # Sección de botones para paneles de información
+        if self.current_song.get('in_database', False):
+            # Separador
+            separator = QFrame()
+            separator.setFrameShape(QFrame.Shape.HLine)
+            separator.setFrameShadow(QFrame.Shadow.Sunken)
+            info_layout.addWidget(separator)
+            
+            # Título para la sección de paneles
+            panels_title = QLabel("Paneles de Información")
+            panels_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            info_layout.addWidget(panels_title)
+            
+            # Layout para los botones de paneles principales
+            panels_layout = QHBoxLayout()
+            
+            # Botón para ver panel del artista
+            has_artist_info = 'artist_details' in self.current_song
+            self.artist_panel_button = QPushButton(self.current_song['artist'])
+            self.artist_panel_button.setEnabled(has_artist_info)
+            if has_artist_info:
+                self.artist_panel_button.clicked.connect(
+                    lambda: self.display_artist_info(self.current_song.get('artist_details', {}))
+                )
+            panels_layout.addWidget(self.artist_panel_button)
+            
+            # Botón para ver panel del álbum
+            has_album_info = 'album_details' in self.current_song
+            self.album_panel_button = QPushButton(self.current_song['album'])
+            self.album_panel_button.setEnabled(has_album_info)
+            if has_album_info:
+                self.album_panel_button.clicked.connect(
+                    lambda: self.display_album_info(self.current_song.get('album_details', {}))
+                )
+            panels_layout.addWidget(self.album_panel_button)
+            
+            # Botón para ver letras
+            has_lyrics = self.current_song.get('has_lyrics', False)
+            self.lyrics_button = QPushButton("Ver Letras")
+            self.lyrics_button.setEnabled(has_lyrics)
+            if has_lyrics:
+                self.lyrics_button.clicked.connect(
+                    lambda: self.show_lyrics(self.current_song.get('song_id'))
+                )
+            panels_layout.addWidget(self.lyrics_button)
+            
+            info_layout.addLayout(panels_layout)
+        
+        # Sección de información técnica si está disponible
+        if self.current_song.get('in_database', False):
+            # Separador
+            separator2 = QFrame()
+            separator2.setFrameShape(QFrame.Shape.HLine)
+            separator2.setFrameShadow(QFrame.Shadow.Sunken)
+            info_layout.addWidget(separator2)
+            
+            # # Sección técnica
+            # tech_widget = QWidget()
+            # tech_layout = QVBoxLayout(tech_widget)
+            
+            # tech_title = QLabel("Información Técnica")
+            # tech_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            # tech_layout.addWidget(tech_title)
+            
+            # if 'genre' in self.current_song:
+            #     tech_layout.addWidget(QLabel(f"Género: {self.current_song.get('genre', '-')}"))
+            # if 'bitrate' in self.current_song:
+            #     tech_layout.addWidget(QLabel(f"Bitrate: {self.current_song.get('bitrate', '-')} kbps"))
+            # if 'sample_rate' in self.current_song:
+            #     tech_layout.addWidget(QLabel(f"Sample Rate: {self.current_song.get('sample_rate', '-')} Hz"))
+            # if 'bit_depth' in self.current_song:
+            #     tech_layout.addWidget(QLabel(f"Bit Depth: {self.current_song.get('bit_depth', '-')} bits"))
+            
+            # info_layout.addWidget(tech_widget)
+            
+            ##Enlaces para la canción
+            # separator3 = QFrame()
+            # separator3.setFrameShape(QFrame.Shape.HLine)
+            # separator3.setFrameShadow(QFrame.Shadow.Sunken)
+            # info_layout.addWidget(separator3)
+            
+            # Sección de enlaces
+            links_widget = QWidget()
+            links_layout = QVBoxLayout(links_widget)
+            
+            # links_title = QLabel("Enlaces")
+            # links_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            # links_layout.addWidget(links_title)
+            
+            # Botones para enlaces de la canción
+            links_song_layout = QHBoxLayout()
+            
+            if 'spotify_url' in self.current_song and self.current_song['spotify_url'] != '-':
+                spotify_button = QPushButton("Spotify")
+                spotify_button.clicked.connect(lambda: self.open_url(self.current_song.get('spotify_url')))
+                links_song_layout.addWidget(spotify_button)
+                
+            if 'lastfm_url' in self.current_song and self.current_song['lastfm_url'] != '-':
+                lastfm_button = QPushButton("Last.fm")
+                lastfm_button.clicked.connect(lambda: self.open_url(self.current_song.get('lastfm_url')))
+                links_song_layout.addWidget(lastfm_button)
+                
+            if 'youtube_url' in self.current_song and self.current_song['youtube_url'] != '-':
+                youtube_button = QPushButton("YouTube")
+                youtube_button.clicked.connect(lambda: self.open_url(self.current_song.get('youtube_url')))
+                links_song_layout.addWidget(youtube_button)
+                
+            if 'musicbrainz_url' in self.current_song and self.current_song['musicbrainz_url'] != '-':
+                mb_button = QPushButton("MusicBrainz")
+                mb_button.clicked.connect(lambda: self.open_url(self.current_song.get('musicbrainz_url')))
+                links_song_layout.addWidget(mb_button)
+            
+            links_layout.addLayout(links_song_layout)
+            
+            info_layout.addWidget(links_widget)
+        
+        # Espacio flexible al final para que todo quede en la parte superior
+        info_layout.addStretch()
+        
+        # Establecer el widget en el área de desplazamiento
+        self.song_info_scroll_area.setWidget(info_container)
+        
+        # Reemplazar el contenido del panel izquierdo con el área de desplazamiento
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self.song_info_scroll_area)
+        
+        # Eliminar el layout anterior y aplicar el nuevo
+        QWidget().setLayout(self.left_panel.layout())  # Truco para eliminar el layout anterior
+        self.left_panel.setLayout(left_layout)
+        
+        # Actualizar el título del historial
+        self.history_title.setText(f"Historial de Scrobbles ({self.username}) - {len(self.scrobbles_data)} entradas")
+
+    # Agregar este método para mostrar un panel con la información del artista
+    def display_artist_info(self, artist_details):
+        """Muestra toda la información disponible del artista en una ventana separada."""
+        if not artist_details:
+            return
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Información de {artist_details.get('name', 'Artista')}")
+        dialog.resize(600, 500)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Área de desplazamiento para el contenido
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        
+        # Título
+        artist_name = QLabel(artist_details.get('name', 'Artista'))
+        artist_name.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        content_layout.addWidget(artist_name)
+        
+        # Detalles básicos
+        details_layout = QGridLayout()
+        row = 0
+        
+        if artist_details.get('formed_year', '-') != '-':
+            details_layout.addWidget(QLabel("Formado en:"), row, 0)
+            details_layout.addWidget(QLabel(artist_details['formed_year']), row, 1)
+            row += 1
+        
+        if artist_details.get('origin', '-') != '-':
+            details_layout.addWidget(QLabel("Origen:"), row, 0)
+            details_layout.addWidget(QLabel(artist_details['origin']), row, 1)
+            row += 1
+        
+        if artist_details.get('genres', '-') != '-':
+            details_layout.addWidget(QLabel("Géneros:"), row, 0)
+            details_layout.addWidget(QLabel(artist_details['genres']), row, 1)
+            row += 1
+        
+        content_layout.addLayout(details_layout)
+        
+        # Biografía
+        if artist_details.get('bio', '-') != '-':
+            bio_title = QLabel("Biografía")
+            bio_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(bio_title)
+            
+            bio_text = QTextEdit()
+            bio_text.setReadOnly(True)
+            bio_text.setMinimumHeight(150)
+            bio_text.setText(artist_details['bio'])
+            content_layout.addWidget(bio_text)
+        
+        # Contenido de Wikipedia
+        if artist_details.get('wikipedia_content', '-') != '-':
+            wiki_title = QLabel("Información de Wikipedia")
+            wiki_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(wiki_title)
+            
+            wiki_text = QTextEdit()
+            wiki_text.setReadOnly(True)
+            wiki_text.setMinimumHeight(150)
+            wiki_text.setText(artist_details['wikipedia_content'])
+            content_layout.addWidget(wiki_text)
+        
+        # Enlaces
+        links_exist = any(key in artist_details and artist_details[key] != '-' for key in 
+                        ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 
+                        'rateyourmusic_url', 'discogs_url'])
+        
+        if links_exist:
+            links_title = QLabel("Enlaces")
+            links_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(links_title)
+            
+            links_layout = QHBoxLayout()
+            
+            if artist_details.get('spotify_url', '-') != '-':
+                spotify_button = QPushButton("Spotify")
+                spotify_button.clicked.connect(lambda: self.open_url(artist_details.get('spotify_url')))
+                links_layout.addWidget(spotify_button)
+            
+            if artist_details.get('youtube_url', '-') != '-':
+                youtube_button = QPushButton("YouTube")
+                youtube_button.clicked.connect(lambda: self.open_url(artist_details.get('youtube_url')))
+                links_layout.addWidget(youtube_button)
+            
+            if artist_details.get('wikipedia_url', '-') != '-':
+                wiki_button = QPushButton("Wikipedia")
+                wiki_button.clicked.connect(lambda: self.open_url(artist_details.get('wikipedia_url')))
+                links_layout.addWidget(wiki_button)
+            
+            if artist_details.get('musicbrainz_url', '-') != '-':
+                mb_button = QPushButton("MusicBrainz")
+                mb_button.clicked.connect(lambda: self.open_url(artist_details.get('musicbrainz_url')))
+                links_layout.addWidget(mb_button)
+            
+            if artist_details.get('rateyourmusic_url', '-') != '-':
+                rym_button = QPushButton("RYM")
+                rym_button.clicked.connect(lambda: self.open_url(artist_details.get('rateyourmusic_url')))
+                links_layout.addWidget(rym_button)
+            
+            if artist_details.get('discogs_url', '-') != '-':
+                discogs_button = QPushButton("Discogs")
+                discogs_button.clicked.connect(lambda: self.open_url(artist_details.get('discogs_url')))
+                links_layout.addWidget(discogs_button)
+            
+            content_layout.addLayout(links_layout)
+        
+        scroll_area.setWidget(content_widget)
+        layout.addWidget(scroll_area)
+        
+        # Botón para cerrar
+        close_button = QPushButton("Cerrar")
+        close_button.clicked.connect(dialog.accept)
+        layout.addWidget(close_button)
+        
+        dialog.exec()
+
+    # Agregar este método para mostrar un panel con la información del álbum
+    def display_album_info(self, album_details):
+        """Muestra toda la información disponible del álbum en una ventana separada."""
+        if not album_details:
+            return
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Información de {album_details.get('title', 'Álbum')}")
+        dialog.resize(600, 500)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Área de desplazamiento para el contenido
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        
+        # Título
+        album_title = QLabel(album_details.get('title', 'Álbum'))
+        album_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        content_layout.addWidget(album_title)
+        
+        # Artista
+        if album_details.get('artist', '-') != '-':
+            artist_label = QLabel(f"Artista: {album_details.get('artist', '-')}")
+            content_layout.addWidget(artist_label)
+        
+        # Detalles básicos
+        details_layout = QGridLayout()
+        row = 0
+        
+        if album_details.get('year', '-') != '-':
+            details_layout.addWidget(QLabel("Año:"), row, 0)
+            details_layout.addWidget(QLabel(album_details['year']), row, 1)
+            row += 1
+        
+        if album_details.get('label', '-') != '-':
+            details_layout.addWidget(QLabel("Sello:"), row, 0)
+            details_layout.addWidget(QLabel(album_details['label']), row, 1)
+            row += 1
+        
+        if album_details.get('genre', '-') != '-':
+            details_layout.addWidget(QLabel("Género:"), row, 0)
+            details_layout.addWidget(QLabel(album_details['genre']), row, 1)
+            row += 1
+        
+        if album_details.get('total_tracks', '-') != '-':
+            details_layout.addWidget(QLabel("Pistas:"), row, 0)
+            details_layout.addWidget(QLabel(str(album_details['total_tracks'])), row, 1)
+            row += 1
+        
+        content_layout.addLayout(details_layout)
+        
+        # Contenido de Wikipedia
+        if album_details.get('wikipedia_content', '-') != '-':
+            wiki_title = QLabel("Información de Wikipedia")
+            wiki_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(wiki_title)
+            
+            wiki_text = QTextEdit()
+            wiki_text.setReadOnly(True)
+            wiki_text.setMinimumHeight(150)
+            wiki_text.setText(album_details['wikipedia_content'])
+            content_layout.addWidget(wiki_text)
+        
+        # Enlaces
+        links_exist = any(key in album_details and album_details[key] != '-' for key in 
+                        ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 
+                        'rateyourmusic_url', 'discogs_url'])
+        
+        if links_exist:
+            links_title = QLabel("Enlaces")
+            links_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(links_title)
+            
+            links_layout = QHBoxLayout()
+            
+            if album_details.get('spotify_url', '-') != '-':
+                spotify_button = QPushButton("Spotify")
+                spotify_button.clicked.connect(lambda: self.open_url(album_details.get('spotify_url')))
+                links_layout.addWidget(spotify_button)
+            
+            if album_details.get('youtube_url', '-') != '-':
+                youtube_button = QPushButton("YouTube")
+                youtube_button.clicked.connect(lambda: self.open_url(album_details.get('youtube_url')))
+                links_layout.addWidget(youtube_button)
+            
+            if album_details.get('wikipedia_url', '-') != '-':
+                wiki_button = QPushButton("Wikipedia")
+                wiki_button.clicked.connect(lambda: self.open_url(album_details.get('wikipedia_url')))
+                links_layout.addWidget(wiki_button)
+            
+            if album_details.get('musicbrainz_url', '-') != '-':
+                mb_button = QPushButton("MusicBrainz")
+                mb_button.clicked.connect(lambda: self.open_url(album_details.get('musicbrainz_url')))
+                links_layout.addWidget(mb_button)
+            
+            if album_details.get('rateyourmusic_url', '-') != '-':
+                rym_button = QPushButton("RYM")
+                rym_button.clicked.connect(lambda: self.open_url(album_details.get('rateyourmusic_url')))
+                links_layout.addWidget(rym_button)
+            
+            if album_details.get('discogs_url', '-') != '-':
+                discogs_button = QPushButton("Discogs")
+                discogs_button.clicked.connect(lambda: self.open_url(album_details.get('discogs_url')))
+                links_layout.addWidget(discogs_button)
+            
+            content_layout.addLayout(links_layout)
+        
+        # Lista de canciones si está disponible
+        if 'tracks' in album_details and album_details['tracks']:
+            tracks_title = QLabel("Lista de canciones")
+            tracks_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+            content_layout.addWidget(tracks_title)
+            
+            tracks_list = QListWidget()
+            for track in album_details['tracks']:
+                tracks_list.addItem(f"{track.get('position', '-')}. {track.get('title', '-')} ({track.get('duration', '-')})")
+            
+            tracks_list.setMaximumHeight(150)
+            content_layout.addWidget(tracks_list)
+        
+        scroll_area.setWidget(content_widget)
+        layout.addWidget(scroll_area)
+        
+        # Botón para cerrar
+        close_button = QPushButton("Cerrar")
+        close_button.clicked.connect(dialog.accept)
+        layout.addWidget(close_button)
+        
+        dialog.exec()
+
+    # Función auxiliar para abrir URLs (asegúrate de que esta función exista)
+    def open_url(self, url):
+        """Abre una URL en el navegador predeterminado del sistema."""
+        if url and url != '-':
+            QDesktopServices.openUrl(QUrl(url))
 
     
 # Actualización para inicializar la tabla con la nueva columna
@@ -451,7 +903,7 @@ class LastFMModule(BaseModule):
                 SELECT a.id, a.bio, a.tags, a.origin, a.formed_year, 
                     a.total_albums, a.spotify_url, a.youtube_url, 
                     a.musicbrainz_url, a.wikipedia_url, a.wikipedia_content, a.mbid,
-                    a.formed_year, a.bio, a.origin, a.rateyourmusic_url, a.discogs_url
+                    a.formed_year, a.bio, a.origin, a.rateyourmusic_url, a.discogs_url,
                     a.similar_artists
                 FROM artists a
                 WHERE a.name LIKE ?
@@ -578,479 +1030,11 @@ class LastFMModule(BaseModule):
                     'in_database': False
                 }
     
-        # ACTUALIZACIÓN DE LA INTERFAZ
-    def update_ui(self):
-        """Actualiza los elementos de la interfaz con los datos cargados, incluyendo información extendida
-        de artista, álbum y enlaces a servicios."""
-        # Limpiar el panel izquierdo antes de reconstruirlo
-        if hasattr(self, 'song_info_scroll_area'):
-            self.song_info_scroll_area.deleteLater()
-        
-        # Crear un área de desplazamiento para el panel izquierdo
-        self.song_info_scroll_area = QScrollArea()
-        self.song_info_scroll_area.setWidgetResizable(True)
-        self.song_info_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.song_info_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.song_info_scroll_area.setFrameShape(QFrame.Shape.NoFrame)  # Elimina el borde
-        
-        # Contenedor para toda la información
-        info_container = QWidget()
-        info_layout = QVBoxLayout(info_container)
-        info_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Sección básica de información de canción
-        basic_info_widget = QWidget()
-        basic_info_layout = QVBoxLayout(basic_info_widget)
-        
-        # Título de la sección
-        self.current_title = QLabel("Canción Actual")
-        self.current_title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        basic_info_layout.addWidget(self.current_title)
-        
-        # Información básica
-        self.song_title = QLabel(f"Título: {self.current_song['title']}")
-        self.song_artist = QLabel(f"Artista: {self.current_song['artist']}")
-        self.song_album = QLabel(f"Álbum: {self.current_song['album']}")
-        self.song_duration = QLabel(f"Duración: {self.current_song['duration']}")
-        self.song_playcount = QLabel(f"Reproducciones: {self.current_song['play_count']}")
-        
-        basic_info_layout.addWidget(self.song_title)
-        basic_info_layout.addWidget(self.song_artist)
-        basic_info_layout.addWidget(self.song_album)
-        basic_info_layout.addWidget(self.song_duration)
-        basic_info_layout.addWidget(self.song_playcount)
-        
-        # Advertencia si no está en la base de datos
-        if not self.current_song.get('in_database', False):
-            warning_style = "background-color: rgba(255, 255, 0, 0.3); padding: 5px; border-radius: 3px;"
-            self.song_title.setStyleSheet(warning_style)
-            self.song_artist.setStyleSheet(warning_style)
-            self.song_album.setStyleSheet(warning_style)
-            
-            self.db_warning_label = QLabel("⚠️ Datos no encontrados en la base de datos")
-            self.db_warning_label.setStyleSheet("color: #B7950B; font-weight: bold;")
-            basic_info_layout.insertWidget(1, self.db_warning_label)
-        
-        info_layout.addWidget(basic_info_widget)
-        
-        # Sección de información técnica si está disponible
-        if self.current_song.get('in_database', False):
-            
-            # Separador
-            separator = QFrame()
-            separator.setFrameShape(QFrame.Shape.HLine)
-            separator.setFrameShadow(QFrame.Shadow.Sunken)
-            info_layout.addWidget(separator)
-            
-            # Sección técnica
-            tech_widget = QWidget()
-            tech_layout = QVBoxLayout(tech_widget)
-            
-            tech_title = QLabel("Información Técnica")
-            tech_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-            tech_layout.addWidget(tech_title)
-            
-            if 'genre' in self.current_song:
-                tech_layout.addWidget(QLabel(f"Género: {self.current_song.get('genre', '-')}"))
-            if 'bitrate' in self.current_song:
-                tech_layout.addWidget(QLabel(f"Bitrate: {self.current_song.get('bitrate', '-')} kbps"))
-            if 'sample_rate' in self.current_song:
-                tech_layout.addWidget(QLabel(f"Sample Rate: {self.current_song.get('sample_rate', '-')} Hz"))
-            if 'bit_depth' in self.current_song:
-                tech_layout.addWidget(QLabel(f"Bit Depth: {self.current_song.get('bit_depth', '-')} bits"))
-            
-            info_layout.addWidget(tech_widget)
-            
-            # Enlaces para la canción
-            separator2 = QFrame()
-            separator2.setFrameShape(QFrame.Shape.HLine)
-            separator2.setFrameShadow(QFrame.Shadow.Sunken)
-            info_layout.addWidget(separator2)
-            
-            # Sección de enlaces
-            links_widget = QWidget()
-            links_layout = QVBoxLayout(links_widget)
-            
-            links_title = QLabel("Enlaces")
-            links_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-            links_layout.addWidget(links_title)
-            
-            # Botones para enlaces de la canción
-            links_song_layout = QHBoxLayout()
-            
-            if 'spotify_url' in self.current_song and self.current_song['spotify_url'] != '-':
-                spotify_button = QPushButton("Spotify")
-                spotify_button.clicked.connect(lambda: self.open_url(self.current_song.get('spotify_url')))
-                links_song_layout.addWidget(spotify_button)
-                
-            if 'lastfm_url' in self.current_song and self.current_song['lastfm_url'] != '-':
-                lastfm_button = QPushButton("Last.fm")
-                lastfm_button.clicked.connect(lambda: self.open_url(self.current_song.get('lastfm_url')))
-                links_song_layout.addWidget(lastfm_button)
-                
-            if 'youtube_url' in self.current_song and self.current_song['youtube_url'] != '-':
-                youtube_button = QPushButton("YouTube")
-                youtube_button.clicked.connect(lambda: self.open_url(self.current_song.get('youtube_url')))
-                links_song_layout.addWidget(youtube_button)
-                
-            if 'musicbrainz_url' in self.current_song and self.current_song['musicbrainz_url'] != '-':
-                mb_button = QPushButton("MusicBrainz")
-                mb_button.clicked.connect(lambda: self.open_url(self.current_song.get('musicbrainz_url')))
-                links_song_layout.addWidget(mb_button)
-            
-            links_layout.addLayout(links_song_layout)
-            
-            # Letras
-            if 'has_lyrics' in self.current_song and self.current_song['has_lyrics']:
-                lyrics_button = QPushButton("Ver Letras")
-                lyrics_button.clicked.connect(lambda: self.show_lyrics(self.current_song.get('song_id')))
-                
-    
-                links_layout.addWidget(lyrics_button)
-            
-            info_layout.addWidget(links_widget)
-            
-            # Información del Artista
-            if 'artist_details' in self.current_song:
-
-                # Actualizar botones de información adicional
-                has_artist_info = 'artist_details' in self.current_song and (
-                    self.current_song['artist_details'].get('wikipedia_content', '-') != '-' or
-                    self.current_song['artist_details'].get('bio', '-') != '-'
-                )
-                has_album_info = 'album_details' in self.current_song and (
-                    self.current_song['album_details'].get('wikipedia_content', '-') != '-'
-                )
-                if has_artist_info:
-                    self.artist_wiki_button.setEnabled(has_artist_info)
-                
-                if has_album_info:
-                    self.album_wiki_button.setEnabled(has_album_info)
-
-                separator3 = QFrame()
-                separator3.setFrameShape(QFrame.Shape.HLine)
-                separator3.setFrameShadow(QFrame.Shadow.Sunken)
-                info_layout.addWidget(separator3)
-                
-                artist_widget = QWidget()
-                artist_layout = QVBoxLayout(artist_widget)
-                
-                artist_title = QLabel(f"Información del Artista: {self.current_song['artist']}")
-                artist_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-                artist_layout.addWidget(artist_title)
-                
-                artist_details = self.current_song['artist_details']
-                
-                if artist_details.get('bio', '-') != '-':
-                    bio_label = QLabel("Biografía:")
-                    bio_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    artist_layout.addWidget(bio_label)
-                    
-                    bio_text = QTextEdit()
-                    bio_text.setReadOnly(True)
-                    bio_text.setMaximumHeight(100)
-                    bio_text.setText(artist_details['bio'][:500] + '...' if len(artist_details['bio']) > 500 else artist_details['bio'])
-                    artist_layout.addWidget(bio_text)
-                
-                if artist_details.get('formed_year', '-') != '-' or artist_details.get('origin', '-') != '-':
-                    details_layout = QHBoxLayout()
-                    
-                    if artist_details.get('formed_year', '-') != '-':
-                        formed_label = QLabel(f"Formado en: {artist_details['formed_year']}")
-                        details_layout.addWidget(formed_label)
-                    
-                    if artist_details.get('origin', '-') != '-':
-                        origin_label = QLabel(f"Origen: {artist_details['origin']}")
-                        details_layout.addWidget(origin_label)
-                    
-                    artist_layout.addLayout(details_layout)
-                
-                # Enlaces del artista
-                if any(key in artist_details and artist_details[key] != '-' for key in ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 'rateyourmusic_url', 'discogs_url']):
-                    artist_links_label = QLabel("Enlaces del Artista:")
-                    artist_links_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    artist_layout.addWidget(artist_links_label)
-                    
-                    artist_links_layout = QHBoxLayout()
-                    
-                    if artist_details.get('spotify_url', '-') != '-':
-                        spotify_button = QPushButton("Spotify")
-                        spotify_button.clicked.connect(lambda: self.open_url(artist_details.get('spotify_url')))
-                        artist_links_layout.addWidget(spotify_button)
-                    
-                    if artist_details.get('youtube_url', '-') != '-':
-                        youtube_button = QPushButton("YouTube")
-                        youtube_button.clicked.connect(lambda: self.open_url(artist_details.get('youtube_url')))
-                        artist_links_layout.addWidget(youtube_button)
-                    
-                    if artist_details.get('wikipedia_url', '-') != '-':
-                        wiki_button = QPushButton("Wikipedia")
-                        wiki_button.clicked.connect(lambda: self.open_url(artist_details.get('wikipedia_url')))
-                        artist_links_layout.addWidget(wiki_button)
-                    
-                    if artist_details.get('musicbrainz_url', '-') != '-':
-                        mb_button = QPushButton("MusicBrainz")
-                        mb_button.clicked.connect(lambda: self.open_url(artist_details.get('musicbrainz_url')))
-                        artist_links_layout.addWidget(mb_button)
-                    
-                    if artist_details.get('rateyourmusic_url', '-') != '-':
-                        rym_button = QPushButton("RYM")
-                        rym_button.clicked.connect(lambda: self.open_url(artist_details.get('rateyourmusic_url')))
-                        artist_links_layout.addWidget(rym_button)
-                    
-                    if artist_details.get('discogs_url', '-') != '-':
-                        discogs_button = QPushButton("Discogs")
-                        discogs_button.clicked.connect(lambda: self.open_url(artist_details.get('discogs_url')))
-                        artist_links_layout.addWidget(discogs_button)
-                    
-                    artist_layout.addLayout(artist_links_layout)
-                
-                # Botón para ver información completa del artista
-                view_artist_button = QPushButton("Ver información completa del artista")
-                view_artist_button.clicked.connect(lambda: self.display_artist_info(artist_details))
-                artist_layout.addWidget(view_artist_button)
-                
-                info_layout.addWidget(artist_widget)
-            
-            # Información del Álbum
-            if 'album_details' in self.current_song:
-                separator4 = QFrame()
-                separator4.setFrameShape(QFrame.Shape.HLine)
-                separator4.setFrameShadow(QFrame.Shadow.Sunken)
-                info_layout.addWidget(separator4)
-                
-                album_widget = QWidget()
-                album_layout = QVBoxLayout(album_widget)
-                
-                album_title = QLabel(f"Información del Álbum: {self.current_song['album']}")
-                album_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-                album_layout.addWidget(album_title)
-                
-                album_details = self.current_song['album_details']
-                
-                details_layout = QHBoxLayout()
-                
-                if album_details.get('year', '-') != '-':
-                    year_label = QLabel(f"Año: {album_details['year']}")
-                    details_layout.addWidget(year_label)
-                
-                if album_details.get('label', '-') != '-':
-                    label_label = QLabel(f"Sello: {album_details['label']}")
-                    details_layout.addWidget(label_label)
-                
-                album_layout.addLayout(details_layout)
-                
-                if album_details.get('genre', '-') != '-':
-                    genre_label = QLabel(f"Género: {album_details['genre']}")
-                    album_layout.addWidget(genre_label)
-                
-                if album_details.get('total_tracks', '-') != '-':
-                    tracks_label = QLabel(f"Pistas: {album_details['total_tracks']}")
-                    album_layout.addWidget(tracks_label)
-                
-                # Enlaces del álbum
-                if any(key in album_details and album_details[key] != '-' for key in ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 'rateyourmusic_url', 'discogs_url']):
-                    album_links_label = QLabel("Enlaces del Álbum:")
-                    album_links_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    album_layout.addWidget(album_links_label)
-                    
-                    album_links_layout = QHBoxLayout()
-                    
-                    if album_details.get('spotify_url', '-') != '-':
-                        spotify_button = QPushButton("Spotify")
-                        spotify_button.clicked.connect(lambda: self.open_url(album_details.get('spotify_url')))
-                        album_links_layout.addWidget(spotify_button)
-                    
-                    if album_details.get('youtube_url', '-') != '-':
-                        youtube_button = QPushButton("YouTube")
-                        youtube_button.clicked.connect(lambda: self.open_url(album_details.get('youtube_url')))
-                        album_links_layout.addWidget(youtube_button)
-                    
-                    if album_details.get('wikipedia_url', '-') != '-':
-                        wiki_button = QPushButton("Wikipedia")
-                        wiki_button.clicked.connect(lambda: self.open_url(album_details.get('wikipedia_url')))
-                        album_links_layout.addWidget(wiki_button)
-                    
-                    if album_details.get('musicbrainz_url', '-') != '-':
-                        mb_button = QPushButton("MusicBrainz")
-                        mb_button.clicked.connect(lambda: self.open_url(album_details.get('musicbrainz_url')))
-                        album_links_layout.addWidget(mb_button)
-                    
-                    if album_details.get('rateyourmusic_url', '-') != '-':
-                        rym_button = QPushButton("RYM")
-                        rym_button.clicked.connect(lambda: self.open_url(album_details.get('rateyourmusic_url')))
-                        album_links_layout.addWidget(rym_button)
-                    
-                    if album_details.get('discogs_url', '-') != '-':
-                        discogs_button = QPushButton("Discogs")
-                        discogs_button.clicked.connect(lambda: self.open_url(album_details.get('discogs_url')))
-                        album_links_layout.addWidget(discogs_button)
-                    
-                    album_layout.addLayout(album_links_layout)
-                
-                # Si hay contenido de Wikipedia
-                if album_details.get('wikipedia_content', '-') != '-':
-                    wiki_label = QLabel("Información de Wikipedia:")
-                    wiki_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-                    album_layout.addWidget(wiki_label)
-                    
-                    wiki_text = QTextEdit()
-                    wiki_text.setReadOnly(True)
-                    wiki_text.setMaximumHeight(100)
-                    wiki_text.setText(album_details['wikipedia_content'][:500] + '...' if len(album_details['wikipedia_content']) > 500 else album_details['wikipedia_content'])
-                    album_layout.addWidget(wiki_text)
-                
-                info_layout.addWidget(album_widget)
-        
-        # Espacio flexible al final para que todo quede en la parte superior
-        info_layout.addStretch()
-        
-        # Establecer el widget en el área de desplazamiento
-        self.song_info_scroll_area.setWidget(info_container)
-        
-        # Reemplazar el contenido del panel izquierdo con el área de desplazamiento
-        left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(self.song_info_scroll_area)
-        
-        # Eliminar el layout anterior y aplicar el nuevo
-        QWidget().setLayout(self.left_panel.layout())  # Truco para eliminar el layout anterior
-        self.left_panel.setLayout(left_layout)
-        
-        # Actualizar el título del historial
-        self.history_title.setText(f"Historial de Scrobbles ({self.username}) - {len(self.scrobbles_data)} entradas")
+   
 
 
-    def display_artist_info(self, artist_data):
-        """Muestra la información completa del artista en una ventana de diálogo."""
-        from PyQt6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout, QHBoxLayout, QPushButton
-        
-        # Crear un diálogo para mostrar la información
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Información del Artista: {artist_data.get('name', artist_data.get('artist', '-'))}")
-        dialog.resize(800, 600)
-        
-        # Crear un explorador de texto para mostrar la información
-        text_browser = QTextBrowser()
-        text_browser.setOpenExternalLinks(True)
-        
-        # Formatear la información como HTML
-        html_content = f"<h1>{artist_data.get('name', artist_data.get('artist', '-'))}</h1>"
-        
-        # Información básica
-        if artist_data.get('formed_year', '-') != '-' or artist_data.get('origin', '-') != '-':
-            html_content += "<h2>Información Básica</h2>"
-            html_content += "<ul>"
-            if artist_data.get('formed_year', '-') != '-':
-                html_content += f"<li><b>Formado en:</b> {artist_data['formed_year']}</li>"
-            if artist_data.get('origin', '-') != '-':
-                html_content += f"<li><b>Origen:</b> {artist_data['origin']}</li>"
-            if artist_data.get('tags', '-') != '-':
-                html_content += f"<li><b>Etiquetas:</b> {artist_data['tags']}</li>"
-            if artist_data.get('total_albums', '-') != '-':
-                html_content += f"<li><b>Total de álbumes:</b> {artist_data['total_albums']}</li>"
-            html_content += "</ul>"
-        
-        # Biografía
-        if artist_data.get('bio', '-') != '-':
-            html_content += "<h2>Biografía</h2>"
-            html_content += f"<p>{artist_data['bio']}</p>"
-        
-        # Contenido de Wikipedia
-        if artist_data.get('wikipedia_content', '-') != '-':
-            html_content += "<h2>De Wikipedia</h2>"
-            html_content += f"<p>{artist_data['wikipedia_content']}</p>"
-        
-        # Enlaces
-        html_content += "<h2>Enlaces</h2><ul>"
-        for link_type in ['spotify_url', 'youtube_url', 'musicbrainz_url', 'wikipedia_url', 'rateyourmusic_url', 'discogs_url']:
-            if link_type in artist_data and artist_data[link_type] != '-':
-                platform_name = link_type.split('_')[0].capitalize()
-                html_content += f"<li><a href='{artist_data[link_type]}'>{platform_name}</a></li>"
-        html_content += "</ul>"
-        
-        # Artistas similares
-        if artist_data.get('similar_artists', '-') != '-':
-            html_content += "<h2>Artistas Similares</h2>"
-            html_content += f"<p>{artist_data['similar_artists']}</p>"
-        
-        # Establecer el contenido HTML
-        text_browser.setHtml(html_content)
-        
-        # Botones de navegación
-        button_layout = QHBoxLayout()
-        close_button = QPushButton("Cerrar")
-        close_button.clicked.connect(dialog.accept)
-        button_layout.addStretch()
-        button_layout.addWidget(close_button)
-        
-        # Configurar el layout
-        layout = QVBoxLayout()
-        layout.addWidget(text_browser)
-        layout.addLayout(button_layout)
-        dialog.setLayout(layout)
-        
-        # Mostrar el diálogo
-        dialog.exec()
 
-    def display_artist_info(self, artist_data):
-        """Muestra la información del artista en una ventana o panel"""
-        # Aquí implementarías cómo mostrar la información obtenida
-        # Por ejemplo, podrías crear una nueva ventana o diálogo
-        
-        from PyQt6.QtWidgets import QDialog, QTextBrowser, QVBoxLayout
-        
-        # Crear un diálogo para mostrar la información
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Información del Artista")
-        dialog.resize(800, 600)
-        
-        # Crear un explorador de texto para mostrar la información
-        text_browser = QTextBrowser()
-        
-        # Formatear la información como HTML
-        html_content = "<h1>Información del Artista</h1>"
-        
-        # Añadir enlaces
-        if "links" in artist_data:
-            html_content += "<h2>Enlaces</h2><ul>"
-            for platform, url in artist_data["links"].items():
-                html_content += f"<li><a href='{url}'>{platform.capitalize()}</a></li>"
-            html_content += "</ul>"
-        
-        # Añadir información de Wikipedia si está disponible
-        if "wikipedia_content" in artist_data and artist_data["wikipedia_content"]:
-            html_content += "<h2>Biografía</h2>"
-            html_content += f"<p>{artist_data['wikipedia_content'][:500]}...</p>"
-        
-        # Mostrar álbumes
-        if "albums" in artist_data and artist_data["albums"]:
-            html_content += "<h2>Álbumes</h2><ul>"
-            for album in artist_data["albums"]:
-                html_content += f"<li><b>{album['name']}</b> ({album['year']}) - {album['genre']}</li>"
-            html_content += "</ul>"
-        
-        # Establecer el contenido HTML
-        text_browser.setHtml(html_content)
-        
-        # Configurar el layout
-        layout = QVBoxLayout()
-        layout.addWidget(text_browser)
-        dialog.setLayout(layout)
-        
-        # Mostrar el diálogo
-        dialog.exec()
 
-    def open_url(self, url):
-        """Abre una URL en el navegador predeterminado."""
-        if not url or url == '-':
-            return
-            
-        try:
-            import webbrowser
-            webbrowser.open(url)
-        except Exception as e:
-            print(f"Error al abrir URL {url}: {e}")
 
 
 
