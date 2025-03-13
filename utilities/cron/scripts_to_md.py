@@ -118,6 +118,7 @@ if __name__ == "__main__":
         "/home/huan/Scripts/python_venv", 
         "/home/huan/Scripts/.stfolder", 
         "/home/huan/Scripts/menus/musica/__pycache__/",
+        "/home/huan/Scripts/menus/musica/modules/__pycache__",
         "/home/huan/Scripts/.stignore"
         ]
     sync_files(source, destination, exclude)
