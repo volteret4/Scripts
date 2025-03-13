@@ -3,7 +3,7 @@
 - qbitorrent con watchfolder e inicio automático
 - modifica
 - script descarga_finalizada.sh
-- python venv con spotipy, tabulate, bencodepy
+- python venv con spotipy, tabulate, markdown (instalado)
 
 
 #### Activar watchfolder en qbittorrent

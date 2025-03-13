@@ -218,6 +218,11 @@ def procesar_playlist_json(playlist_data, lidarr_url, lidarr_api_key, jackett_ur
         album_key = f"{artista}-{album}"
         cancion_count += len(canciones)  # Contar todas las canciones
         
+        # Verificar si ya hemos procesado este álbum antes
+        if album_key in discos_descargados:
+            print(f"\n[{i}/{len(playlist_data)}] El álbum {artista} - {album} ya ha sido procesado, saltando.")
+            continue
+            
         print(f"\n[{i}/{len(playlist_data)}] Procesando: {artista} - {album} ({len(canciones)} canciones)")
         
         # Verificar si ya hemos buscado este álbum antes
@@ -511,6 +516,7 @@ def copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder, artista
     print(f"Se han copiado {copiados} de {len(torrents_descargados)} torrents a {carpeta_watchfolder}")
     return resultados
 
+
 def main():
     parser = argparse.ArgumentParser(description='Buscar torrents de música por artista y álbum')
     parser.add_argument('--artista', help='Nombre del artista')
@@ -636,12 +642,14 @@ def main():
         parser.print_help()
         sys.exit(1)
     
-    # Procesamiento según el modo de entrada (argumentos o archivo JSON)
-    if config.get("json_file") and not (config.get("artista") and config.get("album")):
+    # Procesamiento según el modo de entrada
+    num_canciones = 0
+    if config.get("json_file"):
+        # Leer los datos de la playlist desde el JSON
         playlist_data = leer_json_file(config["json_file"])
         print(f"\nLeyendo {len(playlist_data)} elementos de la playlist del archivo JSON.")
         
-        # Procesar datos de la playlist
+        # Procesar datos de la playlist - IMPORTANTE: Esto sustituye al bucle adicional que había antes
         torrents_descargados, discos_descargados, artista_album_mapping, num_canciones = procesar_playlist_json(
             playlist_data,
             config["lidarr_url"], 
@@ -653,70 +661,6 @@ def main():
             config["modo"],
             config["carpeta_torrents_temporales"]
         )
-        discos = leer_json_file(config["json_file"])
-        print(f"\nLeyendo {len(discos)} discos del archivo JSON.")
-        
-        for i, disco in enumerate(discos, 1):
-            print(f"\n[{i}/{len(discos)}] Procesando: {disco.get('artista', '')} - {disco.get('album', '')}")
-            
-            # Aquí verificamos que el disco tenga los campos necesarios
-            artista = disco.get('artista', '')
-            album = disco.get('album', '')
-            
-            # Ignora campos extra que no necesita este script
-            ignored_fields = [key for key in disco if key not in ['artista', 'album']]
-            if ignored_fields:
-                print(f"\nIgnorando campos adicionales en el disco: {', '.join(ignored_fields)}")
-            
-            if not artista or not album:
-                print("\nError: Falta información de artista o álbum en el disco.")
-                continue
-            
-            # Saltar descarga de torrents si se especifica en la configuración
-            if config.get("skip_torrents", False):
-                print("\nSaltando descarga de torrents según configuración.")
-                continue
-                
-            # Buscar información en Lidarr
-            artista_info, album_info = buscar_en_lidarr(artista, album, config["lidarr_url"], config["lidarr_api_key"])
-            
-            # Si se encontró información en Lidarr, usar esos términos para buscar
-            if artista_info and album_info:
-                print(f"Información encontrada en Lidarr: {artista_info['artistName']} - {album_info['title']}")
-                busqueda_artista = artista_info['artistName']
-                busqueda_album = album_info['title']
-            else:
-                # Usar los términos proporcionados directamente
-                busqueda_artista = artista
-                busqueda_album = album
-            
-            # Buscar torrents en Jackett, aplicando filtro FLAC si corresponde
-            resultados = buscar_en_jackett(busqueda_artista, busqueda_album, 
-                                         config["jackett_url"], config["jackett_api_key"], 
-                                         config["indexador"], config["flac"])
-            
-            # Mostrar resultados
-            print(formatear_resultados(resultados))
-            
-            # Procesar según el modo seleccionado
-            if config["modo"].lower() == 'interactivo':
-                torrent_seleccionado = modo_interactivo(resultados)
-            else:  # modo automático
-                torrent_seleccionado = modo_automatico(resultados)
-            
-            # Descargar torrent si se seleccionó alguno
-            if torrent_seleccionado:
-                ruta_torrent = descargar_torrent(torrent_seleccionado, config["carpeta_torrents_temporales"])
-                if ruta_torrent:
-                    # Añadir explícitamente a la lista
-                    torrents_descargados.append(ruta_torrent)
-                    # Guardar el mapeo para posterior actualización del JSON
-                    disco_key = f"{artista}-{album}"
-                    artista_album_mapping.append(disco_key)
-                    discos_descargados[disco_key] = True
-                    print(f"\nTorrent añadido a la lista. Total: {len(torrents_descargados)}")
-    
-    
     else:
         # Modo con artista y álbum específicos
         artista = config.get("artista")
@@ -759,6 +703,9 @@ def main():
             ruta_torrent = descargar_torrent(torrent_seleccionado, config["carpeta_torrents_temporales"])
             if ruta_torrent:
                 torrents_descargados.append(ruta_torrent)
+                album_key = f"{artista}-{album}"
+                artista_album_mapping.append(album_key)
+                discos_descargados[album_key] = True
     
     # Mostrar el recuento de torrents descargados
     num_torrents = len(torrents_descargados)
@@ -766,8 +713,6 @@ def main():
     for i, t in enumerate(torrents_descargados, 1):
         print(f"  {i}. {t}")
 
-    
-    print(f"torrents descargados {torrents_descargados}")
     # Copiar todos los torrents a la carpeta final
     if torrents_descargados:
         if not config.get("carpeta_watchfolder"):
@@ -776,7 +721,6 @@ def main():
         else:
             print(f"\nCopiando todos los torrents a la carpeta watchfolder: {config['carpeta_watchfolder']}")
             carpeta_watchfolder = config.get('carpeta_watchfolder')
-            print(f"timaginas {carpeta_watchfolder}")
             # Pasar el mapeo a la función de copiar torrents
             resultados_torrents = copiar_torrents_a_carpeta(torrents_descargados, carpeta_watchfolder, artista_album_mapping)
             
@@ -793,13 +737,12 @@ def main():
         print("\nIniciando el script 3_servidor_playlist.py para procesar los torrents...")
         temp_server_port = config.get("temp_server_port", 8584)
         proceso_fondo = iniciar_script_fondo(
-            num_torrents=len(torrents_descargados),
-            num_canciones=num_canciones,  # Pasar el número de canciones al script
+            numero_torrents=len(torrents_descargados),
+            numero_canciones=num_canciones,  # Pasar el número de canciones al script
             output_path=config.get("output_path"),
             json_file=config.get("json_file"),
             temp_server_port=temp_server_port
         )
-    
     
     # Terminar el script mostrando información del proceso en segundo plano
     if 'proceso_fondo' in locals() and proceso_fondo:
@@ -807,7 +750,5 @@ def main():
         print(f"Número de torrents enviados al script de fondo: {num_torrents}")
     else:
         print("No se pudo iniciar el script 3_servidor_playlist.py")
-
-
 if __name__ == "__main__":
     main()

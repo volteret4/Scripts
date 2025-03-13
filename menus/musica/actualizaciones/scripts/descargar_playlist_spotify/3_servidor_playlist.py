@@ -332,7 +332,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         logger.info(f"{self.client_address[0]} - {format % args}")
 
-def run_server(server_address, processor, num_torrents):
+def run_server(server_address, processor, num_canciones):
     RequestHandler.processor = processor
     RequestHandler.processed_count = 0
     RequestHandler.max_torrents = num_torrents
@@ -474,7 +474,7 @@ def main():
     logger.info(f"  - Número de torrents a procesar: {args.numero_torrents if args.numero_torrents > 0 else 'ilimitado'}")
     
     # Iniciar servidor
-    run_server((config["host"], config["temp_server_port"]), processor, args.numero_torrents)
+    run_server((config["host"], config["temp_server_port"]), processor, args.numero_canciones)
     
     return 0
 
