@@ -3,13 +3,15 @@ import json
 import traceback
 import sqlite3
 import requests
+import time
+from urllib.parse import quote_plus
 from datetime import datetime
 from pathlib import Path
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                             QTableView, QHeaderView, QLabel, QSplitter, QFrame,
                             QScrollArea, QDialog, QGridLayout, QTextEdit)
-from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal, QSortFilterProxyModel, QTimer, QUrl
-from PyQt6.QtGui import QFont, QColor, QDesktopServices
+from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal, QSortFilterProxyModel, QTimer, QUrl, QEvent
+from PyQt6.QtGui import QFont, QColor, QDesktopServices, QIcon
 
 from base_module import BaseModule, THEMES, PROJECT_ROOT
 
@@ -19,9 +21,10 @@ class LastFMModule(BaseModule):
     Muestra información de la canción en reproducción y un historial de scrobbles.
     """
     
-    def __init__(self, api_key, username, database_path, track_limit=50):
+    def __init__(self, lastfm_api_key, username, database_path, listenbrainz_user, track_limit=50):
         # Primero asignamos las propiedades
-        self.api_key = api_key
+        self.lastfm_api_key = lastfm_api_key
+        self.listenbrainz_user = listenbrainz_user
         self.username = username
         self.database_path = database_path
         self.track_limit = track_limit
@@ -619,36 +622,61 @@ class LastFMModule(BaseModule):
         if url and url != '-':
             QDesktopServices.openUrl(QUrl(url))
 
-    
-# Actualización para inicializar la tabla con la nueva columna
-    def init_table_model(self):
-        """Inicializa el modelo de tabla con la configuración correcta."""
-        # Asegurarse de que scrobbles_data tenga al menos una estructura vacía
-        if not hasattr(self, 'scrobbles_data') or self.scrobbles_data is None:
-            self.scrobbles_data = []
+
+
         
-        # Crear el modelo de tabla
-        self.table_model = ScrobblesTableModel(self.scrobbles_data)
-        
-        # Configurar el modelo proxy
-        self.proxy_model = QSortFilterProxyModel(self)
-        self.proxy_model.setSourceModel(self.table_model)
-        
-        # Asignar el modelo proxy a la tabla
-        self.scrobbles_table.setModel(self.proxy_model)
-        
-        # Configurar cabeceras de la tabla
-        self.scrobbles_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        # Configurar clic en celda
-        self.scrobbles_table.clicked.connect(self.on_table_clicked)
-        
-        # Permitir el sorting
-        self.scrobbles_table.setSortingEnabled(True)
+    def show_lyrics(self, song_id):
+        """Muestra las letras de la canción en un diálogo."""
+        if not song_id:
+            return
+            
+        try:
+            conn = sqlite3.connect(self.database_path)
+            cursor = conn.cursor()
+            
+            query = """
+            SELECT l.lyrics, s.title, s.artist 
+            FROM lyrics l
+            JOIN songs s ON l.track_id = s.id
+            WHERE l.track_id = ?
+            """
+            
+            cursor.execute(query, (song_id,))
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                from PyQt6.QtWidgets import QDialog, QTextEdit, QVBoxLayout, QLabel
+                
+                dialog = QDialog(self)
+                dialog.setWindowTitle(f"Letras - {result[1]} ({result[2]})")
+                dialog.resize(500, 600)
+                
+                layout = QVBoxLayout()
+                
+                # Título
+                title_label = QLabel(f"{result[1]} - {result[2]}")
+                title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+                layout.addWidget(title_label)
+                
+                # Texto de las letras
+                lyrics_edit = QTextEdit()
+                lyrics_edit.setReadOnly(True)
+                lyrics_edit.setPlainText(result[0])
+                layout.addWidget(lyrics_edit)
+                
+                dialog.setLayout(layout)
+                dialog.exec()
+            else:
+                print(f"No se encontraron letras para la canción con ID {song_id}")
+                
+        except Exception as e:
+            print(f"Error al mostrar letras: {e}")
+            traceback.print_exc()
 
 
 
-    # CARGA DE DATOS
+
     def load_data(self):
         """Carga datos desde LastFM y la base de datos."""
         try:
@@ -663,10 +691,32 @@ class LastFMModule(BaseModule):
             
             # Guardar datos de scrobbles a JSON
             self.save_scrobbles_to_json()
+            
+            # Actualizar la información de scrobbles solo para canciones nuevas
+            new_tracks = [track for track in self.scrobbles_data if track.get('is_new', False)]
+            
+            if new_tracks:
+                print(f"Encontrados {len(new_tracks)} nuevos scrobbles, actualizando información...")
                 
+                # Crear el hilo solo si hay nuevas canciones
+                self.update_thread = ScrobblesUpdateThread(self)
+                self.update_thread.finished.connect(self.on_scrobbles_updated)
+                self.update_thread.start()
+            
         except Exception as e:
             print(f"Error al cargar datos: {e}")
             traceback.print_exc()
+
+    def on_scrobbles_updated(self):
+        """Manejador para cuando se completa la actualización de scrobbles."""
+        # Actualizar el modelo de la tabla solo si es necesario
+        if hasattr(self, 'table_model'):
+            self.table_model.update_data(self.scrobbles_data)
+        
+        # Contar cuántas canciones tienen información de scrobbles
+        tracks_with_scrobbles = sum(1 for track in self.scrobbles_data if 'scrobbles_count' in track)
+        
+        print(f"Actualización de scrobbles completada. {tracks_with_scrobbles}/{len(self.scrobbles_data)} canciones con información de scrobbles.")
     
     def fetch_lastfm_data(self):
         """Obtiene datos recientes de LastFM a través de su API."""
@@ -676,7 +726,7 @@ class LastFMModule(BaseModule):
             params = {
                 'method': 'user.getrecenttracks',
                 'user': self.username,
-                'api_key': self.api_key,
+                'api_key': self.lastfm_api_key,
                 'format': 'json',
                 'limit': self.track_limit
             }
@@ -772,27 +822,54 @@ class LastFMModule(BaseModule):
             print(f"Error en fetch_lastfm_data: {e}")
             traceback.print_exc()
 
+    # Cuando se obtienen nuevos scrobbles, marca cada uno como 'nuevo'
+        for scrobble in new_scrobbles:
+            scrobble['is_new'] = True
+        
+        # Añadir los nuevos scrobbles a los existentes
+        if not hasattr(self, 'scrobbles_data') or self.scrobbles_data is None:
+            self.scrobbles_data = new_scrobbles
+        else:
+            # Añadir solo los scrobbles que no existen ya
+            existing_ids = {(s.get('artist', ''), s.get('title', ''), s.get('timestamp', '')) 
+                            for s in self.scrobbles_data}
+            
+            for scrobble in new_scrobbles:
+                scrobble_id = (scrobble.get('artist', ''), scrobble.get('title', ''), scrobble.get('timestamp', ''))
+                if scrobble_id not in existing_ids:
+                    self.scrobbles_data.append(scrobble)
+                    existing_ids.add(scrobble_id)
+        
+        # Actualizar el modelo
+        if hasattr(self, 'table_model'):
+            self.table_model.update_data(self.scrobbles_data)
 
-    def debug_table_data(self):
-        """Función para depurar el contenido de la tabla y modelo de datos."""
-        print("\n===== DEBUGGING TABLE DATA =====")
-        print(f"Número de scrobbles en self.scrobbles_data: {len(self.scrobbles_data)}")
-        print(f"Modelo: Filas según rowCount(): {self.table_model.rowCount()}")
-        print(f"Modelo: Columnas según columnCount(): {self.table_model.columnCount()}")
-        
-        # Verificar si la tabla está usando el modelo proxy correctamente
-        print(f"Tabla: Modelo usado: {type(self.scrobbles_table.model()).__name__}")
-        print(f"Modelo proxy: Filas según rowCount(): {self.proxy_model.rowCount()}")
-        
-        # Verificar algunos datos de ejemplo
-        if self.scrobbles_data:
-            print("\nPrimeros 2 elementos en self.scrobbles_data:")
-            for i, item in enumerate(self.scrobbles_data[:2]):
-                print(f"  {i}: {item}")
-        
-        print("================================\n")
-    
- 
+
+    # GESTIÓN DE SCROBBLES
+    def save_scrobbles_to_json(self):
+        """Guarda los datos de scrobbles en un archivo JSON."""
+        try:
+            # Usar directorio home del usuario
+            data_dir = PROJECT_ROOT / '.content' / 'cache' / 'lastfm_scrobbler'
+            print(f"Intentando guardar datos de scrobbles en {data_dir}")
+            
+            # Crear directorio si no existe
+            data_dir.mkdir(exist_ok=True)
+            
+            # Crear archivo JSON con los scrobbles
+            scrobbles_file = data_dir / 'recent_tracks.json'
+            print(f"Guardando scrobbles en {scrobbles_file}")
+            
+            with open(scrobbles_file, 'w') as f:
+                json.dump(self.scrobbles_data, f, indent=4)
+            
+            print(f"Datos de scrobbles guardados correctamente en {scrobbles_file}")
+            
+        except Exception as e:
+            print(f"Error al guardar los datos de scrobbles: {e}")
+            traceback.print_exc()
+
+
     def load_current_song(self):
         """Carga información de la canción actual desde LastFM y busca información adicional 
         en la base de datos, incluyendo detalles del artista y álbum con contenido de Wikipedia."""
@@ -1033,89 +1110,6 @@ class LastFMModule(BaseModule):
    
 
 
-
-
-
-
-
-
-    
-    # GESTIÓN DE SCROBBLES
-    def save_scrobbles_to_json(self):
-        """Guarda los datos de scrobbles en un archivo JSON."""
-        try:
-            # Usar directorio home del usuario
-            data_dir = PROJECT_ROOT / '.content' / 'cache' / 'lastfm_scrobbler'
-            print(f"Intentando guardar datos de scrobbles en {data_dir}")
-            
-            # Crear directorio si no existe
-            data_dir.mkdir(exist_ok=True)
-            
-            # Crear archivo JSON con los scrobbles
-            scrobbles_file = data_dir / 'recent_tracks.json'
-            print(f"Guardando scrobbles en {scrobbles_file}")
-            
-            with open(scrobbles_file, 'w') as f:
-                json.dump(self.scrobbles_data, f, indent=4)
-            
-            print(f"Datos de scrobbles guardados correctamente en {scrobbles_file}")
-            
-        except Exception as e:
-            print(f"Error al guardar los datos de scrobbles: {e}")
-            traceback.print_exc()
-        
-    def show_lyrics(self, song_id):
-        """Muestra las letras de la canción en un diálogo."""
-        if not song_id:
-            return
-            
-        try:
-            conn = sqlite3.connect(self.database_path)
-            cursor = conn.cursor()
-            
-            query = """
-            SELECT l.lyrics, s.title, s.artist 
-            FROM lyrics l
-            JOIN songs s ON l.track_id = s.id
-            WHERE l.track_id = ?
-            """
-            
-            cursor.execute(query, (song_id,))
-            result = cursor.fetchone()
-            conn.close()
-            
-            if result:
-                from PyQt6.QtWidgets import QDialog, QTextEdit, QVBoxLayout, QLabel
-                
-                dialog = QDialog(self)
-                dialog.setWindowTitle(f"Letras - {result[1]} ({result[2]})")
-                dialog.resize(500, 600)
-                
-                layout = QVBoxLayout()
-                
-                # Título
-                title_label = QLabel(f"{result[1]} - {result[2]}")
-                title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-                layout.addWidget(title_label)
-                
-                # Texto de las letras
-                lyrics_edit = QTextEdit()
-                lyrics_edit.setReadOnly(True)
-                lyrics_edit.setPlainText(result[0])
-                layout.addWidget(lyrics_edit)
-                
-                dialog.setLayout(layout)
-                dialog.exec()
-            else:
-                print(f"No se encontraron letras para la canción con ID {song_id}")
-                
-        except Exception as e:
-            print(f"Error al mostrar letras: {e}")
-            traceback.print_exc()
-
-            
-
-
     def check_track_in_database(self, track_title, artist_name):
         """Verifica si una canción existe en la base de datos con búsqueda mejorada."""
         try:
@@ -1152,6 +1146,167 @@ class LastFMModule(BaseModule):
             traceback.print_exc()
             return False
 
+
+    def get_lastfm_scrobbles(self, artist, track, album=None):
+        """Obtiene los scrobbles de una canción desde LastFM."""
+        if not hasattr(self, 'lastfm_api_key') or not self.lastfm_api_key:
+            print("Error: No se ha configurado la API key de LastFM")
+            return None
+        
+        # Parámetros para la petición a LastFM
+        params = {
+            'method': 'track.getInfo',
+            'api_key': self.lastfm_api_key,
+            'artist': artist,
+            'track': track,
+            'format': 'json'
+        }
+        
+        if album:
+            params['album'] = album
+        
+        try:
+            response = requests.get('http://ws.audioscrobbler.com/2.0/', params=params)
+            if response.status_code == 200:
+                data = response.json()
+                if 'track' in data:
+                    track_info = data['track']
+                    
+                    # Obtener enlaces a LastFM
+                    track_url = track_info.get('url', '')
+                    artist_url = track_info.get('artist', {}).get('url', '')
+                    album_url = track_info.get('album', {}).get('url', '')
+                    
+                    # Obtener número de scrobbles (playcount)
+                    playcount = int(track_info.get('playcount', 0))
+                    
+                    return {
+                        'scrobbles': playcount,
+                        'lastfm_track_url': track_url,
+                        'lastfm_artist_url': artist_url,
+                        'lastfm_album_url': album_url
+                    }
+            
+            return {'scrobbles': 0, 'lastfm_track_url': '', 'lastfm_artist_url': '', 'lastfm_album_url': ''}
+        
+        except Exception as e:
+            print(f"Error al obtener scrobbles de LastFM: {e}")
+            return {'scrobbles': 0, 'lastfm_track_url': '', 'lastfm_artist_url': '', 'lastfm_album_url': ''}
+
+    def get_listenbrainz_scrobbles(self, artist, track):
+        """Obtiene los scrobbles de una canción desde ListenBrainz."""
+        if not hasattr(self, 'listenbrainz_user') or not self.listenbrainz_user:
+            print("Error: No se ha configurado el usuario de ListenBrainz")
+            return 0
+        
+        # URL para la API de ListenBrainz
+        url = f"https://api.listenbrainz.org/1/count/recordingmbid?user_name={quote_plus(self.listenbrainz_user)}"
+        
+        # Parámetros para la consulta
+        params = {
+            'artist_name': artist,
+            'recording_name': track
+        }
+        
+        try:
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                # Obtener el conteo de scrobbles
+                listen_count = data.get('payload', {}).get('count', 0)
+                return listen_count
+            
+            return 0
+        
+        except Exception as e:
+            print(f"Error al obtener scrobbles de ListenBrainz: {e}")
+            return 0
+
+    def update_scrobbles_data(self):
+        """Actualiza los datos de scrobbles solo para canciones nuevas sin información."""
+        if not self.scrobbles_data:
+            return
+        
+        # Contar cuántas canciones necesitan actualización
+        tracks_to_update = [track for track in self.scrobbles_data 
+                            if 'scrobbles_count' not in track or 
+                            not track.get('lastfm_track_url', '') or 
+                            not track.get('lastfm_artist_url', '') or 
+                            not track.get('lastfm_album_url', '')]
+        
+        print(f"Actualizando información de scrobbles para {len(tracks_to_update)} canciones nuevas")
+        
+        for track in tracks_to_update:
+            artist = track.get('artist', '')
+            title = track.get('title', '')
+            album = track.get('album', '')
+            
+            # Obtener datos de LastFM
+            lastfm_data = self.get_lastfm_scrobbles(artist, title, album)
+            
+            # Obtener datos de ListenBrainz
+            listenbrainz_count = self.get_listenbrainz_scrobbles(artist, title)
+            
+            # Combinar los contadores de scrobbles
+            total_scrobbles = (lastfm_data.get('scrobbles', 0) if lastfm_data else 0) + listenbrainz_count
+            
+            # Actualizar los datos del track
+            track['scrobbles_count'] = total_scrobbles
+            
+            # Añadir URLs de LastFM
+            if lastfm_data:
+                track['lastfm_track_url'] = lastfm_data.get('lastfm_track_url', '')
+                track['lastfm_artist_url'] = lastfm_data.get('lastfm_artist_url', '')
+                track['lastfm_album_url'] = lastfm_data.get('lastfm_album_url', '')
+            
+            # Esperar un poco para no sobrecargar las APIs
+            time.sleep(0.2)
+        
+        # Solo actualizar el modelo si hubo cambios
+        if tracks_to_update:
+            # Actualizar el modelo de tabla
+            self.table_model.update_data(self.scrobbles_data)
+
+    def load_scrobbles(self, scrobbles_data):
+        """Carga los scrobbles en la tabla y actualiza los datos con información adicional."""
+        if not scrobbles_data:
+            return
+        
+        # Actualizar los datos de scrobbles
+        self.scrobbles_data = scrobbles_data
+        
+        # Actualizar la tabla
+        self.table_model.update_data(self.scrobbles_data)
+        
+        # Obtener información adicional de LastFM y ListenBrainz
+        # Esto podría ser un proceso lento, considerar hacerlo en un hilo separado
+        self.update_scrobbles_data()
+        
+        # Actualizar el contador en la interfaz
+        self.update_scrobbles_counter()
+
+
+    def debug_table_data(self):
+        """Función para depurar el contenido de la tabla y modelo de datos."""
+        print("\n===== DEBUGGING TABLE DATA =====")
+        print(f"Número de scrobbles en self.scrobbles_data: {len(self.scrobbles_data)}")
+        print(f"Modelo: Filas según rowCount(): {self.table_model.rowCount()}")
+        print(f"Modelo: Columnas según columnCount(): {self.table_model.columnCount()}")
+        
+        # Verificar si la tabla está usando el modelo proxy correctamente
+        print(f"Tabla: Modelo usado: {type(self.scrobbles_table.model()).__name__}")
+        print(f"Modelo proxy: Filas según rowCount(): {self.proxy_model.rowCount()}")
+        
+        # Verificar algunos datos de ejemplo
+        if self.scrobbles_data:
+            print("\nPrimeros 2 elementos en self.scrobbles_data:")
+            for i, item in enumerate(self.scrobbles_data[:2]):
+                print(f"  {i}: {item}")
+        
+        print("================================\n")
+    
+ 
+
     def on_table_clicked(self, index):
         """Maneja clics en la tabla de scrobbles."""
         # Obtener la columna y la fila del índice
@@ -1162,15 +1317,99 @@ class LastFMModule(BaseModule):
         source_index = self.proxy_model.mapToSource(index)
         source_row = source_index.row()
         
-        # Si la columna es la última (Estado en DB), ejecutar la acción
-        if column == 5:  # Columna "En Base de Datos"
-            track_data = self.scrobbles_data[source_row]
+        track_data = self.scrobbles_data[source_row]
+        
+        # Manejar clics en columnas clickables
+        if column == 1 and 'lastfm_track_url' in track_data and track_data['lastfm_track_url']:
+            # Clic en canción - abrir URL de LastFM para la canción
+            QDesktopServices.openUrl(QUrl(track_data['lastfm_track_url']))
+        
+        elif column == 2 and 'lastfm_album_url' in track_data and track_data['lastfm_album_url']:
+            # Clic en álbum - abrir URL de LastFM para el álbum
+            QDesktopServices.openUrl(QUrl(track_data['lastfm_album_url']))
+        
+        elif column == 3 and 'lastfm_artist_url' in track_data and track_data['lastfm_artist_url']:
+            # Clic en artista - abrir URL de LastFM para el artista
+            QDesktopServices.openUrl(QUrl(track_data['lastfm_artist_url']))
+        
+        elif column == 6:  # Columna "En Base de Datos"
             print(f"Click en columna DB para canción: {track_data['title']}")
-            
             # Llamar al método para cambiar a la pestaña Music Browser
             self.switch_tab("Music Browser", "set_search_text", f"t:{track_data.get('title')}")
 
+    
+    def init_table_model(self):
+        """Inicializa el modelo de tabla con la configuración correcta."""
+        # Asegurarse de que scrobbles_data tenga al menos una estructura vacía
+        if not hasattr(self, 'scrobbles_data') or self.scrobbles_data is None:
+            self.scrobbles_data = []
+        
+        # Crear el modelo de tabla
+        self.table_model = ScrobblesTableModel(self.scrobbles_data)
+        
+        # Configurar el modelo proxy
+        self.proxy_model = QSortFilterProxyModel(self)
+        self.proxy_model.setSourceModel(self.table_model)
+        
+        # Asignar el modelo proxy a la tabla
+        self.scrobbles_table.setModel(self.proxy_model)
+        
+        # Configurar cabeceras de la tabla
+        self.scrobbles_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # Configurar clic en celda
+        self.scrobbles_table.clicked.connect(self.on_table_clicked)
+        
+        # Establecer el ancho preferido para la columna de scrobbles
+        self.scrobbles_table.setColumnWidth(5, 100)
+        
+        # Permitir el sorting
+        self.scrobbles_table.setSortingEnabled(True)
 
+        # Configurar cabeceras de la tabla
+        self.scrobbles_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # Configurar clic en celda
+        self.scrobbles_table.clicked.connect(self.on_table_clicked)
+        
+        # Permitir el sorting
+        self.scrobbles_table.setSortingEnabled(True)
+        
+        # Cambiar el cursor al pasar sobre celdas clickables
+        self.scrobbles_table.setMouseTracking(True)
+        self.scrobbles_table.viewport().installEventFilter(self)
+
+
+    def eventFilter(self, obj, event):
+        """Filtro de eventos para cambiar el cursor al pasar sobre celdas clickables."""
+        if obj is self.scrobbles_table.viewport() and event.type() == QEvent.Type.MouseMove:
+            pos = event.pos()
+            index = self.scrobbles_table.indexAt(pos)
+            if index.isValid():
+                # Convertir al índice del modelo fuente
+                source_index = self.proxy_model.mapToSource(index)
+                row = source_index.row()
+                col = source_index.column()
+                
+                # Verificar si la celda es clickable
+                is_clickable = False
+                if 0 <= row < len(self.scrobbles_data):
+                    if col == 1 and 'lastfm_track_url' in self.scrobbles_data[row] and self.scrobbles_data[row]['lastfm_track_url']:
+                        is_clickable = True
+                    elif col == 2 and 'lastfm_album_url' in self.scrobbles_data[row] and self.scrobbles_data[row]['lastfm_album_url']:
+                        is_clickable = True
+                    elif col == 3 and 'lastfm_artist_url' in self.scrobbles_data[row] and self.scrobbles_data[row]['lastfm_artist_url']:
+                        is_clickable = True
+                    elif col == 6:  # Columna "En Base de Datos"
+                        is_clickable = True
+                
+                # Cambiar el cursor según corresponda
+                if is_clickable:
+                    self.scrobbles_table.setCursor(Qt.CursorShape.PointingHandCursor)
+                else:
+                    self.scrobbles_table.setCursor(Qt.CursorShape.ArrowCursor)
+        
+        return super().eventFilter(obj, event)
 
 
 
@@ -1180,13 +1419,8 @@ class ScrobblesTableModel(QAbstractTableModel):
     def __init__(self, data):
         super().__init__()
         self._data = data if data else []
-        self._headers = ["Fecha/Hora", "Canción", "Álbum", "Artista", "Estado", "En Base de Datos"]
-    
-    def rowCount(self, parent=None):
-        return len(self._data)
-    
-    def columnCount(self, parent=None):
-        return len(self._headers)
+        # Mantener las columnas originales más la de scrobbles
+        self._headers = ["Fecha/Hora", "Canción", "Álbum", "Artista", "Estado", "Scrobbles", "En Base de Datos"]
     
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self._data)):
@@ -1207,15 +1441,27 @@ class ScrobblesTableModel(QAbstractTableModel):
             elif col == 4:
                 return self._data[row]['status']
             elif col == 5:
+                # Columna de scrobbles
+                return str(self._data[row].get('scrobbles_count', 0))
+            elif col == 6:
                 return "✓" if self._data[row].get('in_database', False) else "➕"
         
         # Agregar estilos por rol
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if col == 5:  # Centrar la columna de Base de Datos
+            if col == 5:  # Centrar la columna de Scrobbles
+                return int(Qt.AlignmentFlag.AlignCenter)
+            if col == 6:  # Centrar la columna de Base de Datos
                 return int(Qt.AlignmentFlag.AlignCenter)
         
         elif role == Qt.ItemDataRole.ForegroundRole:
-            if col == 5:
+            # Cambiar el color de texto para indicar que es clickable
+            if col == 1 and 'lastfm_track_url' in self._data[row] and self._data[row]['lastfm_track_url']:
+                return QColor('#1565C0')  # Azul para enlaces
+            elif col == 2 and 'lastfm_album_url' in self._data[row] and self._data[row]['lastfm_album_url']:
+                return QColor('#1565C0')  # Azul para enlaces
+            elif col == 3 and 'lastfm_artist_url' in self._data[row] and self._data[row]['lastfm_artist_url']:
+                return QColor('#1565C0')  # Azul para enlaces
+            elif col == 6:
                 # Verde para los que están en la base de datos, azul para los que no
                 if self._data[row].get('in_database', False):
                     return QColor('#2E7D32')  # Verde oscuro
@@ -1223,11 +1469,26 @@ class ScrobblesTableModel(QAbstractTableModel):
                     return QColor('#1976D2')  # Azul
         
         elif role == Qt.ItemDataRole.ToolTipRole:
-            if col == 5:
+            if col == 1 and 'lastfm_track_url' in self._data[row]:  # Tooltip para la canción
+                return f"Clic para abrir en LastFM: {self._data[row]['title']}"
+            elif col == 2 and 'lastfm_album_url' in self._data[row]:  # Tooltip para el álbum
+                return f"Clic para abrir en LastFM: {self._data[row]['album']}"
+            elif col == 3 and 'lastfm_artist_url' in self._data[row]:  # Tooltip para el artista
+                return f"Clic para abrir en LastFM: {self._data[row]['artist']}"
+            elif col == 5:
+                return f"Total de scrobbles: {self._data[row].get('scrobbles_count', 0)}"
+            elif col == 6:
                 if self._data[row].get('in_database', False):
                     return "Esta canción existe en la base de datos"
                 else:
                     return "Haz clic para buscar esta canción en la base de datos"
+        
+        # Opcional: Añadir un estilo para mostrar que es clickable (cursor de mano)
+        elif role == Qt.ItemDataRole.DecorationRole:
+            if (col == 1 and 'lastfm_track_url' in self._data[row]) or \
+               (col == 2 and 'lastfm_album_url' in self._data[row]) or \
+               (col == 3 and 'lastfm_artist_url' in self._data[row]):
+                return QIcon.fromTheme("emblem-web")  # Pequeño icono web, si está disponible
         
         return None
     
