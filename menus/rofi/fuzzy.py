@@ -15,6 +15,13 @@ SEARCH_DIR = "/mnt/windows/FTP/wiki/Obsidian/"
 SECONDARY_PATHS = [
     "/mnt/windows/FTP/wiki/Obsidian/.space/",
     "/mnt/windows/FTP/wiki/Obsidian/Templates/",
+    "/mnt/windows/FTP/wiki/Obsidian/Adjuntos/",
+    "/mnt/windows/FTP/wiki/Obsidian/calendars/",
+    "/mnt/windows/FTP/wiki/Obsidian/Dibujos/",
+    "/mnt/windows/FTP/wiki/Obsidian/journals/",
+    "/mnt/windows/FTP/wiki/Obsidian/Tags/",
+    "/mnt/windows/FTP/wiki/Obsidian/Spaces/Infinity"
+
     # Añade más paths aquí
 ]
 

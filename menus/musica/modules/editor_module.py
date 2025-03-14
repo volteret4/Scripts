@@ -2,6 +2,7 @@ import os
 import sqlite3
 import json
 from typing import List, Dict, Any, Optional, Tuple
+import traceback
 from datetime import datetime
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
                            QLineEdit, QPushButton, QComboBox, QTableWidget, 
@@ -11,6 +12,12 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
 from PyQt6.QtCore import Qt, pyqtSignal, QDateTime, QSettings
 
 from base_module import BaseModule, THEMES
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class DatabaseEditor(BaseModule):
     """Módulo para buscar y editar elementos en la base de datos de música."""
@@ -42,7 +49,9 @@ class DatabaseEditor(BaseModule):
         search_layout = QHBoxLayout(search_panel)
         
         self.table_selector = QComboBox()
-        self.table_selector.addItems(["songs", "artists", "albums", "genres", "lyrics"])
+        # Añadir solo las tablas principales, no las tablas FTS internas
+        main_tables = ["songs", "artists", "albums", "genres", "lyrics", "scrobbles", "listens", "song_links"]
+        self.table_selector.addItems(main_tables)
         self.table_selector.currentTextChanged.connect(self.change_table)
         search_layout.addWidget(QLabel("Tabla:"))
         search_layout.addWidget(self.table_selector)
@@ -62,6 +71,7 @@ class DatabaseEditor(BaseModule):
         
         layout.addWidget(search_panel)
         
+        # El resto de la función sigue igual...
         # Pestañas para resultados y edición
         self.tab_widget = QTabWidget()
         
@@ -205,7 +215,6 @@ class DatabaseEditor(BaseModule):
                 self.save_column_order_directly()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al guardar orden de columnas: {e}")
-            import traceback
             traceback.print_exc()
     
     def save_column_order_directly(self):
@@ -244,59 +253,349 @@ class DatabaseEditor(BaseModule):
             QMessageBox.information(self, "Éxito", "Orden de columnas guardado en la configuración.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al guardar orden de columnas directamente: {e}")
-            import traceback
             traceback.print_exc()
 
-    def change_table(self, table_name: str):
-        """Cambiar la tabla actual y actualizar los campos de búsqueda."""
-        self.current_table = table_name
-        self.search_field.clear()
-        
-        # Obtener la estructura de la tabla
-        fields = self.get_table_structure(table_name)
-        
-        # Añadir los campos a la lista desplegable
-        for field in fields:
-            self.search_field.addItem(field[1])  # field[1] es el nombre del campo
-        
-        # Añadir opción para buscar en todos los campos de texto
-        self.search_field.addItem("Todos los campos de texto")
-    
     def get_table_structure(self, table_name: str) -> List[Tuple]:
         """Obtener la estructura de una tabla."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            cursor.execute(f"PRAGMA table_info({table_name})")
+            
+            # Verificar si la tabla existe antes de consultar su estructura
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            if not cursor.fetchone():
+                print(f"La tabla {table_name} no existe en la base de datos")
+                conn.close()
+                return []
+            
+            # Escapar el nombre de la tabla para prevenir inyección SQL
+            cursor.execute(f"PRAGMA table_info([{table_name}])")
             structure = cursor.fetchall()
             conn.close()
+            
+            # Filtrar tablas del sistema o tablas FTS internas
+            if not structure:
+                print(f"No se encontró estructura para la tabla {table_name}")
+                return []
+                
+            # Filtrar columnas del sistema para tablas FTS
+            if (table_name.endswith("_fts") or table_name.endswith("_config") or 
+                table_name.endswith("_data") or table_name.endswith("_idx") or 
+                table_name.endswith("_docsize")):
+                return [col for col in structure if col[1] not in ('segid', 'term', 'pgno', 'k', 'v', 'block', 'sz')]
+            
             return structure
         except sqlite3.Error as e:
-            print(f"Error al obtener estructura de tabla: {e}")
+            print(f"Error SQLite al obtener estructura de tabla {table_name}: {e}")
+            traceback.print_exc()
             return []
-    
+        except Exception as e:
+            print(f"Error general al obtener estructura de tabla {table_name}: {e}")
+            traceback.print_exc()
+            return []
+
+    def get_table_structure(self, table_name: str) -> List[Tuple]:
+        """Obtener la estructura de una tabla."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Verificar si la tabla existe antes de consultar su estructura
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            if not cursor.fetchone():
+                print(f"La tabla {table_name} no existe en la base de datos")
+                conn.close()
+                return []
+            
+            # Obtener la estructura de la tabla
+            cursor.execute(f"PRAGMA table_info(`{table_name}`)")
+            structure = cursor.fetchall()
+            conn.close()
+            
+            # Si no se encontró estructura, devolver lista vacía
+            if not structure:
+                print(f"No se encontró estructura para la tabla {table_name}")
+                return []
+                
+            # Filtrar columnas del sistema para tablas FTS si es necesario
+            if (table_name.endswith("_fts") or table_name.endswith("_config") or 
+                table_name.endswith("_data") or table_name.endswith("_idx") or 
+                table_name.endswith("_docsize")):
+                return [col for col in structure if col[1] not in ('segid', 'term', 'pgno', 'k', 'v', 'block', 'sz')]
+            
+            return structure
+        except sqlite3.Error as e:
+            print(f"Error SQLite al obtener estructura de tabla {table_name}: {e}")
+            traceback.print_exc()
+            return []
+        except Exception as e:
+            print(f"Error general al obtener estructura de tabla {table_name}: {e}")
+            traceback.print_exc()
+            return []
+
+    def change_table(self, table_name: str):
+        """Cambiar la tabla actual y actualizar los campos de búsqueda."""
+        if not table_name:
+            return
+            
+        self.current_table = table_name
+        self.search_field.clear()
+        
+        try:
+            # Obtener la estructura de la tabla
+            fields = self.get_table_structure(table_name)
+            
+            if not fields:
+                QMessageBox.warning(self, "Error", f"No se pudo obtener la estructura de la tabla {table_name}")
+                return
+            
+            # Añadir los campos a la lista desplegable
+            for field in fields:
+                if len(field) > 1:  # Asegurar que hay un nombre de campo disponible
+                    self.search_field.addItem(field[1])  # field[1] es el nombre del campo
+            
+            # Añadir opción para buscar en todos los campos de texto si la tabla tiene al menos un campo
+            if fields:
+                self.search_field.addItem("Todos los campos de texto")
+            
+            # Comprobar si existe la tabla FTS correspondiente
+            fts_table = f"{table_name}_fts"
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (fts_table,))
+            has_fts = cursor.fetchone() is not None
+            conn.close()
+            
+            # Añadir opción para búsqueda de texto completo solo si existe la tabla FTS
+            if has_fts:
+                self.search_field.addItem("Búsqueda de texto completo")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al cambiar tabla: {str(e)}")
+            traceback.print_exc()
+
+    def search_related_item(self, field_name):
+        """Abrir diálogo para buscar ítem relacionado."""
+        # Determinar la tabla relacionada basada en el nombre del campo
+        related_table = None
+        if field_name == "artist_id":
+            related_table = "artists"
+        elif field_name == "album_id":
+            related_table = "albums"
+        elif field_name == "song_id" or field_name == "track_id":
+            related_table = "songs"
+        elif field_name == "lyrics_id":
+            related_table = "lyrics"
+        elif field_name == "genre_id":
+            related_table = "genres"
+        else:
+            return
+        
+        # Determinar el campo a mostrar en la búsqueda
+        display_field = "name"  # Por defecto, buscamos por nombre
+        if related_table == "songs":
+            display_field = "title"
+        elif related_table == "lyrics":
+            display_field = "track_id"  # Mostrar el ID de la canción asociada
+        
+        # Crear un diálogo para mostrar los resultados de búsqueda
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Buscar en {related_table}")
+        dialog.setMinimumSize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Campo de búsqueda
+        search_layout = QHBoxLayout()
+        search_input = QLineEdit()
+        search_input.setPlaceholderText(f"Buscar por {display_field}...")
+        search_button = QPushButton("Buscar")
+        
+        search_layout.addWidget(search_input)
+        search_layout.addWidget(search_button)
+        
+        layout.addLayout(search_layout)
+        
+        # Tabla de resultados
+        results_table = QTableWidget()
+        results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        results_table.setAlternatingRowColors(True)
+        layout.addWidget(results_table)
+        
+        # Botones de acción
+        button_layout = QHBoxLayout()
+        select_button = QPushButton("Seleccionar")
+        cancel_button = QPushButton("Cancelar")
+        
+        button_layout.addWidget(select_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Conectar señales
+        cancel_button.clicked.connect(dialog.reject)
+        
+        # Función para realizar la búsqueda
+        def perform_search():
+            search_term = search_input.text()
+            
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                
+                # Obtener estructura de tabla
+                cursor.execute(f"PRAGMA table_info({related_table})")
+                columns = [info[1] for info in cursor.fetchall()]
+                
+                # Determinar columna para la búsqueda
+                if display_field in columns:
+                    search_column = display_field
+                elif 'name' in columns:
+                    search_column = 'name'
+                elif 'title' in columns:
+                    search_column = 'title'
+                else:
+                    search_column = columns[1]  # Primera columna después de id
+                
+                # Construir consulta
+                query = f"SELECT * FROM {related_table} WHERE {search_column} LIKE ?"
+                cursor.execute(query, [f"%{search_term}%"])
+                results = cursor.fetchall()
+                
+                # Configurar tabla
+                results_table.setRowCount(len(results))
+                results_table.setColumnCount(len(columns))
+                results_table.setHorizontalHeaderLabels(columns)
+                
+                # Rellenar datos
+                for row, result in enumerate(results):
+                    for col, value in enumerate(result):
+                        item = QTableWidgetItem(str(value) if value is not None else "")
+                        results_table.setItem(row, col, item)
+                
+                results_table.resizeColumnsToContents()
+                
+                # Mostrar columnas relevantes primero
+                header = results_table.horizontalHeader()
+                if 'id' in columns:
+                    header.moveSection(header.visualIndex(columns.index('id')), 0)
+                
+                if search_column in columns and search_column != 'id':
+                    header.moveSection(header.visualIndex(columns.index(search_column)), 1)
+                
+                conn.close()
+                
+            except Exception as e:
+                QMessageBox.critical(dialog, "Error", f"Error al buscar: {e}")
+        
+        # Función para seleccionar un ítem
+        def select_item():
+            selected_rows = results_table.selectedItems()
+            if not selected_rows:
+                return
+            
+            row = selected_rows[0].row()
+            item_id = results_table.item(row, 0).text()
+            
+            # Actualizar el campo con el ID seleccionado
+            self.edit_widgets[field_name].setText(item_id)
+            
+            # Si el campo es lyrics_id, actualizar has_lyrics en songs
+            if field_name == "lyrics_id" and self.current_table == "songs":
+                if "has_lyrics" in self.edit_widgets:
+                    self.edit_widgets["has_lyrics"].setChecked(True)
+            
+            dialog.accept()
+        
+        # Conectar señales restantes
+        search_button.clicked.connect(perform_search)
+        search_input.returnPressed.connect(perform_search)
+        select_button.clicked.connect(select_item)
+        results_table.itemDoubleClicked.connect(lambda: select_item())
+        
+        # Realizar búsqueda inicial con término vacío
+        search_input.setText("")
+        perform_search()
+        
+        # Mostrar diálogo
+        dialog.exec()
+        
+        # Función para seleccionar un ítem
+        def select_item():
+            selected_rows = results_table.selectedItems()
+            if not selected_rows:
+                return
+            
+            row = selected_rows[0].row()
+            item_id = results_table.item(row, 0).text()
+            
+            # Actualizar el campo con el ID seleccionado
+            self.edit_widgets[field_name].setText(item_id)
+            dialog.accept()
+        
+        # Conectar señales restantes
+        search_button.clicked.connect(perform_search)
+        search_input.returnPressed.connect(perform_search)
+        select_button.clicked.connect(select_item)
+        results_table.itemDoubleClicked.connect(lambda: select_item())
+        
+        # Realizar búsqueda inicial con término vacío
+        search_input.setText("")
+        perform_search()
+        
+        # Mostrar diálogo
+        dialog.exec()
+
+
     def search_database(self):
         """Realizar búsqueda en la base de datos y mostrar resultados."""
         search_term = self.search_input.text()
         field = self.search_field.currentText()
         table = self.current_table
         
+        if not search_term or not field or not table:
+            QMessageBox.warning(self, "Campos incompletos", 
+                                "Por favor complete todos los campos de búsqueda.")
+            return
+        
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
             # Construir la consulta SQL
-            if field == "Todos los campos de texto":
+            if field == "Búsqueda de texto completo":
+                # Usar la tabla FTS correspondiente
+                fts_table = f"{table}_fts"
+                
+                # Verificar si existe la tabla FTS
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{fts_table}'")
+                if cursor.fetchone():
+                    # Construir consulta FTS
+                    query = f"SELECT {table}.* FROM {table} JOIN {fts_table} ON {table}.id = {fts_table}.id WHERE {fts_table} MATCH ?"
+                    params = [search_term]
+                else:
+                    QMessageBox.warning(self, "Búsqueda FTS no disponible", 
+                                        f"La búsqueda de texto completo no está disponible para la tabla {table}.")
+                    return
+            elif field == "Todos los campos de texto":
                 # Obtener todos los campos de texto de la tabla
                 cursor.execute(f"PRAGMA table_info({table})")
-                fields = [f[1] for f in cursor.fetchall() if f[2].upper() == 'TEXT']
+                all_fields = cursor.fetchall()
+                text_fields = [f[1] for f in all_fields if f[2].upper() in ('TEXT', 'VARCHAR', 'CHAR', 'CLOB', 'STRING')]
                 
+                if not text_fields:
+                    QMessageBox.warning(self, "No hay campos de texto", 
+                                    f"La tabla {table} no tiene campos de texto para buscar.")
+                    return
+                    
                 # Construir WHERE con todos los campos
-                where_clauses = [f"{f} LIKE ?" for f in fields]
+                where_clauses = [f"{f} LIKE ?" for f in text_fields]
                 query = f"SELECT * FROM {table} WHERE {' OR '.join(where_clauses)}"
-                params = [f"%{search_term}%" for _ in fields]
+                params = [f"%{search_term}%" for _ in text_fields]
             else:
-                query = f"SELECT * FROM {table} WHERE {field} LIKE ?"
+                # Escapar el nombre del campo para prevenir inyección SQL
+                query = f"SELECT * FROM {table} WHERE [{field}] LIKE ?"
                 params = [f"%{search_term}%"]
             
             cursor.execute(query, params)
@@ -338,6 +637,7 @@ class DatabaseEditor(BaseModule):
             
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Error de Base de Datos", f"Error al realizar la búsqueda: {e}")
+            traceback.print_exc()
     
     def edit_selected_item(self):
         """Cargar el ítem seleccionado para edición."""
@@ -393,9 +693,17 @@ class DatabaseEditor(BaseModule):
                     self.edit_layout.addRow(f"{col_name}:", id_label)
                     continue
                 
-                if "TIMESTAMP" in col_type:
+                # Crear el widget apropiado según el tipo de campo
+                if col_name in ["has_lyrics", "is_compilation"] or col_name.startswith("is_"):
+                    # Campos booleanos
+                    widget = QCheckBox()
+                    if col_value is not None:
+                        widget.setChecked(bool(int(col_value)))
+                
+                elif "TIMESTAMP" in col_type or col_name.endswith("_date") or col_name.endswith("_updated"):
                     widget = QDateTimeEdit()
                     widget.setCalendarPopup(True)
+                    widget.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
                     if col_value:
                         try:
                             dt = QDateTime.fromString(str(col_value), "yyyy-MM-dd HH:mm:ss")
@@ -418,18 +726,32 @@ class DatabaseEditor(BaseModule):
                     if col_value is not None:
                         widget.setValue(float(col_value))
                 
-                elif col_name == "lyrics" or col_name == "bio" or "wikipedia_content" in col_name:
+                # Manejo especial para las columnas de texto largo
+                elif col_name in ["lyrics", "bio", "description"] or "wikipedia_content" in col_name:
                     widget = QTextEdit()
                     if col_value:
                         widget.setText(str(col_value))
+                    
+                    # Establecer una altura mínima para campos de texto largo
+                    widget.setMinimumHeight(200)
                 
-                elif col_name.endswith("_path") or "_url" in col_name:
+                # Manejo especial para campos de fecha
+                elif col_name == "date" or col_name == "year" or col_name == "album_year":
+                    widget = QLineEdit()
+                    if col_value:
+                        widget.setText(str(col_value))
+                    # Establecer placeholder para indicar formato esperado
+                    widget.setPlaceholderText("YYYY o YYYY-MM-DD")
+                
+                # Manejo de los campos con paths y URLs
+                elif col_name.endswith("_path") or col_name == "file_path" or col_name == "folder_path":
                     layout = QHBoxLayout()
                     widget = QLineEdit()
                     if col_value:
                         widget.setText(str(col_value))
                     
                     browse_button = QPushButton("...")
+                    # Capturar el nombre del campo para el botón de búsqueda
                     browse_button.clicked.connect(lambda checked, field=col_name: self.browse_path(field))
                     
                     layout.addWidget(widget)
@@ -442,9 +764,38 @@ class DatabaseEditor(BaseModule):
                     self.edit_widgets[col_name] = widget
                     continue
                 
-                else:
+                # Manejo especial para campos URLs
+                elif "_url" in col_name:
                     widget = QLineEdit()
                     if col_value:
+                        widget.setText(str(col_value))
+                    # Establecer placeholder para indicar formato esperado
+                    widget.setPlaceholderText("https://...")
+                
+                # Campo para IDs relacionados con opciones de búsqueda
+                elif col_name.endswith("_id") and col_name != "id":
+                    layout = QHBoxLayout()
+                    widget = QLineEdit()
+                    if col_value is not None:
+                        widget.setText(str(col_value))
+                    
+                    # Botón para buscar elemento relacionado
+                    search_button = QPushButton("Buscar")
+                    search_button.clicked.connect(lambda checked, field=col_name: self.search_related_item(field))
+                    
+                    layout.addWidget(widget)
+                    layout.addWidget(search_button)
+                    
+                    container = QWidget()
+                    container.setLayout(layout)
+                    
+                    self.edit_layout.addRow(f"{col_name}:", container)
+                    self.edit_widgets[col_name] = widget
+                    continue
+                
+                else:
+                    widget = QLineEdit()
+                    if col_value is not None:
                         widget.setText(str(col_value))
                 
                 self.edit_layout.addRow(f"{col_name}:", widget)
@@ -471,25 +822,49 @@ class DatabaseEditor(BaseModule):
             # Cambiar a la pestaña de edición
             self.tab_widget.setCurrentIndex(1)
             
+           
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al cargar ítem para edición: {e}")
-            import traceback
             traceback.print_exc()
     
     def browse_path(self, field_name):
         """Abrir diálogo para seleccionar archivo o directorio."""
         current_path = self.edit_widgets[field_name].text()
         
-        if "file_path" in field_name or "album_art_path" in field_name:
+        if field_name == "file_path":
+            # Para archivos de música
             file_path, _ = QFileDialog.getOpenFileName(
-                self, f"Seleccionar {field_name}", 
+                self, "Seleccionar archivo de música", 
                 os.path.dirname(current_path) if current_path else "",
+                "Archivos de música (*.mp3 *.flac *.wav *.ogg *.m4a *.aac);;Todos los archivos (*)"
             )
             if file_path:
                 self.edit_widgets[field_name].setText(file_path)
+        elif field_name == "album_art_path" or field_name == "album_art_path_denorm":
+            # Para archivos de imagen
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Seleccionar portada de álbum", 
+                os.path.dirname(current_path) if current_path else "",
+                "Archivos de imagen (*.jpg *.jpeg *.png *.gif *.bmp);;Todos los archivos (*)"
+            )
+            if file_path:
+                self.edit_widgets[field_name].setText(file_path)
+        elif field_name == "folder_path":
+            # Para directorios
+            dir_path = QFileDialog.getExistingDirectory(
+                self, "Seleccionar directorio", 
+                current_path if current_path else ""
+            )
+            if dir_path:
+                self.edit_widgets[field_name].setText(dir_path)
         else:
-            # Para URLs, no se hace nada ya que no hay diálogo para URLs
-            pass
+            # Para otros tipos de archivos
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, f"Seleccionar {field_name}", 
+                os.path.dirname(current_path) if current_path else ""
+            )
+            if file_path:
+                self.edit_widgets[field_name].setText(file_path)
     
     def save_item(self):
         """Guardar los cambios del ítem."""
@@ -529,6 +904,8 @@ class DatabaseEditor(BaseModule):
                         value = widget.value()
                     elif isinstance(widget, QDoubleSpinBox):
                         value = widget.value()
+                    elif isinstance(widget, QCheckBox):
+                        value = 1 if widget.isChecked() else 0
                     else:
                         value = str(widget.text()) if hasattr(widget, 'text') else None
                     
@@ -549,7 +926,6 @@ class DatabaseEditor(BaseModule):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al guardar ítem: {e}")
-            import traceback
             traceback.print_exc()
     
     def create_new_item(self):
@@ -595,7 +971,6 @@ class DatabaseEditor(BaseModule):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al crear nuevo ítem: {e}")
-            import traceback
             traceback.print_exc()
     
     def delete_selected_item(self):
@@ -634,7 +1009,6 @@ class DatabaseEditor(BaseModule):
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error al eliminar ítem: {e}")
-                import traceback
                 traceback.print_exc()
     
     def cleanup(self):

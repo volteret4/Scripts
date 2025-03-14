@@ -17,6 +17,13 @@ import http.server
 import socketserver
 import urllib.parse
 import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 
 class SpotifyPlaylistManager(BaseModule):
     def __init__(self, client_id: str, client_secret: str, cache_path: str = None, force_update: str = False, parent=None, theme='Tokyo Night', **kwargs):

@@ -1,3 +1,24 @@
+
+#!/usr/bin/env python
+#
+# Nombre:: db_musica_path.py
+# Descripción: Lee una ruta, extrae información de canciones y las guarda en una base de datos.
+# Autor: volteret4
+# Repositorio: https://github.com/volteret4/
+# Notes: Es el primero de una colección de scripts para gestionar una base de datos de canciones:
+#
+#                   - db_musica_path.py: Lee una ruta, extrae información de canciones y las guarda en una base de datos.
+#                   - enlaces_artista_album.py: Lee la base de datos  y busca enlaces a servicios externos para arista y album(Spotify, Lastfm, YouTube, MusicBrainz, Discogs, RateYourMusic).
+#                   - enlaces_canciones_spotify_lastfm.py: Lee la base de datos  y busca enlaces a servicios externos para canciones(Spotify, Lastfm, Bandcamp, YouTube, MusicBrainz, Discogs, RateYourMusic).
+#                   - letras_genius_db_musica.py: Lee la base de datos creada por db_musica.py y busca las letras de las canciones en Genius,añadiéndolas a la base de datos.
+#                   - wikilinks_desde_mb.py: Lee la base de datos creada por db_musica.py y busca info de wikipedia para base de datos de la biblioteca de musica y añade los confirmados.
+#                   - scrobbles_lastfm.py: Lee las base de datos y obtiene los scrobbles de lastfm. Guarda también el último scrobble.
+#                   - scrobbles_listenbrainz: Idem que el anterior, pero con listenbrainz
+#                   - optimiza_db_lastpass.py: Lee la base de datos y optimiza el esquema para mejorar el rendimiento
+#
+#   Dependencias:   - python3, mutagen, pylast, sqlite3
+#                   - carpeta con musica en flac, m4a, mp3
+
 import os
 import json
 import logging
@@ -9,13 +30,11 @@ from mutagen.flac import FLAC
 import pylast
 import sqlite3
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 import argparse
 
-load_dotenv()
 
 class MusicLibraryManager:
-    def __init__(self, root_path: str, db_path: str):
+    def __init__(self, root_path: str, db_path: str, lastfm_api_key: str):
         self.root_path = Path(root_path).resolve()
         self.db_path = Path(db_path).resolve()
         self.supported_formats = ('.mp3', '.flac', '.m4a')
@@ -29,7 +48,7 @@ class MusicLibraryManager:
         
         # LastFM initialization
         self.network = pylast.LastFMNetwork(
-            api_key=os.getenv("LASTFM_API_KEY")
+            api_key=lastfm_api_key,
         )
         
         # Initialize database
@@ -181,6 +200,7 @@ class MusicLibraryManager:
                     wikipedia_updated TIMESTAMP,
                     mbid TEXT,
                     folder_path TEXT,
+                    bitrate_range TEXT,
                     FOREIGN KEY(artist_id) REFERENCES artists(id),
                     UNIQUE(artist_id, name)
                 )
@@ -203,12 +223,14 @@ class MusicLibraryManager:
                 'wikipedia_content': 'TEXT',
                 'wikipedia_updated': 'TIMESTAMP',
                 'mbid': 'TEXT',
-                'folder_path': 'TEXT'
+                'folder_path': 'TEXT',
+                'bitrate_range': 'TEXT'
             }
             
             for col_name, col_type in new_album_columns.items():
                 if col_name not in album_columns:
                     c.execute(f"ALTER TABLE albums ADD COLUMN {col_name} {col_type}")
+        
         
         # Genres table
         if 'genres' not in existing_tables:
@@ -542,7 +564,7 @@ class MusicLibraryManager:
 
 
     def get_audio_metadata(self, file_path: Path) -> Optional[Dict]:
-        """Extract comprehensive audio metadata including replay gain."""
+        """Extract comprehensive audio metadata including correctly calculated bitrate."""
         try:
             audio = None
             audio_tech = None
@@ -597,9 +619,22 @@ class MusicLibraryManager:
                 'folder_path': str(file_path.parent)  # Add folder path for album grouping
             }
 
-            # Technical information
+            # Technical information - correctly calculate bitrate
             if hasattr(audio_tech, 'info'):
-                metadata['bitrate'] = getattr(audio_tech.info, 'bitrate', 0)
+                # Calculate bitrate correctly based on format
+                if file_path.suffix.lower() == '.flac':
+                    # For FLAC: Calculate from file size and duration
+                    file_size_bits = os.path.getsize(file_path) * 8
+                    duration_seconds = audio_tech.info.length
+                    if duration_seconds > 0:
+                        bitrate = int(file_size_bits / duration_seconds / 1000)  # Convert to kbps
+                    else:
+                        bitrate = 0
+                else:
+                    # For MP3/M4A: Use the reported bitrate
+                    bitrate = getattr(audio_tech.info, 'bitrate', 0) // 1000  # Convert to kbps
+                
+                metadata['bitrate'] = bitrate
                 metadata['sample_rate'] = getattr(audio_tech.info, 'sample_rate', 0)
                 metadata['bit_depth'] = getattr(audio_tech.info, 'bits_per_sample', 0)
                 metadata['duration'] = getattr(audio_tech.info, 'length', 0)
@@ -973,8 +1008,71 @@ class MusicLibraryManager:
                     artist_name
                 ))
 
+    def update_album_bitrates(self):
+        """
+        Actualiza los rangos de bitrate para todos los álbumes en la base de datos.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            self.logger.info("Actualizando rangos de bitrate para álbumes...")
+            
+            # Obtener todos los álbumes
+            c.execute("SELECT id, artist_id, name FROM albums")
+            albums = c.fetchall()
+            
+            updated_count = 0
+            
+            for album_id, artist_id, album_name in albums:
+                # Obtener el artista asociado
+                c.execute("SELECT name FROM artists WHERE id = ?", (artist_id,))
+                artist_result = c.fetchone()
+                
+                if artist_result:
+                    artist_name = artist_result[0]
+                    
+                    # Calcular el rango de bitrate para el álbum
+                    c.execute('''
+                        SELECT MIN(bitrate), MAX(bitrate), COUNT(*)
+                        FROM songs
+                        WHERE album = ? AND artist = ?
+                    ''', (album_name, artist_name))
+                    
+                    bitrate_range = c.fetchone()
+                    
+                    if bitrate_range and bitrate_range[2] > 0:  # Asegurarse de que hay canciones
+                        min_bitrate = bitrate_range[0] if bitrate_range[0] is not None else 0
+                        max_bitrate = bitrate_range[1] if bitrate_range[1] is not None else 0
+                        
+                        # Formatear el rango de bitrate
+                        bitrate_range_str = f"{min_bitrate}-{max_bitrate}" if min_bitrate != max_bitrate else str(min_bitrate)
+                        
+                        # Actualizar el álbum con el rango de bitrate
+                        c.execute('''
+                            UPDATE albums
+                            SET bitrate_range = ?
+                            WHERE id = ?
+                        ''', (bitrate_range_str, album_id))
+                        
+                        updated_count += 1
+                        
+                        if updated_count % 100 == 0:
+                            conn.commit()
+                            self.logger.info(f"Actualizados {updated_count} álbumes")
+            
+            conn.commit()
+            self.logger.info(f"Actualización de rangos de bitrate completada. Actualizados {updated_count} álbumes.")
+        
+        except Exception as e:
+            self.logger.error(f"Error al actualizar rangos de bitrate: {str(e)}")
+        
+        finally:
+            conn.close()
+
+
     def _update_album_info(self, cursor, metadata):
-        """Update album information using folder-based consistency."""
+        """Update album information using folder-based consistency and calculate bitrate range."""
         # Skip if invalid data
         if not metadata['artist'] or not metadata['album']:
             return
@@ -1006,25 +1104,47 @@ class MusicLibraryManager:
         
         existing_album = cursor.fetchone()
         
+        # Calculate bitrate range for the album
+        cursor.execute('''
+            SELECT MIN(bitrate), MAX(bitrate)
+            FROM songs
+            WHERE album = ? AND artist = ?
+        ''', (metadata['album'], artist_name))
+        
+        bitrate_range = cursor.fetchone()
+        min_bitrate = bitrate_range[0] if bitrate_range and bitrate_range[0] is not None else 0
+        max_bitrate = bitrate_range[1] if bitrate_range and bitrate_range[1] is not None else 0
+        
+        # If we have new song data, update the range with current song bitrate
+        if 'bitrate' in metadata and metadata['bitrate']:
+            if metadata['bitrate'] < min_bitrate or min_bitrate == 0:
+                min_bitrate = metadata['bitrate']
+            if metadata['bitrate'] > max_bitrate:
+                max_bitrate = metadata['bitrate']
+        
+        bitrate_range_str = f"{min_bitrate}-{max_bitrate}" if min_bitrate != max_bitrate else str(min_bitrate)
+        
         # Insert or update based on existence and last updated time
         if not existing_album:
             cursor.execute('''
                 INSERT INTO albums 
-                (artist_id, name, year, label, genre, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (artist_id, name, year, label, genre, last_updated, bitrate_range, folder_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 artist_id, metadata['album'], 
                 metadata['date'], metadata['label'], 
-                metadata['genre'], datetime.now()
+                metadata['genre'], datetime.now(),
+                bitrate_range_str, metadata.get('folder_path', '')
             ))
         elif (datetime.now() - self._parse_db_datetime(existing_album[1])) > timedelta(days=30):
             cursor.execute('''
                 UPDATE albums
-                SET year = ?, label = ?, genre = ?, last_updated = ?
+                SET year = ?, label = ?, genre = ?, last_updated = ?, bitrate_range = ?, folder_path = ?
                 WHERE id = ?
             ''', (
                 metadata['date'], metadata['label'], 
                 metadata['genre'], datetime.now(),
+                bitrate_range_str, metadata.get('folder_path', ''),
                 existing_album[0]
             ))
 
@@ -1156,6 +1276,7 @@ if __name__ == "__main__":
     parser.add_argument('--optimize', action='store_true', help='Create indices and optimize database')
     parser.add_argument('--update-schema', action='store_true', help='Update database schema with all tables and indices')
     parser.add_argument('--quick-scan', action='store_true', help='Perform a quick scan based on album folders')
+    parser.add_argument('--update-bitrates', action='store_true', help='Update bitrate ranges for all albums')
 
     args = parser.parse_args()
     
@@ -1173,7 +1294,10 @@ if __name__ == "__main__":
     
     if args.quick_scan:
         manager.quick_scan_library()
+        
+    if args.update_bitrates:
+        manager.update_album_bitrates()
     
     # Escanear la biblioteca siempre como último paso
-    if not args.update_replay_gain and not args.optimize and not args.update_schema and not args.quick_scan:
+    if not args.update_replay_gain and not args.optimize and not args.update_schema and not args.quick_scan and not args.update_bitrates:
         manager.scan_library(force_update=args.force_update)

@@ -11,6 +11,12 @@ from PyQt6.QtCore import pyqtSignal, Qt, QUrl
 from PyQt6.QtGui import QColor, QIcon, QDesktopServices
 import musicbrainzngs
 from datetime import datetime, date
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class LinkLabel(QPushButton):
     """Custom QPushButton that acts as a hyperlink"""

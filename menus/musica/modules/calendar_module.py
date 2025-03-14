@@ -9,7 +9,11 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QTime, QDateTime, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette, QFont
 from base_module import BaseModule, THEMES
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class RadicaleCalendarModule(BaseModule):
     """Módulo de calendario que se sincroniza con Radicale"""

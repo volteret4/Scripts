@@ -12,7 +12,11 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QTextEdit,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
 from PyQt6.QtGui import QDesktopServices, QColor, QFont
 from base_module import BaseModule
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 

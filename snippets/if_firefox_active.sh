@@ -69,6 +69,7 @@ chromium="Chromium$"
 qutebrowser="qutebrowser$"
 thorium="Thorium$"
 floorp="Floorp$"
+zen="Zen Browser$"
 
 deadbeef="DeaDBeeF"
 strawberry=""
@@ -118,6 +119,9 @@ browser=(
     ["chromium"]="\\- Chromium$"
     ["floorp"]="Floorp$"
     ["thorium"]="Thorium$"
+    ["zen"]="Zen Browser$"
+    ["qutebrowser"]="qutebrowser$"
+    ["vivaldi"]="Vivaldi$"
 )
 
 # Itera sobre las aplicaciones
@@ -128,12 +132,12 @@ for browser_name in "${!browser[@]}"; do
         wid=$active_window_id
         if [[ -n "$wid" ]]; then
             xdotool windowfocus --sync "${wid}"
-            sleep 0.2
-            xdotool key --window "${wid}" ctrl+l
-            xdotool key --window "${wid}" ctrl+c
-            xdotool key --clearmodifiers Escape
-        else
-            echo "No se encontró la ventana para ${browser_name}"
+        #     sleep 0.2
+        #     xdotool key --window "${wid}" ctrl+l
+        #     xdotool key --window "${wid}" ctrl+c
+        #     xdotool key --clearmodifiers Escape
+        # else
+        #     echo "No se encontró la ventana para ${browser_name}"
         fi
         break
     fi
@@ -156,13 +160,13 @@ elif [[ ${app} =~ 'strawberry' ]]; then
     album=$(playerctl -p strawberry  metadata album)
     date=$(playerctl -p strawberry  metadata date)
     musica="${artista} - ${cancion} (${date} - ${album})"
-else
-    echo "other"
+# else
+#     echo "other"
 fi
 
 
 # debug time
-url="$(xclip -o)"
+#url="$(xclip -o)"
 
 
 if [[ -z $musica ]]; then

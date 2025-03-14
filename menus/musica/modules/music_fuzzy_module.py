@@ -20,6 +20,12 @@ import glob
 import random
 import urllib.parse
 import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 reproductor = 'deadbeef'
 

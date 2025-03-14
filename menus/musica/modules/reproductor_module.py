@@ -14,6 +14,10 @@ import argparse
 import logging
 
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 def exception_hook(exc_type, exc_value, exc_traceback):
     """Global exception handler to log unhandled exceptions"""
@@ -43,17 +47,6 @@ sys.excepthook = exception_hook
 
 # Set the global exception hook
 sys.excepthook = exception_hook
-
-# Tema Tokyo Night (puedes personalizarlo o cargar desde config)
-THEME = {
-    'bg': '#1a1b26',
-    'fg': '#a9b1d6',
-    'accent': '#7aa2f7',
-    'secondary_bg': '#24283b',
-    'border': '#414868',
-    'selection': '#364A82',
-    'button_hover': '#3d59a1'
-}
 
 class TabManager(QMainWindow):
     def __init__(self, config_path: str, font_family="Inter", font_size="14px"):
