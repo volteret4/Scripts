@@ -215,6 +215,8 @@ class MusicBrowser(BaseModule):
         
         self.available_themes = kwargs.pop('temas', [])
         self.selected_theme = kwargs.pop('tema_seleccionado', theme)
+        self.boton_pulsado = 0  # Estado inicial
+
 
 
         # Llamar al constructor de la clase padre con los argumentos restantes
@@ -239,13 +241,14 @@ class MusicBrowser(BaseModule):
         # Inicializar los botones antes de usarlos
         self.play_button = QPushButton('Reproducir')
         self.folder_button = QPushButton('Abrir Carpeta')
-        self.custom_button1 = QPushButton('Script 1')
+        self.custom_button1 = QPushButton('Reproduciendo')
         self.custom_button2 = QPushButton('Script 2')
         self.custom_button3 = QPushButton('Script 3')
         
         # Conectar botones
         self.play_button.clicked.connect(self.play_item)
         self.folder_button.clicked.connect(self.open_folder)
+        self.custom_button1.clicked.connect(self.buscar_musica_en_reproduccion)
 
         # Barra de búsqueda y checkbox para ajustes avanzados
         search_layout = QHBoxLayout()
@@ -575,8 +578,20 @@ class MusicBrowser(BaseModule):
         # Forzar actualización
         self.repaint()
         QApplication.processEvents()
-        
 
+    def buscar_musica_en_reproduccion(self):
+        """Busca la música en reproducción y rota la búsqueda"""
+        artista = subprocess.run(['playerctl', 'metadata', '--format', '{{artist}}'], capture_output=True, text=True).stdout.strip()
+        album = subprocess.run(['playerctl', 'metadata', '--format', '{{album}}'], capture_output=True, text=True).stdout.strip()
+        cancion = subprocess.run(['playerctl', 'metadata', '--format', '{{title}}'], capture_output=True, text=True).stdout.strip()
+
+        opciones = [cancion, album, artista]  # Lista cíclica
+        self.boton_pulsado = (self.boton_pulsado + 1) % len(opciones)  # Rotar entre 0, 1, 2
+
+        if opciones[self.boton_pulsado]:  # Evitar búsquedas vacías
+            self.set_search_text(opciones[self.boton_pulsado])
+
+        
 
     def add_to_playlist(self):
         """Añade el elemento seleccionado a la playlist"""

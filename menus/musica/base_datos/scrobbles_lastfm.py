@@ -11,7 +11,7 @@ from pathlib import Path
 def parse_args():
     parser = argparse.ArgumentParser(description='Obtener scrobbles de Last.fm y añadirlos a la base de datos')
     parser.add_argument('--user', type=str, required=True, help='Usuario de Last.fm')
-    parser.add_argument('--api-key', type=str, required=True, help='API key de Last.fm')
+    parser.add_argument('--lastfm-api-key', type=str, required=True, help='API key de Last.fm')
     parser.add_argument('--db-path', type=str, required=True, help='Ruta al archivo de base de datos SQLite')
     parser.add_argument('--force-update', action='store_true', help='Forzar actualización completa')
     parser.add_argument('--output-json', type=str, help='Ruta para guardar todos los scrobbles en formato JSON (opcional)')
@@ -116,7 +116,7 @@ def save_last_timestamp(conn, timestamp, username):
     
     conn.commit()
 
-def get_lastfm_scrobbles(username, api_key, from_timestamp=0, limit=200):
+def get_lastfm_scrobbles(username, lastfm_api_key, from_timestamp=0, limit=200):
     """Obtiene los scrobbles de Last.fm para un usuario desde un timestamp específico"""
     all_tracks = []
     page = 1
@@ -126,7 +126,7 @@ def get_lastfm_scrobbles(username, api_key, from_timestamp=0, limit=200):
         params = {
             'method': 'user.getrecenttracks',
             'user': username,
-            'api_key': api_key,
+            'api_key': lastfm_api_key,
             'format': 'json',
             'limit': limit,
             'page': page,
@@ -272,7 +272,7 @@ def main():
             print("Obteniendo todos los scrobbles (esto puede tardar)")
         
         # Obtener scrobbles
-        tracks = get_lastfm_scrobbles(args.user, args.api_key, from_timestamp)
+        tracks = get_lastfm_scrobbles(args.user, args.lastfm_api_key, from_timestamp)
         print(f"Obtenidos {len(tracks)} scrobbles")
         
         # Guardar todos los scrobbles en JSON si se especificó

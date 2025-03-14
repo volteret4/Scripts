@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 import importlib.util
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, 
-                            QVBoxLayout, QTabWidget, QMessageBox)
+                            QVBoxLayout, QTabWidget, QMessageBox,
+                            QTableWidgetItem)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 from base_module import BaseModule, THEMES
@@ -88,6 +89,7 @@ class TabManager(QMainWindow):
         layout.addWidget(self.tab_widget)
 
         self.apply_theme(self.font_size)
+
 
     def load_modules(self):
         """Loads modules from configuration."""

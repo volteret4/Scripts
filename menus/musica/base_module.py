@@ -223,7 +223,9 @@ class BaseModule(QWidget):
         return self._module_registry.get(module_name)
 
     def call_module_method(self, module_name, method_name, *args, **kwargs):
-        """Llama a un método de otro módulo"""
+        """Llama a un método de otro módulo
+        self.call_module_method('module_name', 'method_name', *args, **kwargs)
+        """
         if not self.tab_manager:
             print("TabManager no configurado")
             return None

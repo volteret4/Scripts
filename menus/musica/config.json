@@ -41,8 +41,7 @@
       "name": "LastFM Tracker",
       "args": {
         "lastfm_api_key": "***ELIMINADO***",
-        "listenbrainz_user": "guevifrito",
-        "username": "paqueradejere",
+        "lastfm_user": "paqueradejere",
         "database_path": "/home/huan/moode_optimizada.sqlite",
         "track_limit": 50
       },
