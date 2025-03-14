@@ -24,6 +24,18 @@
   },
   "modules": [
     {
+      "name": "Widgets Internet",
+      "path": "modules/widget_player_module.py",
+      "args": {
+        "theme": "Tokyo Night"
+      },
+      "logging": {
+        "debug_enabled": true,
+        "capture_stdout": true,
+        "log_color": "#cf7af7"
+      }
+    },
+    {
       "path": "modules/jaangle_module.py",
       "name": "Jaangle",
       "args": {
@@ -75,7 +87,7 @@
       "name": "Database Editor",
       "path": "modules/editor_module.py",
       "args": {
-        "db_path": "/home/huan/Scripts/moode_a.sqlite",
+        "db_path": "/home/huan/moode_optimizada.sqlite",
         "temas": [
           "Tokyo Night",
           "Solarized Dark",
@@ -110,19 +122,20 @@
       "logging": {
         "debug_enabled": true,
         "capture_stdout": true,
-        "log_color": "#7AA2F7"
+        "log_color": "#f77aa2"
       }
     },
     {
       "name": "Muspy",
       "path": "modules/muspy_releases_module.py",
       "args": {
-        "db_path": "/home/huan/Scripts/MOODE.sqlitea",
+        "db_path": "/home/huan/moode_optimizada.sqlite",
         "query_db_script_path": "/home/huan/Scripts/menus/musica/base_datos/tools/consultar_items_db.py",
         "search_mbid_script_path": "/home/huan/Scripts/menus/musica/base_datos/enlaces_artista_album.py",
         "artists_file": "/home/huan/Scripts/menus/musica/.content/artistas.txt",
         "muspy_username": "frodobolson@disroot.org",
         "muspy_api_key": "UtVVzmeeoNWkshuhbbeNt9zHy9QdXi",
+        
         "lastfm_username": "paqueradejere",
         "temas": [
           "Tokyo Night",

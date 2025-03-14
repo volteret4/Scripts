@@ -117,6 +117,8 @@ echo "antes del if $app"
 if [[ "${app}" =~ "strawberry|DeaDBeef" ]]; then
         #bash "$HOME/Scripts/utilities/open_search_links/music_player/${motor}_metadata.sh"
         echo "PENDIENTE"
+    elif [[ ${app} =~ 'zen' ]]; then
+        zen-browser "${url}" &
     elif [[ ${app} =~ 'Thorium' ]]; then
         thorium-browser "${url}" &
     elif [[ ${app} =~ 'Firefox' ]]; then

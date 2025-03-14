@@ -33,8 +33,9 @@ from urllib.parse import urlparse, parse_qs, quote
 from typing import List, Dict
 
 
-logging.basicConfig(level=logging.DEBUG)
-
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class BlogPlaylists(BaseModule):

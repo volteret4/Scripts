@@ -8,7 +8,11 @@ import sys
 from base_module import BaseModule, THEMES
 from pathlib import Path
 import os
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ScriptRunnerModule(BaseModule):
     def __init__(self, config_file=None, scripts_section="scripts", parent=None, theme='Tokyo Night', **kwargs,):

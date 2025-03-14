@@ -12,8 +12,14 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                             QScrollArea, QDialog, QGridLayout, QTextEdit)
 from PyQt6.QtCore import Qt, QAbstractTableModel, pyqtSignal, QSortFilterProxyModel, QTimer, QUrl, QEvent
 from PyQt6.QtGui import QFont, QColor, QDesktopServices, QIcon
+import logging
 
 from base_module import BaseModule, THEMES, PROJECT_ROOT
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class LastFMModule(BaseModule):
     """

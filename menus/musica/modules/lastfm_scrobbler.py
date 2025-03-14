@@ -11,6 +11,12 @@ import sqlite3
 import os
 import subprocess
 from base_module import BaseModule, THEMES, PROJECT_ROOT
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class LastFMScrobblerModule(BaseModule):
     """Module for scrobbling tracks to LastFM and viewing recent scrobbles."""
