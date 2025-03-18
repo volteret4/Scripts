@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple
 import requests
 from bs4 import BeautifulSoup
+from base_module import PROJECT_ROOT
+
 
 
 class MusicLinkUpdater:
@@ -17,6 +19,7 @@ class MusicLinkUpdater:
                 spotify_client_secret: Optional[str] = None,
                 google_api_key: Optional[str] = None,
                 google_cx: Optional[str] = None,
+                lastfm_api_key: Optional[str] = None,
                 limit: Optional[int] = None,
                 force_update: bool = False,
                 delete_old: bool = False):
@@ -39,6 +42,7 @@ class MusicLinkUpdater:
         self.limit = limit
         self.spotify_client_id = spotify_client_id
         self.spotify_client_secret = spotify_client_secret
+        self.lastfm_api_key = lastfm_api_key
         self.google_api_key = google_api_key
         self.google_cx = google_cx
         self.force_update = force_update
@@ -872,32 +876,7 @@ class MusicLinkUpdater:
             self.conn.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Actualiza enlaces de canciones para servicios de streaming")
-    parser.add_argument("db_path", help="Ruta al archivo de base de datos SQLite")
-    parser.add_argument("--checkpoint", default="music_links_checkpoint.json", 
-                      help="Archivo JSON para guardar el progreso (por defecto: music_links_checkpoint.json)")
-    parser.add_argument("--services", default="youtube,spotify,bandcamp,soundcloud,boomkat",
-                      help="Servicios a buscar, separados por comas (por defecto: youtube,spotify,bandcamp,soundcloud,boomkat)")
-    parser.add_argument("--limit", type=int, help="Límite de canciones a procesar")
-    parser.add_argument("--force-update", action="store_true", 
-                      help="Actualizar todos los enlaces incluso si ya existen")
-    parser.add_argument("--delete-old", action="store_true",
-                      help="Eliminar enlaces existentes si no se encuentra uno nuevo (requiere --force-update)")
-    parser.add_argument("--google-api-key", help="Api key para google")
-    parser.add_argument("--google-cx", help="Cx para google. Busqueda  en google")
-                      
-    
-    # Verificar si estos argumentos ya existen antes de añadirlos
-    arg_dict = {action.option_strings[0] if action.option_strings else action.dest: action
-                for action in parser._actions}
-    
-    if '--spotify-client-id' not in arg_dict:
-        parser.add_argument("--spotify-client-id", help="Client ID para la API de Spotify")
-    
-    if '--spotify-client-secret' not in arg_dict:
-        parser.add_argument("--spotify-client-secret", help="Client Secret para la API de Spotify")
-    
-    args = parser.parse_args()
+
     
     # Validar la ruta de la base de datos
     if not os.path.exists(args.db_path):
@@ -939,7 +918,8 @@ def main():
         google_cx=args.google_cx,
         limit=args.limit,
         force_update=args.force_update,
-        delete_old=args.delete_old
+        delete_old=args.delete_old,
+        lastfm_api_key=args.lastfm_api_key
     )
     
     try:
@@ -952,5 +932,130 @@ def main():
         print(f"\nError: {e}")
         sys.exit(1)
 
+
+
+def load_config(config_file=None, required_args=None, script_name=None):
+    """
+    Carga configuración desde un archivo JSON y combina con argumentos de línea de comandos.
+    
+    Args:
+        config_file: Ruta al archivo de configuración JSON.
+        required_args: Lista de argumentos requeridos para este script específico.
+        script_name: Nombre del script actual, para buscar configuración específica.
+        
+    Returns:
+        args: Objeto con todos los argumentos combinados
+    """
+    # Crear el parser con argumentos comunes
+    parser = argparse.ArgumentParser(description='Script con configuración JSON')
+    parser.add_argument('--config', help='Ruta al archivo de configuración JSON')
+    
+    # Añadir todos los argumentos originales para mantener compatibilidad
+    parser = argparse.ArgumentParser(description="Actualiza enlaces de canciones para servicios de streaming")
+    parser.add_argument("db_path", help="Ruta al archivo de base de datos SQLite")
+    parser.add_argument("--checkpoint", default="music_links_checkpoint.json", 
+                      help="Archivo JSON para guardar el progreso (por defecto: music_links_checkpoint.json)")
+    parser.add_argument("--services", default="youtube,spotify,bandcamp,soundcloud,boomkat",
+                      help="Servicios a buscar, separados por comas (por defecto: youtube,spotify,bandcamp,soundcloud,boomkat)")
+    parser.add_argument("--limit", type=int, help="Límite de canciones a procesar")
+    parser.add_argument("--force-update", action="store_true", 
+                      help="Actualizar todos los enlaces incluso si ya existen")
+    parser.add_argument("--delete-old", action="store_true",
+                      help="Eliminar enlaces existentes si no se encuentra uno nuevo (requiere --force-update)")
+    parser.add_argument("--google-api-key", help="Api key para google")
+    parser.add_argument("--google-cx", help="Cx para google. Busqueda  en google")
+    parser.add_argument("--lastfm-api-key", help="API key de Last.fm")                  
+    
+    # Verificar si estos argumentos ya existen antes de añadirlos
+    arg_dict = {action.option_strings[0] if action.option_strings else action.dest: action
+                for action in parser._actions}
+    
+    if '--spotify-client-id' not in arg_dict:
+        parser.add_argument("--spotify-client-id", help="Client ID para la API de Spotify")
+    
+    if '--spotify-client-secret' not in arg_dict:
+        parser.add_argument("--spotify-client-secret", help="Client Secret para la API de Spotify")
+    
+
+    # Parsear argumentos de línea de comandos primero
+    cmd_args = parser.parse_args()
+    
+    required_args.extend(["db_path", "--rate_limit"])
+    # Inicializar con valores por defecto
+    config = {
+        "common": {
+            "db_path": None,
+            "rate_limit": 0.5,
+            "days": 30
+        },
+
+    }
+    
+
+
+    
+    # Usar archivo de configuración especificado en línea de comandos o el predeterminado
+    config_path = cmd_args.config or config_file or "config.json"
+    
+    # Cargar configuración desde el archivo JSON si existe
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                file_config = json.load(f)
+                config.update(file_config)
+        except json.JSONDecodeError:
+            print(f"Error: El archivo {config_path} no es un JSON válido")
+        except Exception as e:
+            print(f"Error al leer el archivo de configuración: {e}")
+    
+    # Crear objeto final de configuración
+    final_config = {}
+    
+    # 1. Cargar valores comunes
+    if "common" in config:
+        final_config.update(config["common"])
+    
+    # 2. Cargar valores específicos del script actual
+    if script_name and script_name in config:
+        final_config.update(config[script_name])
+    
+    # 3. Sobrescribir con argumentos de línea de comandos (si no son None)
+    for arg, value in vars(cmd_args).items():
+        if value is not None and value is not False:
+            # Convertir formato --arg-name a arg_name
+            final_arg = arg.replace('-', '_')
+            final_config[final_arg] = value
+    
+    # Verificar argumentos requeridos
+    if required_args:
+        missing = [arg for arg in required_args if arg not in final_config or final_config[arg] is None]
+        if missing:
+            print(f"Error: Faltan argumentos requeridos: {', '.join(missing)}")
+            print(f"Configúralos en {config_path} o pásalos como parámetros")
+            exit(1)
+    
+    # Convertir diccionario a objeto similar a los argumentos de argparse
+    class Args:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+        
+        def __str__(self):
+            return str(vars(self))
+    
+    return Args(**final_config)
+
+
 if __name__ == "__main__":
+    # Especificar argumentos requeridos para este script específico
+    required_args = ["config"]
+    
+
+    # Cargar configuración
+    args = load_config(
+        config_file="config_database_creator.json",
+        required_args=required_args,
+        script_name="enlaces_canciones_spot_lastfm"
+    )
+
     main()

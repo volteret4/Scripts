@@ -629,7 +629,39 @@ class MusicDatabaseQuery:
         
         return results
 
-
+    def get_all_entries(self, entry_type):
+        """
+        Obtiene todos los artistas, álbumes o canciones que existen en la base de datos
+        
+        :param entry_type: Tipo de entrada ('artistas', 'albums', 'canciones')
+        :return: Lista de nombres según el tipo solicitado
+        """
+        if entry_type.lower() == 'artistas':
+            query = "SELECT name FROM artists ORDER BY name"
+            self.cursor.execute(query)
+            return [row[0] for row in self.cursor.fetchall()]
+        
+        elif entry_type.lower() == 'albums':
+            query = """
+            SELECT albums.name, artists.name
+            FROM albums
+            JOIN artists ON albums.artist_id = artists.id
+            ORDER BY albums.name, artists.name
+            """
+            self.cursor.execute(query)
+            return [{"album": row[0], "artist": row[1]} for row in self.cursor.fetchall()]
+        
+        elif entry_type.lower() == 'canciones':
+            query = """
+            SELECT title, artist, album
+            FROM songs
+            ORDER BY title, artist, album
+            """
+            self.cursor.execute(query)
+            return [{"titulo": row[0], "artista": row[1], "album": row[2]} for row in self.cursor.fetchall()]
+        
+        else:
+            return None
 
     def close(self):
         """
@@ -637,15 +669,18 @@ class MusicDatabaseQuery:
         """
         self.conn.close()
 
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Consultas a base de datos musical')
-    
     parser.add_argument('--db', required=True, help='Ruta a la base de datos SQLite')
-    parser.add_argument('--artist', help='Nombre del artista')
-    parser.add_argument('--album', help='Nombre del álbum')
-    parser.add_argument('--song', help='Título de la canción')
-    parser.add_argument('--mbid', action='store_true', help='Obtener MBID del artista')
-    parser.add_argument('--links', action='store_true', help='Obtener links de servicios')
+    parser.add_argument('--artist', help='Variable principal que contiene el nombre del artista. Necesita ser combinado con otros argumentos')
+    parser.add_argument('--album', help='Nombre del álbum. Necesita ser combinado con otros argumentos')
+    parser.add_argument('--song', help='Título de la canción. Necesita ser combinado con otros argumentos')
+    parser.add_argument('--mbid', action='store_true', help='Obtener MBID del argumento pasado, --artist, --album o --song')
+    parser.add_argument('--links', action='store_true', help='Obtener links de servicios para el argumento adjunto, --artist, --album o --song')
     parser.add_argument('--wiki', action='store_true', help='Obtener contenido de Wikipedia')
     parser.add_argument('--artist-albums', action='store_true', help='Listar álbumes del artista')
     parser.add_argument('--label', help='Obtener álbumes de un sello')
@@ -659,12 +694,14 @@ def main():
     parser.add_argument('--song-info', action='store_true', help='Obtener información completa de la canción')
     parser.add_argument('--path-existente', action='store_true', help='Verificar si existe un archivo y devolver su ruta')
     parser.add_argument('--letra-desconocida', help='Buscar texto en letras de canciones')
+    parser.add_argument('--listar', choices=['artistas', 'albums', 'canciones'], help='Listar todos los artistas, álbumes o canciones')
 
     args = parser.parse_args()
 
     try:
         db = MusicDatabaseQuery(args.db)
-                
+
+
         # Funcionalidad de obtención de MBID
         if args.mbid and args.artist and args.album:
             print(json.dumps(db.get_mbid_by_album_artist(args.artist, args.album)))
@@ -732,6 +769,9 @@ def main():
         elif args.letra_desconocida:
             results = db.search_lyrics(args.letra_desconocida)
             print(json.dumps(results))
+            
+        elif args.listar:
+            print(json.dumps(db.get_all_entries(args.listar)))
         
         else:
             print("Error: Combinación de argumentos no válida")

@@ -51,6 +51,8 @@ class MultiLyricsManager:
         # Initialize database
         self.init_database()
     
+# Add this code to your init_database method in the MultiLyricsManager class
+
     def init_database(self):
         """Verifica y prepara la base de datos para almacenar letras."""
         conn = sqlite3.connect(self.db_path)
@@ -78,6 +80,36 @@ class MultiLyricsManager:
         if 'has_lyrics' not in columns:
             c.execute("ALTER TABLE songs ADD COLUMN has_lyrics INTEGER DEFAULT 0")
             self.logger.info("Columna 'has_lyrics' añadida a la tabla 'songs'")
+        
+        # Verificar y recrear la tabla FTS para lyrics si es necesario
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lyrics_fts'")
+        if c.fetchone():
+            # Eliminar tablas FTS existentes que puedan estar mal configuradas
+            try:
+                c.execute("DROP TABLE IF EXISTS lyrics_fts")
+                self.logger.info("Tabla 'lyrics_fts' eliminada para recreación")
+            except sqlite3.Error as e:
+                self.logger.warning(f"Error al eliminar tabla lyrics_fts: {str(e)}")
+        
+        # Crear tabla FTS correctamente
+        try:
+            c.execute('''
+                CREATE VIRTUAL TABLE lyrics_fts USING fts5(
+                    lyrics,
+                    content='lyrics',
+                    content_rowid='id'
+                )
+            ''')
+            self.logger.info("Tabla FTS 'lyrics_fts' creada exitosamente")
+            
+            # Poblar la tabla FTS con los datos existentes
+            c.execute('''
+                INSERT INTO lyrics_fts(rowid, lyrics)
+                SELECT id, lyrics FROM lyrics
+            ''')
+            self.logger.info("Datos existentes migrados a la tabla FTS")
+        except sqlite3.Error as e:
+            self.logger.warning(f"Error al crear tabla FTS: {str(e)}")
         
         conn.commit()
         conn.close()
@@ -367,10 +399,10 @@ class MultiLyricsManager:
                         try:
                             c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lyrics_fts'")
                             if c.fetchone():
-                                c.execute("INSERT OR REPLACE INTO lyrics_fts(docid, lyrics) VALUES(?, ?)",
-                                    (song_id, lyrics))
+                                c.execute("INSERT OR REPLACE INTO lyrics_fts(rowid, lyrics) VALUES(?, ?)",
+                                    (lyrics_id, lyrics))  # Note: using lyrics_id instead of song_id
                         except sqlite3.Error as e:
-                            self.logger.warning(f"Error actualizando FTS: {str(e)}")
+                            self.logger.warning(f"Error actualizando FTS: {str(e)}")        
                         
                         conn.commit()
                         success += 1

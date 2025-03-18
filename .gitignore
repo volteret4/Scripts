@@ -136,3 +136,5 @@ menus/musica/.content/cache/*
 MOODE.sqlite
 moode_optimizada.sqlite
 wiki_obsidian.db
+menus/musica/base_datos/config_database_creator.json
+menus/musica/config.json
