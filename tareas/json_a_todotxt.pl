@@ -25,11 +25,12 @@
 ##
 ################################################################################
 
+#!/usr/bin/perl
 use strict;
 use warnings;
 use Time::Local;
 
-# Priority mappings.
+# Priority mappings
 my %priority_map = (
   'a' => 'H', 'b' => 'M', 'c' => 'L', 'd' => 'L', 'e' => 'L', 'f' => 'L',
   'g' => 'L', 'h' => 'L', 'i' => 'L', 'j' => 'L', 'k' => 'L', 'l' => 'L',
@@ -37,9 +38,28 @@ my %priority_map = (
   's' => 'L', 't' => 'L', 'u' => 'L', 'v' => 'L', 'w' => 'L', 'x' => 'L',
   'y' => 'L', 'z' => 'L');
 
+# Proper JSON escaping function
+sub json_escape {
+    my ($string) = @_;
+    
+    # Escape special characters
+    $string =~ s/\\/\\\\/g;  # Backslash
+    $string =~ s/"/\\"/g;    # Double quote
+    $string =~ s/\n/\\n/g;   # Newline
+    $string =~ s/\r/\\r/g;   # Carriage return
+    $string =~ s/\t/\\t/g;   # Tab
+    $string =~ s/\f/\\f/g;   # Form feed
+    $string =~ s/\b/\\b/g;   # Backspace
+    
+    return $string;
+}
+
 my @tasks;
 while (my $todo = <>)
 {
+  chomp $todo; # Remove newline
+  next if $todo =~ /^\s*$/;  # Skip empty lines
+  
   my $status = 'pending';
   my $priority = '';
   my $entry = '';
@@ -106,7 +126,12 @@ while (my $todo = <>)
   # Pick first project
   my $first_project = shift @projects;
 
-  # Compose the JSON
+  # Escape all string values
+  $description = json_escape($description);
+  $first_project = json_escape($first_project) if defined $first_project;
+  @contexts = map { json_escape($_) } @contexts;
+
+  # Compose the JSON object
   my $json = '';
   $json .= "{\"status\":\"${status}\"";
   $json .= ",\"priority\":\"${priority}\""     if defined $priority && $priority ne '';
@@ -125,7 +150,8 @@ while (my $todo = <>)
   push @tasks, $json;
 }
 
-print "[\n", join ("\n", @tasks), "\n]\n";
+# Output json with commas between elements
+print "[\n", join (",\n", @tasks), "\n]\n";
 exit 0;
 
 ################################################################################
@@ -138,25 +164,3 @@ sub epoch
 }
 
 ################################################################################
-
-__DATA__
-(A) Thank Mom for the meatballs @phone
-(B) Schedule Goodwill pickup +GarageSale @phone
-Post signs around the neighborhood +GarageSale
-@GroceryStore Eskimo pies
-(A) Thank Mom for the meatballs @phone
-(B) Schedule Goodwill pickup +GarageSale @phone
-(B) Schedule Goodwill pickup +GarageSale @phone
-Post signs around the neighborhood +GarageSale
-Really gotta call Mom (A) @phone @someday
-(b) Get back to the boss
-(B)->Submit TPS report
-2011-03-02 Document +TodoTxt task format
-(A) 2011-03-02 Call Mom
-(A) Call Mom 2011-03-02
-(A) Call Mom +Family +PeaceLoveAndHappiness @iphone @phone
-x 2011-03-03 Call Mom
-xylophone lesson
-X 2012-01-01 Make resolutions
-(A) x Find ticket prices
-x 2011-03-02 2011-03-01 Review Tim's pull request +TodoTxtTouch @github
