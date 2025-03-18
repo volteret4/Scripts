@@ -261,7 +261,10 @@ class ScriptRunnerModule(BaseModule):
         self.show_error_dialog("Error de proceso", 
                                f"El script '{script_name}' encontró un error:\n{error}")
          
-    def log_message(self, message, error=False, success=False, theme='Tokyo Night'):
+    def log_message(self, message, error=False, success=False, theme=None):
+        if theme is None:
+            theme = self.theme
+            
         # Replace newlines with HTML breaks to preserve formatting
         formatted_message = message.replace('\n', '<br>')
         
@@ -270,7 +273,9 @@ class ScriptRunnerModule(BaseModule):
         elif success:
             self.log_text.append(f'<span style="color: #50fa7b; font-weight: bold;">{formatted_message}</span>')
         else:
-            self.log_text.append(f'<span style="color: {THEMES:{theme:["fg"]}};">{formatted_message}</span>')
+            # Corrección del acceso al diccionario de temas
+            fg_color = THEMES.get(theme, THEMES['Tokyo Night'])['fg']
+            self.log_text.append(f'<span style="color: {fg_color};">{formatted_message}</span>')
         
         # Asegurarse de que el mensaje más reciente sea visible
         self.log_text.verticalScrollBar().setValue(self.log_text.verticalScrollBar().maximum())
