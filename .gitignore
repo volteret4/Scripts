@@ -138,3 +138,9 @@ moode_optimizada.sqlite
 wiki_obsidian.db
 menus/musica/base_datos/config_database_creator.json
 menus/musica/config.json
+/home/huan/Scripts/menus/musica/menu_blogs/mpv/lastfm_credentials.py
+menus/musica/actualizaciones/scripts/descargar_playlist_spotify/config.json
+menus/musica/.content/token
+menus/musica/config.json
+.cache
+menus/musica/spotify/.token

@@ -13,8 +13,8 @@ from base_module import PROJECT_ROOT
 
 
 
-class MusicLinkUpdater:
-    def __init__(self, db_path: str, checkpoint_file: str, services: Set[str], 
+class MusicLinkUpdater():
+    def __init__(self, db_path: str, checkpoint_path: str, services: Set[str], 
                 spotify_client_id: Optional[str] = None, 
                 spotify_client_secret: Optional[str] = None,
                 google_api_key: Optional[str] = None,
@@ -22,13 +22,15 @@ class MusicLinkUpdater:
                 lastfm_api_key: Optional[str] = None,
                 limit: Optional[int] = None,
                 force_update: bool = False,
-                delete_old: bool = False):
+                delete_old: bool = False,
+                **kwargs):
+
         """
         Inicializa el actualizador de enlaces para canciones.
         
         Args:
             db_path: Ruta al archivo de la base de datos SQLite
-            checkpoint_file: Archivo JSON para guardar el progreso
+            checkpoint_path: Archivo JSON para guardar el progreso
             services: Conjunto de servicios a buscar ('youtube', 'spotify', 'bandcamp', 'soundcloud', 'boomkat')
             spotify_client_id: Client ID para la API de Spotify
             spotify_client_secret: Client Secret para la API de Spotify
@@ -37,7 +39,7 @@ class MusicLinkUpdater:
             delete_old: Si es True y force_update es True, elimina los enlaces existentes si no se encuentra uno nuevo
         """
         self.db_path = db_path
-        self.checkpoint_file = checkpoint_file
+        self.checkpoint_path = checkpoint_path
         self.services = services
         self.limit = limit
         self.spotify_client_id = spotify_client_id
@@ -47,7 +49,13 @@ class MusicLinkUpdater:
         self.google_cx = google_cx
         self.force_update = force_update
         self.delete_old = delete_old
-        
+        print(f"spotify_client_id: {spotify_client_id}")
+        print(f"spotify_secret_id: {spotify_client_secret}")
+
+        self.spotify = None
+        if 'spotify' in services:
+            self._init_spotify_api()
+
         # Estadísticas
         self.stats = {
             "processed": 0,
@@ -77,7 +85,7 @@ class MusicLinkUpdater:
         
         self.log(f"Iniciando actualizador de enlaces para servicios: {', '.join(services)}")
         self.log(f"Base de datos: {db_path}")
-        self.log(f"Archivo de checkpoint: {checkpoint_file}")
+        self.log(f"Archivo de checkpoint: {checkpoint_path}")
         if limit:
             self.log(f"Límite de canciones: {limit}")
         if 'spotify' in services:
@@ -90,15 +98,45 @@ class MusicLinkUpdater:
             self.log("Modo force-update activado: se actualizarán todos los enlaces aunque ya existan")
         if delete_old and force_update:
             self.log("Modo delete-old activado: se eliminarán los enlaces existentes si no se encuentra uno nuevo")
+            
+
+    def _init_spotify_api(self):
+        """Inicializa la conexión a la API de Spotify"""
+        try:
+            # Usar credenciales proporcionadas o buscar en variables de entorno
+            client_id = self.spotify_client_id or os.getenv("SPOTIFY_CLIENT_ID")
+            client_secret = self.spotify_client_secret or os.getenv("SPOTIFY_CLIENT_SECRET")
+            
+            if client_id and client_secret:
+                from spotipy.oauth2 import SpotifyClientCredentials
+                import spotipy
+                
+                client_credentials_manager = SpotifyClientCredentials(
+                    client_id=client_id, 
+                    client_secret=client_secret
+                )
+                self.spotify = spotipy.Spotify(
+                    client_credentials_manager=client_credentials_manager,
+                    retries=3,
+                    requests_timeout=20
+                )
+                # Verificar que funciona con una consulta simple
+                self.spotify.search(q="test", limit=1)
+                self.log("API de Spotify inicializada correctamente")
+            else:
+                self.log("ADVERTENCIA: No se encontraron credenciales para la API de Spotify")
+        except Exception as e:
+            self.spotify = None
+            self.log(f"Error al inicializar la API de Spotify: {str(e)}")
 
 
     def _load_checkpoint(self) -> int:
         """Carga el último ID procesado desde el archivo de checkpoint."""
-        if not os.path.exists(self.checkpoint_file):
+        if not os.path.exists(self.checkpoint_path):
             return 0
             
         try:
-            with open(self.checkpoint_file, 'r') as f:
+            with open(self.checkpoint_path, 'r') as f:
                 data = json.load(f)
                 if "last_processed_id" in data:
                     self.stats = data
@@ -112,7 +150,7 @@ class MusicLinkUpdater:
         """Guarda el progreso actual en el archivo de checkpoint."""
         self.stats["end_time"] = datetime.now().isoformat()
         
-        with open(self.checkpoint_file, 'w') as f:
+        with open(self.checkpoint_path, 'w') as f:
             json.dump(self.stats, f, indent=2)
             
     def log(self, message: str) -> None:
@@ -189,12 +227,10 @@ class MusicLinkUpdater:
     def search_spotify(self, song: Dict, spotify_client_id: str = None, spotify_client_secret: str = None) -> Tuple[Optional[str], Optional[str]]:
         """
         Realiza una búsqueda de una canción en Spotify utilizando la API oficial a través de spotipy.
-        
         Args:
             song: Diccionario con información de la canción
             spotify_client_id: Client ID de Spotify API
             spotify_client_secret: Client Secret de Spotify API
-            
         Returns:
             Tupla (URL de Spotify, ID de Spotify) o (None, None) si no se encuentra
         """
@@ -205,64 +241,241 @@ class MusicLinkUpdater:
             self.log("Error: No se pudo importar la biblioteca spotipy. Instálela con 'pip install spotipy'")
             return (None, None)
         
+        # Verificar que tenemos la información necesaria
+        required_fields = ['artist', 'title']
+        for field in required_fields:
+            if not song.get(field):
+                self.log(f"Error: Falta campo requerido en la canción: {field}")
+                return (None, None)
+        
         self.log(f"Buscando en Spotify: {song['artist']} - {song['title']}")
         
+        # Verificar credenciales
         if not spotify_client_id or not spotify_client_secret:
-            self.log("Error: Se requieren credenciales de Spotify (client_id y client_secret)")
+            # Intentar obtener credenciales del entorno
+            import os
+            env_client_id = os.environ.get('SPOTIPY_CLIENT_ID')
+            env_client_secret = os.environ.get('SPOTIPY_CLIENT_SECRET')
+            
+            if env_client_id and env_client_secret:
+                self.log("Usando credenciales de Spotify desde variables de entorno")
+                spotify_client_id = env_client_id
+                spotify_client_secret = env_client_secret
+            else:
+                self.log("Error: Se requieren credenciales de Spotify (client_id y client_secret)")
+                return (None, None)
+        
+        # Asegurar que las credenciales son strings y eliminar espacios
+        spotify_client_id = str(spotify_client_id).strip()
+        spotify_client_secret = str(spotify_client_secret).strip()
+        
+        # Verificar que las credenciales no están vacías después de limpiar
+        if not spotify_client_id or not spotify_client_secret:
+            self.log("Error: Las credenciales de Spotify están vacías después de eliminar espacios")
             return (None, None)
         
         try:
-            # Configurar autenticación de Spotify
-            client_credentials_manager = SpotifyClientCredentials(
-                client_id=spotify_client_id,
-                client_secret=spotify_client_secret
-            )
-            sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+            # Configurar autenticación con manejo de cache
+            auth_manager = None
             
-            # Construir la consulta de búsqueda
-            query = f"artist:{song['artist']} track:{song['title']}"
-            if song['album']:
-                query += f" album:{song['album']}"
-            
-            # Realizar la búsqueda en Spotify
-            self.log(f"Ejecutando consulta Spotify: {query}")
-            results = sp.search(q=query, type='track', limit=5)
-            
-            # Verificar si hay resultados
-            if results and results['tracks']['items']:
-                # Obtener el primer resultado (el más relevante)
-                track = results['tracks']['items'][0]
-                track_id = track['id']
-                track_url = track['external_urls']['spotify']
+            try:
+                # Configurar el administrador de autenticación con cache
+                import os
+                cache_path = os.path.join(os.path.expanduser("~"), ".cache-spotify")
                 
-                # Verificar si el artista coincide aproximadamente
-                track_artist = track['artists'][0]['name'].lower()
-                our_artist = song['artist'].lower()
+                self.log(f"Intentando autenticación Spotify (client_id: {spotify_client_id[:5]}...)")
+                auth_manager = SpotifyClientCredentials(
+                    client_id=spotify_client_id,
+                    client_secret=spotify_client_secret,
+                    cache_handler=spotipy.cache_handler.CacheFileHandler(cache_path=cache_path)
+                )
                 
-                # Verificar que el resultado sea relevante (correspondencia aproximada)
-                if our_artist in track_artist or track_artist in our_artist:
-                    self.log(f"Encontrado en Spotify: {track['name']} por {track['artists'][0]['name']}")
-                    return (track_url, track_id)
+                # Crear cliente con retry y timeout configurados
+                sp = spotipy.Spotify(
+                    client_credentials_manager=auth_manager,
+                    retries=3,  # Reintentos automáticos
+                    requests_timeout=20,  # Timeout en segundos
+                    status_retries=3,
+                    status_forcelist=(429, 500, 502, 503, 504)  # Códigos de error para reintentar
+                )
+                
+                # Verificar conexión con una consulta simple
+                sp.search(q="test", limit=1)
+                self.log("Autenticación Spotify exitosa")
+                
+            except spotipy.exceptions.SpotifyException as auth_error:
+                self.log(f"Error de autenticación Spotify: {auth_error}")
+                
+                # Si el error es de credenciales inválidas, mostrar más información
+                if "invalid_client" in str(auth_error):
+                    self.log("Las credenciales proporcionadas son inválidas. Verifique client_id y client_secret.")
+                    self.log("Tip: Asegúrese de que las credenciales están activas en el Dashboard de Spotify")
+                    return (None, None)
                 else:
-                    self.log(f"Resultado descartado por no coincidir el artista: {track['artists'][0]['name']} vs {song['artist']}")
+                    # Intentar un método alternativo: usar variables de entorno temporalmente
+                    import os
+                    self.log("Intentando método alternativo con variables de entorno...")
                     
-                # Si llegamos aquí, el primer resultado no era adecuado
-                # Podríamos intentar con los siguientes resultados
-                for track in results['tracks']['items'][1:]:
-                    track_artist = track['artists'][0]['name'].lower()
-                    if our_artist in track_artist or track_artist in our_artist:
-                        track_id = track['id']
-                        track_url = track['external_urls']['spotify']
-                        self.log(f"Encontrado en Spotify (resultado alternativo): {track['name']} por {track['artists'][0]['name']}")
-                        return (track_url, track_id)
-                
-            self.log("No se encontró en Spotify o los resultados no coinciden lo suficiente")
-            return (None, None)
+                    # Guardar variables originales
+                    old_client_id = os.environ.get('SPOTIPY_CLIENT_ID')
+                    old_client_secret = os.environ.get('SPOTIPY_CLIENT_SECRET')
+                    
+                    try:
+                        # Establecer variables temporales
+                        os.environ['SPOTIPY_CLIENT_ID'] = spotify_client_id
+                        os.environ['SPOTIPY_CLIENT_SECRET'] = spotify_client_secret
+                        
+                        # Crear cliente sin autenticación explícita (usará las variables de entorno)
+                        sp = spotipy.Spotify(retries=3, requests_timeout=20)
+                        sp.search(q="test", limit=1)
+                        self.log("Autenticación exitosa usando variables de entorno")
+                        
+                    except Exception as env_error:
+                        self.log(f"Falló método alternativo: {env_error}")
+                        return (None, None)
+                    finally:
+                        # Restaurar variables originales
+                        if old_client_id:
+                            os.environ['SPOTIPY_CLIENT_ID'] = old_client_id
+                        else:
+                            os.environ.pop('SPOTIPY_CLIENT_ID', None)
+                            
+                        if old_client_secret:
+                            os.environ['SPOTIPY_CLIENT_SECRET'] = old_client_secret
+                        else:
+                            os.environ.pop('SPOTIPY_CLIENT_SECRET', None)
             
+            if not self.spotify:
+                self.log("Error: Cliente de Spotify no inicializado")
+                return (None, None)
+            
+            # Verificar que tenemos la información necesaria
+            required_fields = ['artist', 'title']
+            for field in required_fields:
+                if not song.get(field):
+                    self.log(f"Error: Falta campo requerido en la canción: {field}")
+                    return (None, None)
+
+            # Construir la consulta de búsqueda de manera inteligente
+            try:
+                # Construir la consulta de búsqueda
+                query_parts = []
+                
+                # Incluir artista y título
+                artist_query = f"artist:{song['artist']}"
+                title_query = f"track:{song['title']}"
+                
+                query_parts = [artist_query, title_query]
+                
+                # Agregar album si está disponible
+                if song.get('album'):
+                    album_query = f"album:{song['album']}"
+                    query_parts.append(album_query)
+                
+                # Construir query principal y alternativo
+                primary_query = " ".join(query_parts)
+                
+                # También crear una consulta alternativa más permisiva
+                alt_query = f"{song['artist']} {song['title']}"
+                
+                # Realizar la búsqueda primero con la consulta formal
+                self.log(f"Ejecutando consulta Spotify: {primary_query}")
+                results = self.spotify.search(q=primary_query, type='track', limit=5)
+                
+                # Si no hay resultados, intentar con la consulta alternativa
+                if not results.get('tracks', {}).get('items'):
+                    self.log(f"Sin resultados. Intentando consulta alternativa: {alt_query}")
+                    results = self.spotify.search(q=alt_query, type='track', limit=5)
+                
+                # Verificar resultados
+                if not results.get('tracks', {}).get('items'):
+                    self.log("No se encontraron resultados en Spotify")
+                    return (None, None)
+
+            except Exception as e:
+                self.log(f"Error al buscar en Spotify: {e}")
+                import traceback
+                self.log(f"Detalles del error: {traceback.format_exc()}")
+                return (None, None)
+                
+                # Tomar el primer resultado
+            
+            # Función para normalizar texto y calcular similitud
+            def normalize_text(text):
+                import re
+                if not text:
+                    return ""
+                # Convertir a minúsculas y eliminar caracteres especiales
+                text = text.lower()
+                text = re.sub(r'[^\w\s]', '', text)
+                text = re.sub(r'\s+', ' ', text).strip()
+                return text
+            
+            def similarity_score(text1, text2):
+                text1 = normalize_text(text1)
+                text2 = normalize_text(text2)
+                
+                # Si alguno está vacío, no hay similitud
+                if not text1 or not text2:
+                    return 0
+                    
+                # Verificar inclusión directa
+                if text1 in text2 or text2 in text1:
+                    return 0.9
+                
+                # Calcular similitud de palabras comunes
+                words1 = set(text1.split())
+                words2 = set(text2.split())
+                common_words = words1.intersection(words2)
+                
+                if not words1 or not words2:
+                    return 0
+                    
+                return len(common_words) / max(len(words1), len(words2))
+            
+            # Evaluar cada resultado con un sistema de puntuación
+            best_match = None
+            best_score = 0
+            
+            for track in results['tracks']['items']:
+                # Calcular puntuación para este track
+                artist_score = max([similarity_score(song['artist'], artist['name']) for artist in track['artists']])
+                title_score = similarity_score(song['title'], track['name'])
+                
+                # Calcular puntuación de álbum si está disponible
+                album_score = 0
+                if song.get('album') and track.get('album', {}).get('name'):
+                    album_score = similarity_score(song['album'], track['album']['name'])
+                
+                # Calcular puntuación total (dar más peso al artista y título)
+                total_score = (artist_score * 0.5) + (title_score * 0.4) + (album_score * 0.1)
+                
+                # Registrar para depuración
+                self.log(f"Candidato: {track['artists'][0]['name']} - {track['name']} (Score: {total_score:.2f})")
+                
+                # Actualizar mejor coincidencia si es necesario
+                if total_score > best_score:
+                    best_score = total_score
+                    best_match = track
+            
+            # Determinar si tenemos una buena coincidencia
+            if best_match and best_score > 0.4:  # Umbral ajustable
+                track_id = best_match['id']
+                track_url = best_match['external_urls']['spotify']
+                artist_name = best_match['artists'][0]['name']
+                
+                self.log(f"Encontrado en Spotify: {best_match['name']} por {artist_name} (Score: {best_score:.2f})")
+                return (track_url, track_id)
+            else:
+                self.log(f"No se encontró coincidencia suficientemente buena en Spotify (Mejor score: {best_score:.2f})")
+                return (None, None)
+        
         except Exception as e:
             self.log(f"Error al buscar en Spotify: {e}")
+            # Registrar detalles adicionales para depuración
+            import traceback
+            self.log(f"Detalles del error: {traceback.format_exc()}")
             return (None, None)
-        
  
     def search_bandcamp(self, song: Dict) -> Optional[str]:
         """
@@ -875,187 +1088,118 @@ class MusicLinkUpdater:
         finally:
             self.conn.close()
 
-def main():
+def main(config=None):
+    # Si el script se ejecuta directamente (no desde el padre)
+    if config is None:
+        parser = argparse.ArgumentParser(description='Actualizar enlaces de música')
+        parser.add_argument('--db-path', help='Ruta a la base de datos SQLite')
+        parser.add_argument('--checkpoint-path', help='Archivo de punto de control')
+        parser.add_argument('--services', help='Servicios a buscar (separados por comas)')
+        parser.add_argument('--limit', type=int, help='Límite de canciones a procesar')
+        parser.add_argument('--force-update', action='store_true', help='Actualizar enlaces existentes')
+        parser.add_argument('--delete-old', action='store_true', help='Eliminar enlaces antiguos')
+        parser.add_argument('--spotify-client-id', help='ID de cliente de Spotify')
+        parser.add_argument('--spotify-client-secret', help='Secreto de cliente de Spotify')
+        parser.add_argument('--google-api-key', help='Clave de API de Google')
+        parser.add_argument('--google-cx', help='ID de motor de búsqueda personalizado de Google')
+        parser.add_argument('--lastfm-api-key', help='Clave de API de Last.fm')
+        parser.add_argument('--config', help='Archivo de configuración JSON')
+        
+        args = parser.parse_args()
+        
+        # Inicializar la configuración
+        final_config = {}
+        
+        # Si se proporcionó un archivo de configuración JSON en los argumentos, cargarlo
+        if args.config:
+            with open(args.config, 'r') as f:
+                json_config = json.load(f)
+                
+            # Combinar configuraciones comunes y específicas
+            final_config.update(json_config.get("common", {}))
+            final_config.update(json_config.get("enlaces_canciones_spot_lastfm", {}))
+        
+        # Los argumentos de línea de comandos tienen mayor prioridad
+        arg_dict = vars(args)
+        for arg_name, arg_value in arg_dict.items():
+            if arg_value is not None and arg_name != 'config':
+                # Convertir nombres de argumentos con guiones a subrayados
+                config_key = arg_name.replace('-', '_')
+                final_config[config_key] = arg_value
+    else:
+        # El script se está ejecutando desde el padre y ya recibió la configuración filtrada
+        final_config = config
 
+    # Procesamiento común a ambos casos
+    
+    # Convertir 'limit' a int si es una cadena
+    if 'limit' in final_config and isinstance(final_config['limit'], str):
+        try:
+            final_config['limit'] = int(final_config['limit']) if final_config['limit'] != '0' else None
+        except ValueError:
+            final_config['limit'] = None
+    
+    # Asegurarse de que checkpoint existe
+    if 'checkpoint_path' not in final_config and 'checkpoint_path' in final_config:
+        final_config['checkpoint_path'] = final_config['checkpoint_path']
+
+    # Convertir services de string a set si viene como string
+    if 'services' in final_config and isinstance(final_config['services'], str):
+        final_config['services'] = set(final_config['services'].split(','))
+    elif 'services' in final_config and isinstance(final_config['services'], list):
+        final_config['services'] = set(final_config['services'])
+    
+    # Validaciones
+    required_params = ['db_path', 'checkpoint_path', 'services']
+    missing_params = [param for param in required_params if param not in final_config]
+    if missing_params:
+        print(f"Error: Faltan parámetros requeridos: {', '.join(missing_params)}")
+        sys.exit(1)
     
     # Validar la ruta de la base de datos
-    if not os.path.exists(args.db_path):
-        print(f"Error: La base de datos '{args.db_path}' no existe")
+    if not os.path.exists(final_config['db_path']):
+        print(f"Error: La base de datos '{final_config['db_path']}' no existe")
         sys.exit(1)
     
     # Verificar que delete-old solo se use con force-update
-    if args.delete_old and not args.force_update:
-        print("Error: La opción --delete-old requiere --force-update")
+    if final_config.get('delete_old') and not final_config.get('force_update'):
+        print("Error: La opción delete_old requiere force_update")
         sys.exit(1)
-        
-    # Obtener servicios solicitados
-    services = set(args.services.split(","))
-    valid_services = {"youtube", "spotify", "bandcamp", "soundcloud", "lastfm", "boomkat", "musicbrainz"}
     
+    # Validar servicios
+    services = final_config['services']
+    valid_services = {"youtube", "spotify", "bandcamp", "soundcloud", "lastfm", "boomkat", "musicbrainz"}
     invalid_services = services - valid_services
     if invalid_services:
         print(f"Error: Servicios inválidos: {', '.join(invalid_services)}")
         print(f"Servicios válidos: {', '.join(valid_services)}")
         sys.exit(1)
     
-    # Verificar si los atributos existen antes de acceder a ellos
-    spotify_client_id = getattr(args, 'spotify_client_id', None)
-    spotify_client_secret = getattr(args, 'spotify_client_secret', None)
-    
-    # Verificar credenciales de Spotify si se seleccionó el servicio
-    if 'spotify' in services and (not spotify_client_id or not spotify_client_secret):
-        print("Advertencia: Se seleccionó el servicio Spotify pero no se proporcionaron credenciales.")
-        print("Para utilizar la API de Spotify, proporcione --spotify-client-id y --spotify-client-secret")
+    # Nota: No necesitamos filtrar aquí si ya se hizo en el script padre
+    if config is None:
+        # Filtrar los parámetros vacíos o falsos solo si no vinieron del padre
+        filtered_config = {k: v for k, v in final_config.items() if v not in [False, "", [], {}, None, "0"]}
         
-    # Iniciar el actualizador
-    updater = MusicLinkUpdater(
-        args.db_path, 
-        args.checkpoint, 
-        services, 
-        spotify_client_id=spotify_client_id,
-        spotify_client_secret=spotify_client_secret,
-        google_api_key=args.google_api_key,
-        google_cx=args.google_cx,
-        limit=args.limit,
-        force_update=args.force_update,
-        delete_old=args.delete_old,
-        lastfm_api_key=args.lastfm_api_key
-    )
+        # Restaurar los parámetros requeridos aunque estén vacíos
+        for param in required_params:
+            if param not in filtered_config and param in final_config:
+                filtered_config[param] = final_config[param]
+    else:
+        # Si vino del padre, asumimos que ya están filtrados
+        filtered_config = final_config
     
+    # Iniciar el actualizador con los parámetros filtrados
     try:
+        updater = MusicLinkUpdater(**filtered_config)
         updater.run()
     except KeyboardInterrupt:
         print("\nProceso interrumpido por el usuario")
-        updater._save_checkpoint()
+        if hasattr(updater, '_save_checkpoint'):
+            updater._save_checkpoint()
         sys.exit(1)
     except Exception as e:
         print(f"\nError: {e}")
         sys.exit(1)
 
-
-
-def load_config(config_file=None, required_args=None, script_name=None):
-    """
-    Carga configuración desde un archivo JSON y combina con argumentos de línea de comandos.
-    
-    Args:
-        config_file: Ruta al archivo de configuración JSON.
-        required_args: Lista de argumentos requeridos para este script específico.
-        script_name: Nombre del script actual, para buscar configuración específica.
-        
-    Returns:
-        args: Objeto con todos los argumentos combinados
-    """
-    # Crear el parser con argumentos comunes
-    parser = argparse.ArgumentParser(description='Script con configuración JSON')
-    parser.add_argument('--config', help='Ruta al archivo de configuración JSON')
-    
-    # Añadir todos los argumentos originales para mantener compatibilidad
-    parser = argparse.ArgumentParser(description="Actualiza enlaces de canciones para servicios de streaming")
-    parser.add_argument("db_path", help="Ruta al archivo de base de datos SQLite")
-    parser.add_argument("--checkpoint", default="music_links_checkpoint.json", 
-                      help="Archivo JSON para guardar el progreso (por defecto: music_links_checkpoint.json)")
-    parser.add_argument("--services", default="youtube,spotify,bandcamp,soundcloud,boomkat",
-                      help="Servicios a buscar, separados por comas (por defecto: youtube,spotify,bandcamp,soundcloud,boomkat)")
-    parser.add_argument("--limit", type=int, help="Límite de canciones a procesar")
-    parser.add_argument("--force-update", action="store_true", 
-                      help="Actualizar todos los enlaces incluso si ya existen")
-    parser.add_argument("--delete-old", action="store_true",
-                      help="Eliminar enlaces existentes si no se encuentra uno nuevo (requiere --force-update)")
-    parser.add_argument("--google-api-key", help="Api key para google")
-    parser.add_argument("--google-cx", help="Cx para google. Busqueda  en google")
-    parser.add_argument("--lastfm-api-key", help="API key de Last.fm")                  
-    
-    # Verificar si estos argumentos ya existen antes de añadirlos
-    arg_dict = {action.option_strings[0] if action.option_strings else action.dest: action
-                for action in parser._actions}
-    
-    if '--spotify-client-id' not in arg_dict:
-        parser.add_argument("--spotify-client-id", help="Client ID para la API de Spotify")
-    
-    if '--spotify-client-secret' not in arg_dict:
-        parser.add_argument("--spotify-client-secret", help="Client Secret para la API de Spotify")
-    
-
-    # Parsear argumentos de línea de comandos primero
-    cmd_args = parser.parse_args()
-    
-    required_args.extend(["db_path", "--rate_limit"])
-    # Inicializar con valores por defecto
-    config = {
-        "common": {
-            "db_path": None,
-            "rate_limit": 0.5,
-            "days": 30
-        },
-
-    }
-    
-
-
-    
-    # Usar archivo de configuración especificado en línea de comandos o el predeterminado
-    config_path = cmd_args.config or config_file or "config.json"
-    
-    # Cargar configuración desde el archivo JSON si existe
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                file_config = json.load(f)
-                config.update(file_config)
-        except json.JSONDecodeError:
-            print(f"Error: El archivo {config_path} no es un JSON válido")
-        except Exception as e:
-            print(f"Error al leer el archivo de configuración: {e}")
-    
-    # Crear objeto final de configuración
-    final_config = {}
-    
-    # 1. Cargar valores comunes
-    if "common" in config:
-        final_config.update(config["common"])
-    
-    # 2. Cargar valores específicos del script actual
-    if script_name and script_name in config:
-        final_config.update(config[script_name])
-    
-    # 3. Sobrescribir con argumentos de línea de comandos (si no son None)
-    for arg, value in vars(cmd_args).items():
-        if value is not None and value is not False:
-            # Convertir formato --arg-name a arg_name
-            final_arg = arg.replace('-', '_')
-            final_config[final_arg] = value
-    
-    # Verificar argumentos requeridos
-    if required_args:
-        missing = [arg for arg in required_args if arg not in final_config or final_config[arg] is None]
-        if missing:
-            print(f"Error: Faltan argumentos requeridos: {', '.join(missing)}")
-            print(f"Configúralos en {config_path} o pásalos como parámetros")
-            exit(1)
-    
-    # Convertir diccionario a objeto similar a los argumentos de argparse
-    class Args:
-        def __init__(self, **kwargs):
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-        
-        def __str__(self):
-            return str(vars(self))
-    
-    return Args(**final_config)
-
-
 if __name__ == "__main__":
-    # Especificar argumentos requeridos para este script específico
-    required_args = ["config"]
-    
-
-    # Cargar configuración
-    args = load_config(
-        config_file="config_database_creator.json",
-        required_args=required_args,
-        script_name="enlaces_canciones_spot_lastfm"
-    )
-
     main()
