@@ -1,4 +1,0 @@
-API_KEY = "***ELIMINADO***"
-API_SECRET = "***ELIMINADO***"
-USERNAME = "paqueradejere"
-PASSWORD_HASH = "***ELIMINADO***"

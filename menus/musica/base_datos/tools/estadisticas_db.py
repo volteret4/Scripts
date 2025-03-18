@@ -207,6 +207,13 @@ def analyze_specific_cases(db_path):
         cursor.execute("SELECT COUNT(*) FROM songs WHERE mbid IS NULL OR mbid = ''")
         songs_no_mbid = cursor.fetchone()[0]
         
+        # Nuevos casos específicos para la tabla songs
+        cursor.execute("SELECT COUNT(*) FROM songs WHERE file_path IS NULL OR file_path = ''")
+        songs_no_file_path = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM songs WHERE duration IS NULL")
+        songs_no_duration = cursor.fetchone()[0]
+        
         specific_cases["songs"] = {
             "sin_titulo": songs_no_title,
             "sin_artista": songs_no_artist,
@@ -214,7 +221,9 @@ def analyze_specific_cases(db_path):
             "sin_enlace_spotify": songs_no_spotify,
             "sin_artwork": songs_no_artwork,
             "sin_letras": songs_no_lyrics,
-            "sin_mbid": songs_no_mbid
+            "sin_mbid": songs_no_mbid,
+            "sin_ruta_archivo": songs_no_file_path,
+            "sin_duracion": songs_no_duration
         }
     except sqlite3.OperationalError:
         specific_cases["songs"] = "Error al analizar tabla"
@@ -239,13 +248,26 @@ def analyze_specific_cases(db_path):
         cursor.execute("SELECT COUNT(*) FROM artists WHERE mbid IS NULL OR mbid = ''")
         artists_no_mbid = cursor.fetchone()[0]
         
+        # Nuevos casos para artists
+        cursor.execute("SELECT COUNT(*) FROM artists WHERE tags IS NULL OR tags = ''")
+        artists_no_tags = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM artists WHERE similar_artists IS NULL OR similar_artists = ''")
+        artists_no_similar = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM artists WHERE member_of IS NULL OR member_of = ''")
+        artists_no_member_of = cursor.fetchone()[0]
+        
         specific_cases["artists"] = {
             "sin_biografia": artists_no_bio,
             "sin_contenido_wikipedia": artists_no_wikipedia,
             "sin_enlace_spotify": artists_no_spotify,
             "sin_origen": artists_no_origin,
             "sin_año_formacion": artists_no_formed_year,
-            "sin_mbid": artists_no_mbid
+            "sin_mbid": artists_no_mbid,
+            "sin_etiquetas": artists_no_tags,
+            "sin_artistas_similares": artists_no_similar,
+            "sin_informacion_miembros": artists_no_member_of
         }
     except sqlite3.OperationalError:
         specific_cases["artists"] = "Error al analizar tabla"
@@ -270,13 +292,30 @@ def analyze_specific_cases(db_path):
         cursor.execute("SELECT COUNT(*) FROM albums WHERE mbid IS NULL OR mbid = ''")
         albums_no_mbid = cursor.fetchone()[0]
         
+        # Nuevos casos para albums
+        cursor.execute("SELECT COUNT(*) FROM albums WHERE wikipedia_content IS NULL OR wikipedia_content = ''")
+        albums_no_wikipedia = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM albums WHERE folder_path IS NULL OR folder_path = ''")
+        albums_no_folder_path = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM albums WHERE credits IS NULL")
+        albums_no_credits = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM albums WHERE producers IS NULL OR producers = ''")
+        albums_no_producers = cursor.fetchone()[0]
+        
         specific_cases["albums"] = {
             "sin_artwork": albums_no_artwork,
             "sin_año": albums_no_year,
             "sin_género": albums_no_genre,
             "sin_sello": albums_no_label,
             "sin_enlace_spotify": albums_no_spotify,
-            "sin_mbid": albums_no_mbid
+            "sin_mbid": albums_no_mbid,
+            "sin_contenido_wikipedia": albums_no_wikipedia,
+            "sin_ruta_carpeta": albums_no_folder_path,
+            "sin_creditos": albums_no_credits,
+            "sin_productores": albums_no_producers
         }
     except sqlite3.OperationalError:
         specific_cases["albums"] = "Error al analizar tabla"
@@ -326,50 +365,67 @@ def analyze_specific_cases(db_path):
         cursor.execute("SELECT COUNT(*) FROM song_links WHERE musicbrainz_url IS NULL OR musicbrainz_url = ''")
         song_links_no_musicbrainz = cursor.fetchone()[0]
         
+        # Nuevos casos para song_links
+        cursor.execute("SELECT COUNT(*) FROM song_links WHERE bandcamp_url IS NULL OR bandcamp_url = ''")
+        song_links_no_bandcamp = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM song_links WHERE soundcloud_url IS NULL OR soundcloud_url = ''")
+        song_links_no_soundcloud = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM song_links WHERE boomkat_url IS NULL OR boomkat_url = ''")
+        song_links_no_boomkat = cursor.fetchone()[0]
+        
         specific_cases["song_links"] = {
             "sin_enlace_spotify": song_links_no_spotify,
             "sin_enlace_youtube": song_links_no_youtube,
-            "sin_enlace_musicbrainz": song_links_no_musicbrainz
+            "sin_enlace_musicbrainz": song_links_no_musicbrainz,
+            "sin_enlace_bandcamp": song_links_no_bandcamp,
+            "sin_enlace_soundcloud": song_links_no_soundcloud,
+            "sin_enlace_boomkat": song_links_no_boomkat
         }
     except sqlite3.OperationalError:
         specific_cases["song_links"] = "Error al analizar tabla"
     
-    # Analizar tablas de scrobbles y listens
+    # Analizar tablas de scrobbles y listens si existen
     try:
-        cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE song_id IS NULL")
-        scrobbles_no_song_id = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE album_id IS NULL")
-        scrobbles_no_album_id = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE artist_id IS NULL")
-        scrobbles_no_artist_id = cursor.fetchone()[0]
-        
-        specific_cases["scrobbles"] = {
-            "sin_song_id": scrobbles_no_song_id,
-            "sin_album_id": scrobbles_no_album_id,
-            "sin_artist_id": scrobbles_no_artist_id
-        }
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='scrobbles'")
+        if cursor.fetchone():
+            cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE song_id IS NULL")
+            scrobbles_no_song_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE album_id IS NULL")
+            scrobbles_no_album_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE artist_id IS NULL")
+            scrobbles_no_artist_id = cursor.fetchone()[0]
+            
+            specific_cases["scrobbles"] = {
+                "sin_song_id": scrobbles_no_song_id,
+                "sin_album_id": scrobbles_no_album_id,
+                "sin_artist_id": scrobbles_no_artist_id
+            }
     except sqlite3.OperationalError:
-        specific_cases["scrobbles"] = "Error al analizar tabla"
+        pass
     
     try:
-        cursor.execute("SELECT COUNT(*) FROM listens WHERE song_id IS NULL")
-        listens_no_song_id = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM listens WHERE album_id IS NULL")
-        listens_no_album_id = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM listens WHERE artist_id IS NULL")
-        listens_no_artist_id = cursor.fetchone()[0]
-        
-        specific_cases["listens"] = {
-            "sin_song_id": listens_no_song_id,
-            "sin_album_id": listens_no_album_id,
-            "sin_artist_id": listens_no_artist_id
-        }
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='listens'")
+        if cursor.fetchone():
+            cursor.execute("SELECT COUNT(*) FROM listens WHERE song_id IS NULL")
+            listens_no_song_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM listens WHERE album_id IS NULL")
+            listens_no_album_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM listens WHERE artist_id IS NULL")
+            listens_no_artist_id = cursor.fetchone()[0]
+            
+            specific_cases["listens"] = {
+                "sin_song_id": listens_no_song_id,
+                "sin_album_id": listens_no_album_id,
+                "sin_artist_id": listens_no_artist_id
+            }
     except sqlite3.OperationalError:
-        specific_cases["listens"] = "Error al analizar tabla"
+        pass
     
     conn.close()
     return specific_cases

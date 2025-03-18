@@ -444,14 +444,83 @@ class MultiLyricsManager:
             error_handler.close()
             conn.close()
 
+def main(config=None):
+    # Si el script se ejecuta directamente (no desde el padre)
+    if config is None:
+        parser = argparse.ArgumentParser(description='Actualizador de letras para biblioteca musical con múltiples APIs')
+        parser.add_argument('--db_path', help='Ruta a la base de datos SQLite')
+        parser.add_argument('--force-update', action='store_true', help='Forzar actualización de todas las letras')
+        parser.add_argument('--batch-size', type=int, default=1000, help='Número de canciones a procesar por lote')
+        parser.add_argument('--no-resume', action='store_true', help='No continuar desde el último punto guardado')
+        parser.add_argument('--config', help='Archivo de configuración JSON')
+        
+        args = parser.parse_args()
+        
+        # Inicializar la configuración
+        final_config = {}
+        
+        # Si se proporcionó un archivo de configuración JSON en los argumentos, cargarlo
+        if args.config:
+            with open(args.config, 'r') as f:
+                json_config = json.load(f)
+                
+            # Combinar configuraciones comunes y específicas
+            final_config.update(json_config.get("common", {}))
+            final_config.update(json_config.get("lyrics_updater", {}))
+        
+        # Los argumentos de línea de comandos tienen mayor prioridad
+        arg_dict = vars(args)
+        for arg_name, arg_value in arg_dict.items():
+            if arg_value is not None and arg_name != 'config':
+                # Convertir nombres de argumentos con guiones a subrayados
+                config_key = arg_name.replace('-', '_')
+                final_config[config_key] = arg_value
+    else:
+        # El script se está ejecutando desde el padre y ya recibió la configuración filtrada
+        final_config = config
+
+    # Procesamiento común a ambos casos
+    
+    # Verificar parámetros requeridos
+    required_params = ['db_path']
+    missing_params = [param for param in required_params if param not in final_config]
+    if missing_params:
+        print(f"Error: Faltan parámetros requeridos: {', '.join(missing_params)}")
+        sys.exit(1)
+    
+    # Convertir batch_size a int si es una cadena
+    if 'batch_size' in final_config and isinstance(final_config['batch_size'], str):
+        try:
+            final_config['batch_size'] = int(final_config['batch_size'])
+        except ValueError:
+            final_config['batch_size'] = 1000  # Valor predeterminado
+    
+    # Asegurar valores predeterminados
+    if 'batch_size' not in final_config:
+        final_config['batch_size'] = 1000
+    
+    if 'force_update' not in final_config:
+        final_config['force_update'] = False
+    
+    if 'no_resume' not in final_config:
+        final_config['no_resume'] = False
+    
+    # Iniciar el administrador de letras
+    try:
+        manager = MultiLyricsManager(
+            final_config['db_path'], 
+            batch_size=final_config['batch_size']
+        )
+        manager.update_lyrics(
+            force_update=final_config['force_update'], 
+            resume=not final_config['no_resume']
+        )
+    except KeyboardInterrupt:
+        print("\nProceso interrumpido por el usuario")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Actualizador de letras para biblioteca musical con múltiples APIs')
-    parser.add_argument('db_path', help='Ruta a la base de datos SQLite')
-    parser.add_argument('--force-update', action='store_true', help='Forzar actualización de todas las letras')
-    parser.add_argument('--batch-size', type=int, default=1000, help='Número de canciones a procesar por lote')
-    parser.add_argument('--no-resume', action='store_true', help='No continuar desde el último punto guardado')
-    
-    args = parser.parse_args()
-    
-    manager = MultiLyricsManager(args.db_path, batch_size=args.batch_size)
-    manager.update_lyrics(force_update=args.force_update, resume=not args.no_resume)
+    main()
