@@ -867,7 +867,7 @@ class DatabaseEditor(BaseModule):
                 self.edit_widgets[field_name].setText(file_path)
     
     def save_item(self):
-        """Guardar los cambios del ítem."""
+        """Guardar los cambios del ítem y actualizar tablas relacionadas."""
         if not self.current_item_id:
             QMessageBox.warning(self, "Error", "No hay ítem para guardar.")
             return
@@ -880,9 +880,14 @@ class DatabaseEditor(BaseModule):
             cursor.execute(f"PRAGMA table_info({self.current_table})")
             columns = cursor.fetchall()
             
+            # Guardar los valores antiguos para comparar después
+            cursor.execute(f"SELECT * FROM {self.current_table} WHERE id = ?", (self.current_item_id,))
+            old_values = {col[1]: val for col, val in zip(columns, cursor.fetchone())}
+            
             # Construir la consulta UPDATE
             update_fields = []
             params = []
+            new_values = {}
             
             for col in columns:
                 col_name = col[1]
@@ -911,15 +916,21 @@ class DatabaseEditor(BaseModule):
                     
                     update_fields.append(f"{col_name} = ?")
                     params.append(value)
+                    new_values[col_name] = value
             
+            # Ejecutar la actualización principal
             query = f"UPDATE {self.current_table} SET {', '.join(update_fields)} WHERE id = ?"
             params.append(self.current_item_id)
             
             cursor.execute(query, params)
+            
+            # Actualizar tablas relacionadas
+            self.update_related_tables(cursor, old_values, new_values)
+            
             conn.commit()
             conn.close()
             
-            QMessageBox.information(self, "Éxito", "Ítem actualizado con éxito.")
+            QMessageBox.information(self, "Éxito", "Ítem actualizado con éxito y relaciones propagadas.")
             
             # Actualizar la búsqueda para reflejar los cambios
             self.search_database()
@@ -927,7 +938,203 @@ class DatabaseEditor(BaseModule):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al guardar ítem: {e}")
             traceback.print_exc()
+
     
+
+
+    def update_related_tables(self, cursor, old_values, new_values):
+        """Actualizar tablas relacionadas basado en cambios en la tabla actual."""
+        try:
+            table = self.current_table
+            item_id = self.current_item_id
+            
+            # Caso 1: Actualizar canciones cuando un artista cambia
+            if table == "artists" and "name" in new_values and old_values["name"] != new_values["name"]:
+                # Actualizar campos desnormalizados en songs
+                cursor.execute(
+                    "UPDATE songs SET artist = ? WHERE artist_id = ?", 
+                    (new_values["name"], item_id)
+                )
+                logger.info(f"Actualizado artist en {cursor.rowcount} canciones")
+                
+                # Actualizar campos relacionados en albums si corresponde
+                cursor.execute(
+                    "UPDATE albums SET artist = ? WHERE artist_id = ?",
+                    (new_values["name"], item_id)
+                )
+                logger.info(f"Actualizado artist en {cursor.rowcount} álbumes")
+                
+                # Actualizar en listens y scrobbles si existe
+                try:
+                    cursor.execute(
+                        "UPDATE scrobbles SET artist_name = ? WHERE artist_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado artist_name en {cursor.rowcount} scrobbles")
+                except sqlite3.OperationalError:
+                    # La columna podría no existir
+                    pass
+                
+                try:
+                    cursor.execute(
+                        "UPDATE listens SET artist_name = ? WHERE artist_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado artist_name en {cursor.rowcount} listens")
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Caso 2: Actualizar canciones cuando un álbum cambia
+            elif table == "albums" and "name" in new_values and old_values["name"] != new_values["name"]:
+                cursor.execute(
+                    "UPDATE songs SET album = ? WHERE album_id = ?",
+                    (new_values["name"], item_id)
+                )
+                logger.info(f"Actualizado album en {cursor.rowcount} canciones")
+                
+                # Actualizar en listens y scrobbles si existe
+                try:
+                    cursor.execute(
+                        "UPDATE scrobbles SET album_name = ? WHERE album_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado album_name en {cursor.rowcount} scrobbles")
+                except sqlite3.OperationalError:
+                    pass
+                
+                try:
+                    cursor.execute(
+                        "UPDATE listens SET album_name = ? WHERE album_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado album_name en {cursor.rowcount} listens")
+                except sqlite3.OperationalError:
+                    pass
+            
+            # Caso 3: Actualizar relaciones cuando una canción cambia
+            elif table == "songs":
+                changes = []
+                
+                # Actualizar título
+                if "title" in new_values and old_values["title"] != new_values["title"]:
+                    # Actualizar en lyrics
+                    cursor.execute(
+                        "UPDATE lyrics SET title = ? WHERE track_id = ?",
+                        (new_values["title"], item_id)
+                    )
+                    logger.info(f"Actualizado title en {cursor.rowcount} registros de lyrics")
+                    
+                    # Actualizar en listens y scrobbles
+                    try:
+                        cursor.execute(
+                            "UPDATE scrobbles SET track_name = ? WHERE track_id = ?",
+                            (new_values["title"], item_id)
+                        )
+                    except sqlite3.OperationalError:
+                        pass
+                    
+                    try:
+                        cursor.execute(
+                            "UPDATE listens SET track_name = ? WHERE track_id = ?",
+                            (new_values["title"], item_id)
+                        )
+                    except sqlite3.OperationalError:
+                        pass
+                    
+                    try:
+                        cursor.execute(
+                            "UPDATE song_links SET track_name_denorm = ? WHERE song_id = ?",
+                            (new_values["title"], item_id)
+                        )
+                    except sqlite3.OperationalError:
+                        pass
+                
+                # Verificar cambio de artista
+                if "artist_id" in new_values and old_values["artist_id"] != new_values["artist_id"]:
+                    # Obtener el nombre del nuevo artista
+                    cursor.execute("SELECT name FROM artists WHERE id = ?", (new_values["artist_id"],))
+                    artist_result = cursor.fetchone()
+                    if artist_result:
+                        artist_name = artist_result[0]
+                        cursor.execute(
+                            "UPDATE songs SET artist = ? WHERE id = ?",
+                            (artist_name, item_id)
+                        )
+                        
+                        # Actualizar en listens y scrobbles
+                        try:
+                            cursor.execute(
+                                "UPDATE scrobbles SET artist_name = ?, artist_id = ? WHERE track_id = ?",
+                                (artist_name, new_values["artist_id"], item_id)
+                            )
+                        except sqlite3.OperationalError:
+                            pass
+                        
+                        try:
+                            cursor.execute(
+                                "UPDATE listens SET artist_name = ?, artist_id = ? WHERE track_id = ?",
+                                (artist_name, new_values["artist_id"], item_id)
+                            )
+                        except sqlite3.OperationalError:
+                            pass
+                
+                # Verificar cambio de álbum
+                if "album_id" in new_values and old_values["album_id"] != new_values["album_id"]:
+                    # Obtener el nombre del nuevo álbum
+                    cursor.execute("SELECT name FROM albums WHERE id = ?", (new_values["album_id"],))
+                    album_result = cursor.fetchone()
+                    if album_result:
+                        album_name = album_result[0]
+                        cursor.execute(
+                            "UPDATE songs SET album = ? WHERE id = ?",
+                            (album_name, item_id)
+                        )
+                        
+                        # Actualizar en listens y scrobbles
+                        try:
+                            cursor.execute(
+                                "UPDATE scrobbles SET album_name = ?, album_id = ? WHERE track_id = ?",
+                                (album_name, new_values["album_id"], item_id)
+                            )
+                        except sqlite3.OperationalError:
+                            pass
+                        
+                        try:
+                            cursor.execute(
+                                "UPDATE listens SET album_name = ?, album_id = ? WHERE track_id = ?",
+                                (album_name, new_values["album_id"], item_id)
+                            )
+                        except sqlite3.OperationalError:
+                            pass
+            
+            # Caso 4: Actualizar relaciones cuando un género cambia
+            elif table == "genres" and "name" in new_values and old_values["name"] != new_values["name"]:
+                try:
+                    cursor.execute(
+                        "UPDATE songs SET genre = ? WHERE genre_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado genre en {cursor.rowcount} canciones")
+                except sqlite3.OperationalError:
+                    # Es posible que la columna no exista
+                    pass
+                
+                try:
+                    cursor.execute(
+                        "UPDATE albums SET genre = ? WHERE genre_id = ?",
+                        (new_values["name"], item_id)
+                    )
+                    logger.info(f"Actualizado genre en {cursor.rowcount} álbumes")
+                except sqlite3.OperationalError:
+                    pass
+        
+        except Exception as e:
+            logger.error(f"Error actualizando tablas relacionadas: {e}")
+            traceback.print_exc()
+            # No lanzamos la excepción para permitir que la actualización principal continúe
+
+
+
     def create_new_item(self):
         """Crear un nuevo ítem en la tabla actual."""
         try:
@@ -958,6 +1165,35 @@ class DatabaseEditor(BaseModule):
                 else:
                     default_values.append('')
             
+            # Añadir valores por defecto específicos según la tabla
+            if self.current_table == "songs":
+                # Encontrar índices de campos relevantes
+                title_idx = fields.index("title") if "title" in fields else -1
+                if title_idx >= 0:
+                    default_values[title_idx] = "Nueva Canción"
+                    
+                artist_name_idx = fields.index("artist") if "artist" in fields else -1
+                if artist_name_idx >= 0:
+                    default_values[artist_name_idx] = "Desconocido"
+                    
+                album_name_idx = fields.index("album") if "album" in fields else -1
+                if album_name_idx >= 0:
+                    default_values[album_name_idx] = "Desconocido"
+            
+            elif self.current_table == "artists":
+                name_idx = fields.index("name") if "name" in fields else -1
+                if name_idx >= 0:
+                    default_values[name_idx] = "Nuevo Artista"
+            
+            elif self.current_table == "albums":
+                name_idx = fields.index("name") if "name" in fields else -1
+                if name_idx >= 0:
+                    default_values[name_idx] = "Nuevo Álbum"
+                    
+                artist_name_idx = fields.index("artist") if "artist" in fields else -1
+                if artist_name_idx >= 0:
+                    default_values[artist_name_idx] = "Desconocido"
+            
             query = f"INSERT INTO {self.current_table} ({', '.join(fields)}) VALUES ({', '.join(placeholders)})"
             cursor.execute(query, default_values)
             conn.commit()
@@ -972,9 +1208,9 @@ class DatabaseEditor(BaseModule):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al crear nuevo ítem: {e}")
             traceback.print_exc()
-    
+
     def delete_selected_item(self):
-        """Eliminar el ítem seleccionado."""
+        """Eliminar el ítem seleccionado y manejar referencias."""
         selected_rows = self.results_table.selectedItems()
         if not selected_rows:
             QMessageBox.warning(self, "Selección Requerida", "Por favor seleccione un ítem para eliminar.")
@@ -988,7 +1224,7 @@ class DatabaseEditor(BaseModule):
         reply = QMessageBox.question(
             self, 
             "Confirmar Eliminación",
-            f"¿Está seguro que desea eliminar el ítem con ID {item_id}?",
+            f"¿Está seguro que desea eliminar el ítem con ID {item_id}?\nEsto podría afectar a registros relacionados.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -998,6 +1234,28 @@ class DatabaseEditor(BaseModule):
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
                 
+                # Verificar dependencias antes de eliminar
+                can_delete, dependent_items = self.check_delete_dependencies(cursor, item_id)
+                
+                if not can_delete:
+                    # Mostrar mensaje con elementos dependientes
+                    deps_str = "\n".join([f"- {count} registros en {table}" for table, count in dependent_items.items()])
+                    confirm_cascade = QMessageBox.question(
+                        self,
+                        "Referencias Encontradas",
+                        f"Existen {sum(dependent_items.values())} registros que hacen referencia a este ítem:\n{deps_str}\n\n¿Desea eliminar de todas formas y establecer estas referencias en NULL?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No
+                    )
+                    
+                    if confirm_cascade != QMessageBox.StandardButton.Yes:
+                        conn.close()
+                        return
+                    
+                    # Actualizar referencias a NULL
+                    self.update_dependencies_before_delete(cursor, item_id)
+                
+                # Ejecutar la eliminación
                 cursor.execute(f"DELETE FROM {self.current_table} WHERE id = ?", (item_id,))
                 conn.commit()
                 conn.close()
@@ -1010,7 +1268,181 @@ class DatabaseEditor(BaseModule):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error al eliminar ítem: {e}")
                 traceback.print_exc()
-    
+
+    def check_delete_dependencies(self, cursor, item_id):
+        """Verificar si hay elementos dependientes antes de eliminar."""
+        table = self.current_table
+        dependent_items = {}
+        can_delete = True
+        
+        # Verificar dependencias según el tipo de tabla
+        if table == "artists":
+            # Verificar canciones con este artista
+            cursor.execute("SELECT COUNT(*) FROM songs WHERE artist_id = ?", (item_id,))
+            song_count = cursor.fetchone()[0]
+            if song_count > 0:
+                dependent_items["songs"] = song_count
+                can_delete = False
+            
+            # Verificar álbumes con este artista
+            cursor.execute("SELECT COUNT(*) FROM albums WHERE artist_id = ?", (item_id,))
+            album_count = cursor.fetchone()[0]
+            if album_count > 0:
+                dependent_items["albums"] = album_count
+                can_delete = False
+        
+        elif table == "albums":
+            # Verificar canciones en este álbum
+            cursor.execute("SELECT COUNT(*) FROM songs WHERE album_id = ?", (item_id,))
+            song_count = cursor.fetchone()[0]
+            if song_count > 0:
+                dependent_items["songs"] = song_count
+                can_delete = False
+        
+        elif table == "songs":
+            # Verificar lyrics para esta canción
+            cursor.execute("SELECT COUNT(*) FROM lyrics WHERE track_id = ?", (item_id,))
+            lyrics_count = cursor.fetchone()[0]
+            if lyrics_count > 0:
+                dependent_items["lyrics"] = lyrics_count
+                can_delete = False
+            
+            # Verificar referencias en listens o scrobbles
+            try:
+                cursor.execute("SELECT COUNT(*) FROM listens WHERE track_id = ?", (item_id,))
+                listens_count = cursor.fetchone()[0]
+                if listens_count > 0:
+                    dependent_items["listens"] = listens_count
+                    can_delete = False
+            except sqlite3.OperationalError:
+                pass
+            
+            try:
+                cursor.execute("SELECT COUNT(*) FROM scrobbles WHERE track_id = ?", (item_id,))
+                scrobbles_count = cursor.fetchone()[0]
+                if scrobbles_count > 0:
+                    dependent_items["scrobbles"] = scrobbles_count
+                    can_delete = False
+            except sqlite3.OperationalError:
+                pass
+            
+            try:
+                cursor.execute("SELECT COUNT(*) FROM song_links WHERE song_id = ?", (item_id,))
+                links_count = cursor.fetchone()[0]
+                if links_count > 0:
+                    dependent_items["song_links"] = links_count
+                    can_delete = False
+            except sqlite3.OperationalError:
+                pass
+        
+        elif table == "genres":
+            # Verificar canciones con este género
+            cursor.execute("SELECT COUNT(*) FROM songs WHERE genre_id = ?", (item_id,))
+            song_count = cursor.fetchone()[0]
+            if song_count > 0:
+                dependent_items["songs"] = song_count
+                can_delete = False
+            
+            # Verificar álbumes con este género
+            try:
+                cursor.execute("SELECT COUNT(*) FROM albums WHERE genre_id = ?", (item_id,))
+                album_count = cursor.fetchone()[0]
+                if album_count > 0:
+                    dependent_items["albums"] = album_count
+                    can_delete = False
+            except sqlite3.OperationalError:
+                pass
+        
+        return can_delete, dependent_items
+
+    def update_dependencies_before_delete(self, cursor, item_id):
+        """Actualizar referencias antes de eliminar un ítem."""
+        table = self.current_table
+        
+        try:
+            # Actualizar referencias según el tipo de tabla
+            if table == "artists":
+                # Establecer artist_id como NULL en songs
+                cursor.execute("UPDATE songs SET artist_id = NULL, artist = 'Desconocido' WHERE artist_id = ?", (item_id,))
+                logger.info(f"Actualizadas {cursor.rowcount} canciones con artista NULL")
+                
+                # Actualizar álbumes
+                cursor.execute("UPDATE albums SET artist_id = NULL, artist = 'Desconocido' WHERE artist_id = ?", (item_id,))
+                logger.info(f"Actualizados {cursor.rowcount} álbumes con artista NULL")
+                
+                # Actualizar scrobbles y listens si existen
+                try:
+                    cursor.execute("UPDATE scrobbles SET artist_id = NULL, artist_name = 'Desconocido' WHERE artist_id = ?", (item_id,))
+                except sqlite3.OperationalError:
+                    pass
+                
+                try:
+                    cursor.execute("UPDATE listens SET artist_id = NULL, artist_name = 'Desconocido' WHERE artist_id = ?", (item_id,))
+                except sqlite3.OperationalError:
+                    pass
+            
+            elif table == "albums":
+                # Establecer album_id como NULL en songs
+                cursor.execute("UPDATE songs SET album_id = NULL, album = 'Desconocido' WHERE album_id = ?", (item_id,))
+                logger.info(f"Actualizadas {cursor.rowcount} canciones con álbum NULL")
+                
+                # Actualizar referencias en scrobbles y listens
+                try:
+                    cursor.execute("UPDATE scrobbles SET album_id = NULL, album_name = 'Desconocido' WHERE album_id = ?", (item_id,))
+                except sqlite3.OperationalError:
+                    pass
+                
+                try:
+                    cursor.execute("UPDATE listens SET album_id = NULL, album_name = 'Desconocido' WHERE album_id = ?", (item_id,))
+                except sqlite3.OperationalError:
+                    pass
+            
+            elif table == "songs":
+                # Eliminar lyrics relacionadas
+                cursor.execute("DELETE FROM lyrics WHERE track_id = ?", (item_id,))
+                logger.info(f"Eliminados {cursor.rowcount} registros de lyrics relacionados")
+                
+                # Eliminar referencias en listens y scrobbles
+                try:
+                    cursor.execute("DELETE FROM listens WHERE track_id = ?", (item_id,))
+                    logger.info(f"Eliminados {cursor.rowcount} registros de listens relacionados")
+                except sqlite3.OperationalError:
+                    pass
+                
+                try:
+                    cursor.execute("DELETE FROM scrobbles WHERE track_id = ?", (item_id,))
+                    logger.info(f"Eliminados {cursor.rowcount} registros de scrobbles relacionados")
+                except sqlite3.OperationalError:
+                    pass
+                
+                try:
+                    cursor.execute("DELETE FROM song_links WHERE song_id = ?", (item_id,))
+                    logger.info(f"Eliminados {cursor.rowcount} registros de song_links relacionados")
+                except sqlite3.OperationalError:
+                    pass
+            
+            elif table == "genres":
+                # Actualizar canciones con este género
+                cursor.execute("UPDATE songs SET genre_id = NULL, genre = 'Sin categoría' WHERE genre_id = ?", (item_id,))
+                logger.info(f"Actualizadas {cursor.rowcount} canciones con género NULL")
+                
+                # Actualizar álbumes si existe la relación
+                try:
+                    cursor.execute("UPDATE albums SET genre_id = NULL, genre = 'Sin categoría' WHERE genre_id = ?", (item_id,))
+                    logger.info(f"Actualizados {cursor.rowcount} álbumes con género NULL")
+                except sqlite3.OperationalError:
+                    pass
+            
+            elif table == "lyrics":
+                # Actualizar canciones relacionadas
+                cursor.execute("UPDATE songs SET has_lyrics = 0, lyrics_id = NULL WHERE lyrics_id = ?", (item_id,))
+                logger.info(f"Actualizadas {cursor.rowcount} canciones sin lyrics")
+        
+        except Exception as e:
+            logger.error(f"Error actualizando dependencias: {e}")
+            traceback.print_exc()
+            # No lanzamos la excepción para permitir que la eliminación continúe
+        
     def cleanup(self):
         """Método llamado cuando se cierra el módulo."""
         # Guardar el orden de columnas antes de cerrar

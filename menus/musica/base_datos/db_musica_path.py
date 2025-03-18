@@ -18,6 +18,7 @@
 #
 #   Dependencias:   - python3, mutagen, pylast, sqlite3
 #                   - carpeta con musica en flac, m4a, mp3
+#   Ha tardado 43 minutos para una carpeta en NFS con 84 GB, 600 carpetas con 
 
 import os
 import json
@@ -88,13 +89,10 @@ class MusicLibraryManager:
                     added_year INTEGER,
                     duration REAL,
                     lyrics_id INTEGER,
-                    replay_gain REAL,
                     replay_gain_track_gain REAL,
                     replay_gain_track_peak REAL,
                     replay_gain_album_gain REAL,
                     replay_gain_album_peak REAL,
-                    album_year TEXT,
-                    artist_origin TEXT,
                     album_art_path_denorm TEXT,
                     has_lyrics INTEGER DEFAULT 0
                 )
@@ -112,13 +110,10 @@ class MusicLibraryManager:
                 'added_year': 'INTEGER',
                 'duration': 'REAL',
                 'lyrics_id': 'INTEGER',
-                'replay_gain': 'REAL',
                 'replay_gain_track_gain': 'REAL',
                 'replay_gain_track_peak': 'REAL',
                 'replay_gain_album_gain': 'REAL',
                 'replay_gain_album_peak': 'REAL',
-                'album_year': 'TEXT',
-                'artist_origin': 'TEXT',
                 'album_art_path_denorm': 'TEXT',
                 'has_lyrics': 'INTEGER DEFAULT 0'
             }
@@ -168,7 +163,9 @@ class MusicLibraryManager:
                 'wikipedia_url': 'TEXT',
                 'wikipedia_content': 'TEXT',
                 'wikipedia_updated': 'TIMESTAMP',
-                'mbid': 'TEXT'
+                'mbid': 'TEXT',
+                'aliases': 'TEXT',
+                'member_of': 'TEXT'
             }
             
             for col_name, col_type in new_artist_columns.items():
@@ -224,7 +221,11 @@ class MusicLibraryManager:
                 'wikipedia_updated': 'TIMESTAMP',
                 'mbid': 'TEXT',
                 'folder_path': 'TEXT',
-                'bitrate_range': 'TEXT'
+                'bitrate_range': 'TEXT',
+                'producers': 'TEXT',
+                'engineers': 'TEXT',
+                'mastering_engineers': 'TEXT',
+                'credits': 'JSON'
             }
             
             for col_name, col_type in new_album_columns.items():
@@ -611,6 +612,7 @@ class MusicLibraryManager:
                 'genre': audio.get('genre', ['Unknown'])[0],
                 'label': audio.get('organization', [None])[0] or audio.get('label', [None])[0] or '',
                 'mbid': audio.get('musicbrainz_trackid', [''])[0],
+                'date_created': datetime.fromtimestamp(os.path.getctime(file_path)),
                 'last_modified': datetime.fromtimestamp(os.path.getmtime(file_path)),
                 'added_timestamp': current_time,
                 'added_week': int(current_time.strftime('%V')),  # ISO week number
@@ -667,6 +669,8 @@ class MusicLibraryManager:
                         metadata['replay_gain_album_gain'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
                     if 'replaygain_album_peak' in tag.lower():
                         metadata['replay_gain_album_peak'] = self._parse_replay_gain_value(str(raw_audio[tag][0]))
+
+
 
             return metadata
 
@@ -741,6 +745,106 @@ class MusicLibraryManager:
         return missing_album_ids
 
 
+    def update_album_artwork_and_paths(self):
+        """
+        Actualiza la tabla 'albums' con información sobre:
+        - folder_path: La ruta de la carpeta que contiene las canciones del álbum
+        - album_art_path: La ruta de la imagen de portada (cover, folder, album)
+        - total_tracks: El número total de canciones del álbum
+        También actualiza la tabla 'songs' con:
+        - album_art_path_denorm: La ruta de la imagen de portada del álbum
+        """
+        # Conectar a la base de datos
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+
+        try:
+            # Primero, obtener todos los álbumes en la base de datos
+            c.execute("SELECT id, name FROM albums")
+            albums = c.fetchall()
+            
+            self.logger.info(f"Actualizando información de rutas, portadas y conteo de canciones para {len(albums)} álbumes...")
+            start_time = datetime.now()
+            
+            albums_updated = 0
+            artwork_found = 0
+            
+            for album_id, album_name in albums:
+                # Obtener las rutas de carpetas y contar canciones para este álbum desde la tabla songs
+                c.execute("""
+                    SELECT file_path FROM songs 
+                    WHERE album = ?
+                """, (album_name,))
+                
+                results = c.fetchall()
+                track_count = len(results)
+                
+                # Extraer las rutas de carpetas únicas
+                folder_paths = set()
+                for row in results:
+                    if row[0]:
+                        # Obtener la carpeta padre del archivo
+                        folder_path = str(Path(row[0]).parent)
+                        folder_paths.add(folder_path)
+                
+                if not folder_paths:
+                    continue
+                    
+                # Actualizar los folder_paths y total_tracks en la tabla albums
+                folder_paths_str = ";".join(folder_paths)
+                c.execute("UPDATE albums SET folder_path = ?, total_tracks = ? WHERE id = ?", 
+                        (folder_paths_str, track_count, album_id))
+                albums_updated += 1
+                
+                # Buscar imágenes de portada en las carpetas
+                album_art_path = None
+                for folder_path in folder_paths:
+                    # Buscar archivos de imagen con nombres comunes para portadas
+                    potential_covers = []
+                    folder = Path(folder_path)
+                    
+                    # Buscar archivos de imagen con nombres comunes para portadas
+                    for cover_name in ['cover', 'folder', 'album', 'front']:
+                        for ext in ['.jpg', '.jpeg', '.png']:
+                            # Buscar exacto
+                            exact_match = folder / f"{cover_name}{ext}"
+                            if exact_match.exists():
+                                potential_covers.append(str(exact_match))
+                            
+                            # Buscar con mayúsculas
+                            upper_match = folder / f"{cover_name.capitalize()}{ext}"
+                            if upper_match.exists():
+                                potential_covers.append(str(upper_match))
+                    
+                    # Si encontramos portadas, usar la primera
+                    if potential_covers:
+                        album_art_path = potential_covers[0]
+                        break
+                
+                # Actualizar album_art_path en la tabla albums
+                if album_art_path:
+                    c.execute("UPDATE albums SET album_art_path = ? WHERE id = ?", 
+                            (album_art_path, album_id))
+                    artwork_found += 1
+                    
+                    # Actualizar el campo album_art_path_denorm en la tabla songs
+                    c.execute("""
+                        UPDATE songs 
+                        SET album_art_path_denorm = ? 
+                        WHERE album = ?
+                    """, (album_art_path, album_name))
+                
+            # Guardar los cambios
+            conn.commit()
+            self.logger.info(f"Actualización completada: {albums_updated} álbumes actualizados, {artwork_found} con portadas encontradas, en {(datetime.now() - start_time).total_seconds():.2f} segundos")
+                
+        except Exception as e:
+            self.logger.error(f"Error al actualizar rutas y portadas de álbumes: {str(e)}")
+            conn.rollback()
+        
+        finally:
+            conn.close()
+
     def _extract_float_tag(self, audio, tag_name):
         """Extract a float value from an audio tag, handling different formats."""
         if tag_name in audio:
@@ -773,13 +877,76 @@ class MusicLibraryManager:
         except (ValueError, TypeError):
             return None
 
+    def update_album_bitrates(self):
+
+        """
+        Actualiza los rangos de bitrate para todos los álbumes en la base de datos.
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            self.logger.info("Actualizando rangos de bitrate para álbumes...")
+            
+            # Obtener todos los álbumes
+            c.execute("SELECT id, artist_id, name FROM albums")
+            albums = c.fetchall()
+            
+            updated_count = 0
+            
+            for album_id, artist_id, album_name in albums:
+                # Obtener el artista asociado
+                c.execute("SELECT name FROM artists WHERE id = ?", (artist_id,))
+                artist_result = c.fetchone()
+                
+                if artist_result:
+                    artist_name = artist_result[0]
+                    
+                    # Calcular el rango de bitrate para el álbum
+                    c.execute('''
+                        SELECT MIN(bitrate), MAX(bitrate), COUNT(*)
+                        FROM songs
+                        WHERE album = ? AND artist = ?
+                    ''', (album_name, artist_name))
+                    
+                    bitrate_range = c.fetchone()
+                    
+                    if bitrate_range and bitrate_range[2] > 0:  # Asegurarse de que hay canciones
+                        min_bitrate = bitrate_range[0] if bitrate_range[0] is not None else 0
+                        max_bitrate = bitrate_range[1] if bitrate_range[1] is not None else 0
+                        
+                        # Formatear el rango de bitrate
+                        bitrate_range_str = f"{min_bitrate}-{max_bitrate}" if min_bitrate != max_bitrate else str(min_bitrate)
+                        
+                        # Actualizar el álbum con el rango de bitrate
+                        c.execute('''
+                            UPDATE albums
+                            SET bitrate_range = ?
+                            WHERE id = ?
+                        ''', (bitrate_range_str, album_id))
+                        
+                        updated_count += 1
+                        
+                        if updated_count % 100 == 0:
+                            conn.commit()
+                            self.logger.info(f"Actualizados {updated_count} álbumes")
+            
+            conn.commit()
+            self.logger.info(f"Actualización de rangos de bitrate completada. Actualizados {updated_count} álbumes.")
+        
+        except Exception as e:
+            self.logger.error(f"Error al actualizar rangos de bitrate: {str(e)}")
+        
+        finally:
+            conn.close()
+
 
     def scan_library(self, force_update=False):
         """Comprehensive library scanning with selective updates."""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        error_log_path = 'music_library_scan_errors.log'
+        error_log_path = 'db_musica_path_error.log'
         error_logger = logging.getLogger('error_log')
         error_logger.setLevel(logging.ERROR)
         error_handler = logging.FileHandler(error_log_path, encoding='utf-8')
@@ -843,6 +1010,7 @@ class MusicLibraryManager:
                         else:
                             db_last_modified = None
                             original_added_timestamp = None
+                            
 
                         if force_update or not db_last_modified or last_modified > db_last_modified:
                             metadata = self.get_audio_metadata(file_path)
@@ -957,6 +1125,9 @@ class MusicLibraryManager:
             self.logger.info(f"Files processed: {processed_files}")
             self.logger.info(f"Files with errors: {error_files}")
 
+
+
+
     def _ensure_song_links_entry(self, cursor, file_path):
         """Asegurarse de que existe una entrada en song_links para esta canción"""
         # Primero obtener el ID de la canción
@@ -1008,67 +1179,6 @@ class MusicLibraryManager:
                     artist_name
                 ))
 
-    def update_album_bitrates(self):
-        """
-        Actualiza los rangos de bitrate para todos los álbumes en la base de datos.
-        """
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        
-        try:
-            self.logger.info("Actualizando rangos de bitrate para álbumes...")
-            
-            # Obtener todos los álbumes
-            c.execute("SELECT id, artist_id, name FROM albums")
-            albums = c.fetchall()
-            
-            updated_count = 0
-            
-            for album_id, artist_id, album_name in albums:
-                # Obtener el artista asociado
-                c.execute("SELECT name FROM artists WHERE id = ?", (artist_id,))
-                artist_result = c.fetchone()
-                
-                if artist_result:
-                    artist_name = artist_result[0]
-                    
-                    # Calcular el rango de bitrate para el álbum
-                    c.execute('''
-                        SELECT MIN(bitrate), MAX(bitrate), COUNT(*)
-                        FROM songs
-                        WHERE album = ? AND artist = ?
-                    ''', (album_name, artist_name))
-                    
-                    bitrate_range = c.fetchone()
-                    
-                    if bitrate_range and bitrate_range[2] > 0:  # Asegurarse de que hay canciones
-                        min_bitrate = bitrate_range[0] if bitrate_range[0] is not None else 0
-                        max_bitrate = bitrate_range[1] if bitrate_range[1] is not None else 0
-                        
-                        # Formatear el rango de bitrate
-                        bitrate_range_str = f"{min_bitrate}-{max_bitrate}" if min_bitrate != max_bitrate else str(min_bitrate)
-                        
-                        # Actualizar el álbum con el rango de bitrate
-                        c.execute('''
-                            UPDATE albums
-                            SET bitrate_range = ?
-                            WHERE id = ?
-                        ''', (bitrate_range_str, album_id))
-                        
-                        updated_count += 1
-                        
-                        if updated_count % 100 == 0:
-                            conn.commit()
-                            self.logger.info(f"Actualizados {updated_count} álbumes")
-            
-            conn.commit()
-            self.logger.info(f"Actualización de rangos de bitrate completada. Actualizados {updated_count} álbumes.")
-        
-        except Exception as e:
-            self.logger.error(f"Error al actualizar rangos de bitrate: {str(e)}")
-        
-        finally:
-            conn.close()
 
 
     def _update_album_info(self, cursor, metadata):
@@ -1267,37 +1377,60 @@ class MusicLibraryManager:
             conn.close()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Music Library Manager')
-    parser.add_argument('root_path', help='Root directory of music library')
-    parser.add_argument('db_path', help='Path to SQLite database')
-    parser.add_argument('--force-update', action='store_true', help='Force update all files')
-    parser.add_argument('--update-replay-gain', action='store_true', help='Update replay gain information only')
-    parser.add_argument('--optimize', action='store_true', help='Create indices and optimize database')
-    parser.add_argument('--update-schema', action='store_true', help='Update database schema with all tables and indices')
-    parser.add_argument('--quick-scan', action='store_true', help='Perform a quick scan based on album folders')
-    parser.add_argument('--update-bitrates', action='store_true', help='Update bitrate ranges for all albums')
+def main(config=None):
+    if config is None:
+        parser = argparse.ArgumentParser(description='enlaces_artista_album')
+        parser.add_argument('--config', required=True, help='Archivo de configuración')
+        args = parser.parse_args()
+        
+        with open(args.config, 'r') as f:
+            config_data = json.load(f)
+            
+        # Combinar configuraciones
+        config = {}
+        config.update(config_data.get("common", {}))
+        config.update(config_data.get("db_musica_path", {}))
 
-    args = parser.parse_args()
-    
-    manager = MusicLibraryManager(args.root_path, args.db_path)
-    
-    if args.update_schema:
+    # Verificamos que todas las claves necesarias existan
+    db_path = config.get('db_path')
+    root_path = config.get('root_path')
+    lastfm_api_key = config.get('lastfm_api_key')
+    print(f"db_path: {db_path}")
+    print(f"Ruta de la base de datos (después de Path().resolve()): {Path(db_path).resolve()}")
+    print(f"¿La ruta existe? {os.path.exists(db_path)}")
+    print(f"¿Tienes permisos? {os.access(db_path, os.R_OK | os.W_OK) if os.path.exists(db_path) else 'N/A'}")
+
+    if not all([db_path, root_path, lastfm_api_key]):
+        missing = []
+        if not db_path: missing.append('db_path')
+        if not root_path: missing.append('root_path')
+        if not lastfm_api_key: missing.append('lastfm_api_key')
+        print(f"Error: Faltan claves necesarias en la configuración: {', '.join(missing)}")
+        return 1
+        
+    manager = MusicLibraryManager(root_path, db_path, lastfm_api_key)
+
+
+    if config.get('update_schema', False):
         manager.update_schema()
     
-    if args.optimize:
+    if config.get('optimize', False):
         manager.optimize_database()
         manager.create_indices()
         
-    if args.update_replay_gain:
+    if config.get('update_replay_gain', False):
         manager.update_replay_gain_only()
     
-    if args.quick_scan:
+    if config.get('quick_scan', False):
         manager.quick_scan_library()
         
-    if args.update_bitrates:
+    if config.get('update_bitrates', False):
         manager.update_album_bitrates()
     
     # Escanear la biblioteca siempre como último paso
-    if not args.update_replay_gain and not args.optimize and not args.update_schema and not args.quick_scan and not args.update_bitrates:
-        manager.scan_library(force_update=args.force_update)
+    if not config.get('update_replay_gain', False) and not config.get('optimize', False) and not config.get('update_schema', False) and not config.get('quick_scan', False) and not config.get('update_bitrates', False):
+        manager.scan_library(force_update=config.get('force_update', False))
+        manager.update_album_artwork_and_paths()
+
+if __name__ == "__main__":
+    main()
