@@ -1,4 +1,4 @@
-
+#! /usr/bin/env bash
 # Obterner ruta del archivo en reproducción
 deadbeef="$(deadbeef --nowplaying-tf "%artist%")"
 

@@ -144,3 +144,6 @@ menus/musica/.content/token
 menus/musica/config.json
 .cache
 menus/musica/spotify/.token
+menus/musica/actualizaciones/scripts_config.json
+menus/musica/menu_blogs/mpv/lastfm_credentials.py
+menus/musica/base_datos/config.yaml
