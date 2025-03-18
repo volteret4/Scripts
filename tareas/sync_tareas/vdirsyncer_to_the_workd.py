@@ -23,8 +23,11 @@ TODO_DIR = Path("/mnt/windows/FTP/Wiki/Obsidian/Important/todotxt/todo")  # CHAN
 TODO_DIR_ROOT = Path("/mnt/windows/FTP/Wiki/Obsidian/Important/todotxt/")
 TASKS_FILE = Path("/mnt/windows/FTP/wiki/Obsidian/Important/Tareas.md")
 
+# Temp file for todoman output
+TEMP_TODOMAN_FILE = Path(f"{HOME}/Scripts/.content/logs/todoman_tasks_temp.txt")
+
 # Checkpoint file - saves the last processed date
-CHECKPOINT_FILE = Path(f"{HOME}/Scripts/.content/logs/importar_tareas_todo_checkpoint.json")
+CHECKPOINT_FILE = Path(f"{HOME}/Scripts/.content/logs/importar_tareas_todoman_checkpoint.json")
 
 # Logging configuration
 LOG_FILE = Path(f"{HOME}/Scripts/.content/logs/importar_tareas_todoman.log")
@@ -120,6 +123,77 @@ def add_task_query(file_path, project_name):
             f.write(f"```task\nnotdone\ntags include #{project_name}\nsort by due\nsort by priority\nsort by scheduled\n```\n")
         logger.info(f"Added task query for #{project_name} in {file_path}")
 
+def load_existing_tasks():
+    """
+    Load tasks from Obsidian's Tareas.md file to avoid duplicates.
+    Returns a set of task text content (normalized) for comparison.
+    """
+    existing_tasks = set()
+    try:
+        if TASKS_FILE.exists():
+            # Read with error handling for encoding issues
+            with open(TASKS_FILE, "r", encoding='utf-8', errors='replace') as f:
+                content = f.read()
+                
+            # Find all task lines with "- [ ]"
+            task_lines = re.findall(r'- \[ \] (.*?)(?:\n|$)', content)
+            
+            for task in task_lines:
+                # Clean the task text to handle emojis and special characters
+                task = clean_text(task)
+                
+                # Normalize task text for comparison (remove dates and formatting)
+                normalized = re.sub(r' due:\d{4}-\d{2}-\d{2}', '', task)  # Remove due dates in text format
+                normalized = re.sub(r' t:\d{4}-\d{2}-\d{2}', '', normalized)  # Remove start dates in text format
+                normalized = re.sub(r' \d{4}-\d{2}-\d{2}', '', normalized)  # Remove any dates
+                
+                # Also handle emoji date formats
+                normalized = re.sub(r' 📅 \d{4}-\d{2}-\d{2}', '', normalized)
+                normalized = re.sub(r' ⏳ \d{4}-\d{2}-\d{2}', '', normalized)
+                normalized = re.sub(r' 🛫 \d{4}-\d{2}-\d{2}', '', normalized)
+                normalized = re.sub(r' ➕ \d{4}-\d{2}-\d{2}', '', normalized)
+                
+                # Remove priority markers
+                normalized = re.sub(r'🔺|🔼|🔽|\(A\)|\(B\)|\(C\)', '', normalized)
+                
+                # Strip any remaining whitespace
+                normalized = normalized.strip()
+                
+                existing_tasks.add(normalized)
+                
+    except Exception as e:
+        logger.error(f"Error loading existing tasks: {e}")
+    
+    return existing_tasks
+
+def task_exists_in_obsidian(task_text, existing_tasks):
+    """
+    Check if a task already exists in Obsidian's Tareas.md.
+    Compares normalized task text.
+    """
+    # Clean the text first to handle encoding issues
+    task_text = clean_text(task_text)
+    
+    # Normalize task text for comparison
+    normalized = re.sub(r' due:\d{4}-\d{2}-\d{2}', '', task_text)  # Remove due dates in text format
+    normalized = re.sub(r' t:\d{4}-\d{2}-\d{2}', '', normalized)  # Remove start dates in text format
+    normalized = re.sub(r' \d{4}-\d{2}-\d{2}', '', normalized)  # Remove any dates
+    
+    # Also handle emoji date formats
+    normalized = re.sub(r' 📅 \d{4}-\d{2}-\d{2}', '', normalized)
+    normalized = re.sub(r' ⏳ \d{4}-\d{2}-\d{2}', '', normalized)
+    normalized = re.sub(r' 🛫 \d{4}-\d{2}-\d{2}', '', normalized)
+    normalized = re.sub(r' ➕ \d{4}-\d{2}-\d{2}', '', normalized)
+    
+    # Remove priority markers
+    normalized = re.sub(r'🔺|🔼|🔽|\(A\)|\(B\)|\(C\)', '', normalized)
+    
+    # Strip any remaining whitespace
+    normalized = normalized.strip()
+    
+    # Check if normalized text exists in the set of existing tasks
+    return normalized in existing_tasks
+
 def get_checkpoint():
     """Retrieves the date of the last checkpoint and processed tasks."""
     try:
@@ -157,9 +231,10 @@ def save_checkpoint(processed_tasks):
     except Exception as e:
         logger.error(f"Error saving checkpoint: {e}")
 
-def parse_todoman_tasks(output):
+
+def parse_todoman_tasks_from_file(file_path):
     """
-    Parses the output of todoman's list command and extracts the tasks.
+    Parses todoman tasks from a saved output file.
     Format example:
     [ ] 83  15/04/25 22:38:01 crear script que lea TODOS de scripts y los añada a todotxt
     [ ] 55  24/03/25 16:37:01 ansible proxmox  [server]
@@ -167,37 +242,82 @@ def parse_todoman_tasks(output):
     """
     tasks = []
     
-    # Regular expression to match todoman task lines
-    pattern = r'\[ \] (\d+)\s+(!*)?\s*(\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}|\(no due date\))\s+(.+?)(?:\s+\[([^]]+)\])?$'
+    try:
+        # Read file with error handling for encoding issues
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+        
+        for line in lines:
+            # Clean the line to handle encoding issues and remove ANSI color codes
+            line = clean_ansi_codes(clean_text(line.strip()))
+            if not line or not line.startswith('[ ]'):
+                continue
+            
+            try:
+                # Extract task ID - make sure to only get the numeric ID
+                id_match = re.match(r'\[ \] (\d+)', line)
+                if not id_match:
+                    continue
+                
+                task_id = id_match.group(1)
+                
+                # Remove the '[ ] ID' prefix to get the rest of the content
+                remaining = line[line.find(task_id) + len(task_id):].strip()
+                
+                # Check for priority markers (!)
+                priority = 0
+                if '!' in remaining:
+                    exclamation_match = re.match(r'^(\s*!+)', remaining)
+                    if exclamation_match:
+                        priority = len(exclamation_match.group(1).strip())
+                        remaining = remaining[exclamation_match.end():].strip()
+                
+                # Parse the due date
+                due_date = None
+                if '(no due date)' in remaining:
+                    remaining = remaining.replace('(no due date)', '').strip()
+                else:
+                    # Try to extract the date pattern DD/MM/YY HH:MM:SS
+                    date_match = re.match(r'(\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+(.*)', remaining)
+                    if date_match:
+                        date_str = date_match.group(1)
+                        remaining = date_match.group(2)
+                        try:
+                            due_date = datetime.datetime.strptime(date_str, '%d/%m/%y %H:%M:%S').strftime('%Y-%m-%d')
+                        except ValueError:
+                            logger.warning(f"Could not parse date: {date_str}")
+                
+                # Extract categories if present [cat1, cat2]
+                categories = []
+                cat_match = re.search(r'\[(.*?)\]$', remaining)
+                if cat_match:
+                    categories_str = cat_match.group(1)
+                    categories = [cat.strip() for cat in categories_str.split(',')]
+                    remaining = remaining[:cat_match.start()].strip()
+                
+                # The remaining part is the task text
+                text = remaining
+                
+                # Create hash for deduplication
+                task_hash = hashlib.md5(f"{task_id}-{text}".encode('utf-8', errors='ignore')).hexdigest()
+                
+                # Create task data with all information from the list output
+                task_data = {
+                    "id": task_id,
+                    "text": text,
+                    "summary": text,  # Use text as summary since we have it
+                    "priority": priority,  # 0=normal, 1=!, 2=!!
+                    "due_date": due_date,
+                    "categories": categories,
+                    "hash": task_hash
+                }
+                tasks.append(task_data)
+                
+            except Exception as e:
+                logger.warning(f"Could not parse task line: {line}. Error: {e}")
     
-    lines = output.strip().split('\n')
-    for line in lines:
-        match = re.match(pattern, line)
-        if match:
-            task_id = match.group(1)
-            priority = match.group(2)  # ! or !! for priority
-            due_str = match.group(3)
-            text = match.group(4).strip()
-            categories = match.group(5).split(',') if match.group(5) else []
-            
-            # Parse due date
-            due_date = None
-            if due_str != '(no due date)':
-                try:
-                    due_date = datetime.datetime.strptime(due_str, '%d/%m/%y %H:%M:%S').strftime('%Y-%m-%d')
-                except ValueError:
-                    logger.warning(f"Could not parse date: {due_str}")
-            
-            # Create task data
-            task_data = {
-                "id": task_id,
-                "text": text,
-                "priority": len(priority) if priority else 0,  # 0=normal, 1=!, 2=!!
-                "due_date": due_date,
-                "categories": categories,
-                "hash": hashlib.md5(f"{task_id}-{text}".encode()).hexdigest()
-            }
-            tasks.append(task_data)
+    except Exception as e:
+        logger.error(f"Error reading todoman tasks file: {e}")
     
     return tasks
 
@@ -233,64 +353,67 @@ def get_todoman_task_details(task_id):
     start_match = re.search(start_pattern, output)
     if start_match:
         start_date_str = start_match.group(1).strip()
-        try:
-            # Convert date string to ISO format
-            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d %H:%M:%S')
-            details['start_date'] = start_date.strftime('%Y-%m-%d')
-        except ValueError:
-            logger.warning(f"Could not parse start date: {start_date_str}")
+        if start_date_str != '':
+            try:
+                # Convert date string to ISO format
+                start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d %H:%M:%S')
+                details['start_date'] = start_date.strftime('%Y-%m-%d')
+            except ValueError:
+                logger.warning(f"Could not parse start date: {start_date_str}")
     
     due_match = re.search(due_pattern, output)
     if due_match:
         due_date_str = due_match.group(1).strip()
-        try:
-            # Convert date string to ISO format
-            due_date = datetime.datetime.strptime(due_date_str, '%Y-%m-%d %H:%M:%S')
-            details['due_date'] = due_date.strftime('%Y-%m-%d')
-        except ValueError:
-            logger.warning(f"Could not parse due date: {due_date_str}")
+        if due_date_str != '':
+            try:
+                # Convert date string to ISO format
+                due_date = datetime.datetime.strptime(due_date_str, '%Y-%m-%d %H:%M:%S')
+                details['due_date'] = due_date.strftime('%Y-%m-%d')
+            except ValueError:
+                logger.warning(f"Could not parse due date: {due_date_str}")
     
     return details
-
-def process_task(task_data, processed_tasks):
+def process_task(task_data, processed_tasks, existing_obsidian_tasks, use_task_show=False):
     """
     Processes a task and adds it to the systems.
+    If use_task_show is True, gets additional details using todoman show command.
     """
-    # Check if already processed
+    # Check if already processed by hash
     if task_data['hash'] in processed_tasks:
-        logger.info(f"Task {task_data['id']} already processed, skipping")
+        logger.info(f"Task {task_data['id']} already processed by hash, skipping")
         return False
     
     try:
-        # Get more details about the task
-        details = get_todoman_task_details(task_data['id'])
+        # Get more details about the task if requested
+        if use_task_show:
+            details = get_todoman_task_details(task_data['id'])
+            # Merge details with existing task data
+            task_data.update(details)
         
-        # Merge details with existing task data
-        task_data.update(details)
-        
-        # Extract text and dates
-        task_text = task_data.get('summary', task_data['text'])
+        # Extract text and dates - clean the text to handle encoding issues
+        task_text = clean_text(task_data.get('summary', task_data['text']))
         fecha_hoy = datetime.date.today().strftime("%Y-%m-%d")
         
         # Use task dates or default values
         fecha_inicio = task_data.get("start_date", fecha_hoy)
-        fecha_fin = task_data.get("due_date", (datetime.date.today() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"))
+        fecha_fin = task_data.get("due_date", None)
         
         # Extract categories
         categorias = task_data.get("categories", [])
         
         # Determine if it's a music-related task
-        music_sites = ["youtu.be", "youtube.com", "bandcamp.com", "soundcloud.com"]
+        music_sites = ["youtu.be", "youtube.com", "bandcamp.com", "soundcloud.com", "mixmag"]
         is_music = any(site.lower() in task_text.lower() for site in music_sites)
         
         # Determine project
         project = None
         for categoria in categorias:
-            if categoria.strip().lower() == "m_fuzzy":
+            categoria = categoria.strip().lower()
+            if categoria == "m_fuzzy" or categoria == "enlaces":
                 project = "Aplicacion_musica_pollo"
                 is_music = True
                 break
-            elif categoria.strip().lower() == "server":
+            elif categoria == "server":
                 project = "Server_management"
                 break
         
@@ -319,11 +442,30 @@ def process_task(task_data, processed_tasks):
                 with open(proyecto_path, "w", encoding='utf-8') as f:
                     f.write(f"# {project}\n\n")
         
-        # Prepare task text
-        task_text_with_project = f"#{project} {task_text}"
+        # Prepare tags for Obsidian
+        tags = []
         
-        # Convert title for Obsidian (with hashtags)
-        titulo_obsidian = convert_tags_to_hashtags(task_text_with_project)
+        # Add main project tag
+        tags.append(f"#{project}")
+        
+        # Add categories as tags
+        for categoria in categorias:
+            categoria = categoria.strip()
+            if categoria and categoria.lower() != project.lower():
+                tags.append(f"#{categoria}")
+        
+        # Join tags with spaces
+        tags_str = " ".join(tags)
+        
+        # Format task text for Obsidian (without tags, as they'll be added separately)
+        obsidian_task = task_text
+        
+        # Check if task already exists in Obsidian
+        full_task_text = f"{tags_str} {obsidian_task}"
+        if task_exists_in_obsidian(full_task_text, existing_obsidian_tasks):
+            logger.info(f"Task already exists in Obsidian: {full_task_text}")
+            # Add to processed tasks to prevent future processing
+            return True
         
         # Determine task type (music or standard)
         if is_music:
@@ -342,15 +484,40 @@ def process_task(task_data, processed_tasks):
         # Ensure parent directories exist
         todofile.parent.mkdir(parents=True, exist_ok=True)
         
-        # 1. Add task to Obsidian
+        # 1. Add task to Obsidian with proper formatting
         with open(TASKS_FILE, "a", encoding='utf-8') as f:
-            f.write("\n")
-            f.write(f"- [ ] {titulo_obsidian}")
-            if fecha_fin:
-                f.write(f" 📅 {fecha_fin}")
+            # Start with task marker
+            task_line = f"- [ ] "
+            
+            # Add creation date if it's not today
             if fecha_inicio and fecha_inicio != fecha_hoy:
-                f.write(f" ⏳ {fecha_inicio}")
-        logger.info(f"Added task to {TASKS_FILE}: {titulo_obsidian}")
+                task_line += f"➕ {fecha_inicio} "
+            
+            # Add tags 
+            task_line += f"{tags_str} "
+            
+            # Add priority marker if present
+            if task_data['priority'] >= 2:
+                task_line += "🔺 "  # Highest priority
+            elif task_data['priority'] == 1:
+                task_line += "🔼 "  # Medium priority
+            
+            # Add scheduled/start date if it's not the creation date
+            if fecha_inicio and fecha_inicio != fecha_hoy:
+                task_line += f"🛫 {fecha_inicio} "
+            
+            # Add due date if present
+            if fecha_fin:
+                task_line += f"📅 {fecha_fin} "
+            
+            # Add the actual task text
+            task_line += obsidian_task
+            
+            # Write the task
+            f.write("\n")
+            f.write(task_line)
+            
+        logger.info(f"Added task to {TASKS_FILE}: {task_line}")
         
         # Add task query block to project file if it doesn't exist
         add_task_query(proyecto_info["path"], project)
@@ -364,7 +531,7 @@ def process_task(task_data, processed_tasks):
         # Add categories
         for categoria in categorias:
             categoria = categoria.strip()
-            if categoria:
+            if categoria and not categoria.lower() == project.lower():
                 todo_txt += f" +{categoria}"
         
         # Add priority (A, B, C)
@@ -385,7 +552,7 @@ def process_task(task_data, processed_tasks):
         logger.info(f"Added task to {todofile} (todo.sh)")
         
         # Import to todo.sh
-        todo_sh_cmd = f'todo.sh add "{todo_txt}"'
+        todo_sh_cmd = f'todo.sh add "{clean_text_for_shell(todo_txt)}"'
         run_command(todo_sh_cmd, shell=True)
         logger.info("Task imported to todo.sh")
         
@@ -405,14 +572,90 @@ def process_task(task_data, processed_tasks):
         
         # Notify about success
         if is_music or album:
-            run_command(f'notify-send "Imported album: {album if album else ""} {titulo_obsidian}"', shell=True)
+            run_command(f'notify-send "Imported album: {album if album else ""} {tags_str} {obsidian_task}"', shell=True)
         else:
-            run_command(f'notify-send "Imported task: {titulo_obsidian} ({fecha_inicio} → {fecha_fin})"', shell=True)
+            run_command(f'notify-send "Imported task: {tags_str} {obsidian_task} ({fecha_inicio} → {fecha_fin if fecha_fin else "no due date"})"', shell=True)
         
         return True
     except Exception as e:
         logger.error(f"Error processing task {task_data['id']} '{task_data['text']}': {e}")
         return False
+
+
+def clean_ansi_codes(text):
+    """Remove ANSI color codes from text."""
+    ansi_pattern = re.compile(r'\x1B\[[0-9;]*[mK]')
+    return ansi_pattern.sub('', text)
+
+
+
+def clean_text(text):
+    """
+    Cleans a string by handling encoding issues and replacing emojis
+    with their text equivalents when needed.
+    """
+    try:
+        if not text:
+            return ""
+            
+        # If we're dealing with bytes, decode properly
+        if isinstance(text, bytes):
+            text = text.decode('utf-8', errors='replace')
+        
+        # For normal processing (keeping emojis intact), just return the text
+        return text
+    except Exception as e:
+        # If there's any exception in processing, fall back to ASCII
+        logger.warning(f"Error in clean_text: {e}")
+        return str(text).encode('ascii', errors='ignore').decode('ascii')
+
+
+def clean_argument_string(text):
+    """
+    Cleans a string to be safe for use as a command line argument.
+    Removes non-ASCII characters and escapes special characters.
+    """
+    # Remove non-ASCII characters
+    text = re.sub(r'[^\x00-\x7F]+', '', text)
+    # Escape special characters for shell
+    text = text.replace('"', '\\"').replace('$', '\\$').replace('`', '\\`')
+    # Remove characters that might cause problems in command line
+    text = text.replace('\n', ' ').replace('\r', '')
+    return text.strip()
+
+
+
+def clean_text_for_shell(text):
+    """
+    Cleans a string by removing non-ASCII characters and replacing emojis
+    with their text equivalents for shell command usage.
+    """
+    if not text:
+        return ""
+        
+    # Convert Path objects to string if needed
+    if isinstance(text, Path):
+        text = str(text)
+        
+    # Handle bytes if needed
+    if isinstance(text, bytes):
+        text = text.decode('utf-8', errors='replace')
+        
+    # Replace emojis with their text equivalents
+    text = text.replace("🔺", "(A) ").replace("🔼", "(B) ").replace("🔽", "(C) ")
+    text = text.replace("📅", "due:").replace("🛫", "t:").replace("⏳", "t:").replace("➕", "")
+    
+    # Remove other non-ASCII characters for shell compatibility
+    text = re.sub(r'[^\x00-\x7F\n]+', '', text)
+    
+    # Escape special characters for shell
+    text = text.replace('"', '\\"').replace('$', '\\$').replace('`', '\\`')
+    
+    # Remove characters that might cause problems in command line
+    text = text.replace('\n', ' ').replace('\r', '')
+    
+    return text.strip()
+
 
 def main():
     try:
@@ -431,28 +674,54 @@ def main():
         logger.info(f"Last checkpoint: {last_run.isoformat()}")
         logger.info(f"Previously processed tasks: {len(processed_tasks)}")
         
+        # Load existing tasks from Obsidian
+        existing_obsidian_tasks = load_existing_tasks()
+        logger.info(f"Loaded {len(existing_obsidian_tasks)} existing tasks from Obsidian")
+        
         # Variable to count processed tasks and new list of hashes
         processed_count = 0
         new_processed_tasks = processed_tasks.copy()
         
-        # Get tasks from todoman
-        cmd = 'todo --config "/home/huan/.config/todoman/config_tareas.py" list'
-        output, result = run_command(cmd, shell=True)
+        # Create temp file directory if it doesn't exist
+        TEMP_TODOMAN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Before running todo.sh add command or any other shell command
+        todo_txt_clean = clean_text_for_shell(TEMP_TODOMAN_FILE)
+        todo_sh_cmd = f'todo.sh add "{todo_txt_clean}"'
+
+        # Get tasks from todoman and save to temp file
+        cmd = f'todo --config "/home/huan/.config/todoman/config_tareas.py" list > {TEMP_TODOMAN_FILE}'
+        _, result = run_command(cmd, shell=True)
         
         if result != 0:
-            logger.error(f"Error getting tasks from todoman: {output}")
+            logger.error("Error getting tasks from todoman")
             run_command('notify-send -u critical "Error getting tasks from todoman"', shell=True)
             return 1
         
-        # Parse tasks
-        tasks = parse_todoman_tasks(output)
+        # Check if temp file was created and has content
+        if not TEMP_TODOMAN_FILE.exists() or TEMP_TODOMAN_FILE.stat().st_size == 0:
+            logger.error("Todoman task file is empty or was not created")
+            run_command('notify-send -u critical "Error: Todoman task file is empty"', shell=True)
+            return 1
+        
+        # Parse tasks from file
+        tasks = parse_todoman_tasks_from_file(TEMP_TODOMAN_FILE)
         logger.info(f"Found {len(tasks)} tasks in todoman")
         
         # Process each task
         for task in tasks:
-            if process_task(task, processed_tasks):
-                processed_count += 1
-                new_processed_tasks.append(task["hash"])
+            # Force re-processing if checkpoint was recently deleted
+            # (assumes checkpoint file doesn't exist or was recently created)
+            force_reprocess = not CHECKPOINT_FILE.exists() or (
+                CHECKPOINT_FILE.exists() and 
+                datetime.datetime.fromtimestamp(CHECKPOINT_FILE.stat().st_mtime) > 
+                datetime.datetime.now() - datetime.timedelta(minutes=5)
+            )
+            
+            if force_reprocess or task["hash"] not in processed_tasks:
+                if process_task(task, processed_tasks if not force_reprocess else [], existing_obsidian_tasks):
+                    processed_count += 1
+                    new_processed_tasks.append(task["hash"])
         
         # Notify results
         if processed_count > 0:
@@ -468,6 +737,8 @@ def main():
         logger.error(f"General error in script: {e}")
         run_command('notify-send -u critical "Error importing tasks" "Check the log for more details"', shell=True)
         return 1
+
+
 
 if __name__ == "__main__":
     sys.exit(main())

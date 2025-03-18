@@ -31,6 +31,7 @@ from datetime import datetime
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs, quote
 from typing import List, Dict
+import threading
 
 
 # Configure logging
@@ -39,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 
 class BlogPlaylists(BaseModule):
+    # Definir las señales a nivel de clase
+    show_move_dialog_signal = pyqtSignal(str, str)
+    error_signal = pyqtSignal(str)
     def __init__(self, **kwargs):
         # Extract theme-related arguments
         self.available_themes = kwargs.pop('temas', [])
@@ -67,6 +71,10 @@ class BlogPlaylists(BaseModule):
         self.local_dir.mkdir(parents=True, exist_ok=True)
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         
+        # Conectar las señales
+        self.show_move_dialog_signal.connect(self.show_move_dialog)
+        self.error_signal.connect(lambda msg: QMessageBox.critical(self, "Error", msg))
+        
         # Initialize UI
         self.init_ui()
 
@@ -74,6 +82,10 @@ class BlogPlaylists(BaseModule):
         super().apply_theme(theme_name)
 
     def init_ui(self):
+        if self.layout() is not None:
+            logging.info("Layout already exists, not creating a new one")
+            return
+
         layout = QVBoxLayout(self)
         
         # Main content area with three panels
@@ -493,8 +505,9 @@ class BlogPlaylists(BaseModule):
             self.move_to_listened(blog_name, playlist_name)
             self.refresh_blogs()
 
+    # Método play_selected actualizado
     def play_selected(self):
-        """Play the selected playlist."""
+        """Play the selected playlist without blocking the UI."""
         if not self.playlist_list.selectedItems():
             QMessageBox.warning(
                 self,
@@ -515,23 +528,15 @@ class BlogPlaylists(BaseModule):
             QMessageBox.critical(self, "Error", "No se encuentra el archivo de la playlist")
             return
 
-        try:
-            process = subprocess.run(
-                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm_starter.sh", 
-                 "--player-operation-mode=pseudo-gui", 
-                 "--force-window=yes", 
-                 str(playlist_path)]
-            )
-            
-            if process.returncode == 0 and playlist_data['type'] == 'blog':
-                self.show_move_dialog(playlist_data['blog'], playlist_data['name'])
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
+        # Crear y ejecutar el hilo
+        player_thread = MpvPlayerThread(playlist_path, self, playlist_data)
+        player_thread.daemon = True  # Hilo en segundo plano
+        player_thread.start()
 
 
+    # Método play_selected_track actualizado
     def play_selected_track(self):
-        """Reproduce el track seleccionado."""
+        """Reproduce el track seleccionado sin bloquear la interfaz."""
         selected_tracks = self.content_list.selectedItems()
         if not selected_tracks:
             return
@@ -544,16 +549,11 @@ class BlogPlaylists(BaseModule):
         
         url = track_data['url']
         
-        try:
-            # Ejecuta mpv con solo el URL seleccionado
-            process = subprocess.run(
-                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm_starter.sh", 
-                "--player-operation-mode=pseudo-gui", 
-                "--force-window=yes", 
-                url]
-            )
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error al reproducir: {str(e)}")
+        # Crear y ejecutar el hilo
+        player_thread = MpvPlayerThread(url, self)
+        player_thread.daemon = True  # Hilo en segundo plano
+        player_thread.start()
+
 
 
     def process_url(self):
@@ -774,3 +774,35 @@ class PlaylistManager:
                         feed_dir,
                         month_key
                     )
+
+
+# Agregar esta clase a tu código
+
+# Implementación del hilo para reproducción de MPV
+class MpvPlayerThread(threading.Thread):
+    def __init__(self, playlist_path, app, playlist_data=None):
+        super().__init__()
+        self.playlist_path = playlist_path
+        self.app = app
+        self.playlist_data = playlist_data
+        
+    def run(self):
+        try:
+            process = subprocess.run(
+                ["/home/huan/Scripts/menus/musica/menu_blogs/mpv/mpv_lastfm_starter.sh", 
+                 "--player-operation-mode=pseudo-gui", 
+                 "--force-window=yes", 
+                 str(self.playlist_path)]
+            )
+            
+            # Solo mostrar el diálogo si el proceso terminó correctamente y es una playlist de blog
+            if process.returncode == 0 and self.playlist_data and self.playlist_data['type'] == 'blog':
+                # Emitir la señal para mostrar el diálogo desde el hilo principal de Qt
+                self.app.show_move_dialog_signal.emit(self.playlist_data['blog'], self.playlist_data['name'])
+                
+        except Exception as e:
+            # Notificar error en la UI principal
+            self.app.error_signal.emit(f"Error al reproducir: {str(e)}")
+
+
+
