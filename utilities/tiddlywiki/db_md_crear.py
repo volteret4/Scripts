@@ -82,6 +82,7 @@ def create_database():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT,
         path TEXT,
+        directory TEXT,
         content TEXT,
         source TEXT,
         last_modified TIMESTAMP,
@@ -113,8 +114,11 @@ def create_database():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippets_path ON snippets(path)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippets_filename ON snippets(filename)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippets_source ON snippets(source)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippets_directory ON snippets(directory)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippets_last_modified ON snippets(last_modified)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippet_tags ON snippet_tags(snippet_id, tag_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_snippet_tags_tag_id ON snippet_tags(tag_id)')
     
     # Crear tabla para almacenar metadatos de indexación
     cursor.execute('''
@@ -130,6 +134,7 @@ def create_database():
         filename, 
         content, 
         path,
+        directory,
         source,
         content='snippets',
         content_rowid='id'
@@ -156,7 +161,7 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
         else:
             abs_excluded_paths.append(os.path.join(root_dir, path))
     
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     cursor = conn.cursor()
     
     # Verificar si las tablas existen
@@ -164,7 +169,7 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
     if not cursor.fetchone():
         conn.close()
         create_database()
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         cursor = conn.cursor()
     
     # Contador de archivos procesados
@@ -191,7 +196,9 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                     skipped_files += 1
                     continue
                     
-                file_directory = os.path.basename(root)
+                # Obtener el directorio relativo a la raíz para usar como categoría
+                rel_path = os.path.relpath(root, root_dir)
+                file_directory = rel_path if rel_path != '.' else ''
                 
                 # Leer el contenido del archivo
                 try:
@@ -206,7 +213,7 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                 
                 # Añadir el nombre de la carpeta como tag
                 if file_directory:
-                    content_tags.append(file_directory)
+                    content_tags.append(os.path.basename(file_directory))
                 
                 # Extraer posible URL source del contenido
                 source = extract_source_from_content(content)
@@ -225,9 +232,9 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                         # Actualizar el archivo existente
                         cursor.execute('''
                         UPDATE snippets 
-                        SET content = ?, source = ?, last_modified = ?, file_hash = ?, filename = ?
+                        SET content = ?, source = ?, last_modified = ?, file_hash = ?, filename = ?, directory = ?
                         WHERE id = ?
-                        ''', (content, source, last_modified, file_hash, file, existing_file[0]))
+                        ''', (content, source, last_modified, file_hash, file, file_directory, existing_file[0]))
                         
                         # Eliminar tags antiguos
                         cursor.execute('DELETE FROM snippet_tags WHERE snippet_id = ?', (existing_file[0],))
@@ -246,8 +253,8 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                                         (existing_file[0], tag_id))
                         
                         # Actualizar índice de búsqueda
-                        cursor.execute('INSERT OR REPLACE INTO snippet_fts(rowid, filename, content, path, source) VALUES (?, ?, ?, ?, ?)',
-                                     (existing_file[0], file, content, file_path, source))
+                        cursor.execute('INSERT OR REPLACE INTO snippet_fts(rowid, filename, content, path, directory, source) VALUES (?, ?, ?, ?, ?, ?)',
+                                     (existing_file[0], file, content, file_path, file_directory, source))
                         
                         updated_files += 1
                     else:
@@ -255,9 +262,9 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                 else:
                     # Insertar nuevo archivo
                     cursor.execute('''
-                    INSERT INTO snippets (filename, path, content, source, last_modified, file_hash)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (file, file_path, content, source, last_modified, file_hash))
+                    INSERT INTO snippets (filename, path, directory, content, source, last_modified, file_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (file, file_path, file_directory, content, source, last_modified, file_hash))
                     
                     snippet_id = cursor.lastrowid
                     
@@ -275,8 +282,8 @@ def update_database(root_dir, force_update=False, excluded_paths=None, db_path='
                                     (snippet_id, tag_id))
                     
                     # Insertar en índice de búsqueda
-                    cursor.execute('INSERT INTO snippet_fts(rowid, filename, content, path, source) VALUES (?, ?, ?, ?, ?)',
-                                 (snippet_id, file, content, file_path, source))
+                    cursor.execute('INSERT INTO snippet_fts(rowid, filename, content, path, directory, source) VALUES (?, ?, ?, ?, ?, ?)',
+                                 (snippet_id, file, content, file_path, file_directory, source))
                     
                     new_files += 1
                 

@@ -1,1201 +1,613 @@
-#!/usr/bin/env python3
 import sys
-import os
 import sqlite3
-import subprocess
-import datetime
-import re
-from dateutil.relativedelta import relativedelta
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QSplitter, QTreeWidget, 
-                           QTreeWidgetItem, QLineEdit, QVBoxLayout, QHBoxLayout, 
-                           QWidget, QPushButton, QTextEdit, QCheckBox, QMessageBox,
-                           QLabel, QFileDialog, QComboBox)
-from PyQt6.QtCore import Qt, QSize, QSortFilterProxyModel
-from PyQt6.QtGui import QKeySequence, QFont, QIcon, QShortcut
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QLineEdit, QListWidget, QTextEdit, QPushButton, QLabel, QListWidgetItem,
+                             QDialog, QCheckBox, QScrollArea, QSplitter, QFrame, QMessageBox,  QDialogButtonBox)
+from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtGui import QColor, QPalette, QFont, QIcon
 import markdown
-
-# Reutilizamos la función de parse_date del script original
-def parse_date(date_str):
-    """
-    Convierte una cadena de fecha en un objeto datetime.
-    Admite formatos:
-    - Fechas ISO (YYYY-MM-DD)
-    - Meses (enero 2024, ene 2024)
-    - Años (2024)
-    - Relativos (hoy, ayer, esta semana, este mes, este año)
-    """
-    today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Fechas relativas
-    if date_str.lower() == "hoy":
-        return today, today + datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-    
-    if date_str.lower() == "ayer":
-        yesterday = today - datetime.timedelta(days=1)
-        return yesterday, yesterday + datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-    
-    if date_str.lower() == "esta semana":
-        start_of_week = today - datetime.timedelta(days=today.weekday())
-        end_of_week = start_of_week + datetime.timedelta(days=7) - datetime.timedelta(microseconds=1)
-        return start_of_week, end_of_week
-    
-    if date_str.lower() == "este mes":
-        start_of_month = today.replace(day=1)
-        if today.month == 12:
-            end_of_month = today.replace(year=today.year + 1, month=1, day=1) - datetime.timedelta(microseconds=1)
-        else:
-            end_of_month = today.replace(month=today.month + 1, day=1) - datetime.timedelta(microseconds=1)
-        return start_of_month, end_of_month
-    
-    if date_str.lower() == "este año":
-        start_of_year = today.replace(month=1, day=1)
-        end_of_year = today.replace(year=today.year + 1, month=1, day=1) - datetime.timedelta(microseconds=1)
-        return start_of_year, end_of_year
-    
-    # Intentar formato ISO
-    try:
-        date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-        return date, date + datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-    except ValueError:
-        pass
-    
-    # Intentar año
-    if re.match(r'^\d{4}$', date_str):
-        year = int(date_str)
-        start = datetime.datetime(year, 1, 1)
-        end = datetime.datetime(year + 1, 1, 1) - datetime.timedelta(microseconds=1)
-        return start, end
-    
-    # Intentar mes y año
-    meses = {
-        'enero': 1, 'ene': 1, 'jan': 1, 'january': 1,
-        'febrero': 2, 'feb': 2, 'february': 2,
-        'marzo': 3, 'mar': 3, 'march': 3,
-        'abril': 4, 'abr': 4, 'apr': 4, 'april': 4,
-        'mayo': 5, 'may': 5,
-        'junio': 6, 'jun': 6, 'june': 6,
-        'julio': 7, 'jul': 7, 'july': 7,
-        'agosto': 8, 'ago': 8, 'aug': 8, 'august': 8,
-        'septiembre': 9, 'sep': 9, 'sept': 9, 'september': 9,
-        'octubre': 10, 'oct': 10, 'october': 10,
-        'noviembre': 11, 'nov': 11, 'november': 11,
-        'diciembre': 12, 'dic': 12, 'dec': 12, 'december': 12
-    }
-    
-    for nombre_mes, num_mes in meses.items():
-        # Patrones como "enero 2024" o "ene 2024"
-        pattern = f'^{nombre_mes}\s+(\d{{4}})$'
-        match = re.match(pattern, date_str.lower())
-        if match:
-            year = int(match.group(1))
-            start = datetime.datetime(year, num_mes, 1)
-            if num_mes == 12:
-                end = datetime.datetime(year + 1, 1, 1) - datetime.timedelta(microseconds=1)
-            else:
-                end = datetime.datetime(year, num_mes + 1, 1) - datetime.timedelta(microseconds=1)
-            return start, end
-    
-    raise ValueError(f"Formato de fecha no reconocido: {date_str}")
-
-def search_snippets(db_path, search_text="", exact_match=False, path=None, title=None, 
-                   tags=None, content=None, source=None, date=None):
-    print(f"Buscando en: {db_path}")
-    print(f"Parámetros de búsqueda: texto='{search_text}', exacta={exact_match}, path={path}, title={title}, tags={tags}")
-    
-    # Resto del código existente...
-    
-    # Antes de retornar los resultados
-
-    """
-    Busca snippets en la base de datos según los criterios especificados.
-    Los criterios se combinan con AND lógico.
-    Añade soporte para búsqueda difusa/exacta.
-    """
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    # Construir la consulta SQL base
-    query = """
-    SELECT DISTINCT s.id, s.filename, s.path, s.content, s.source, s.last_modified
-    FROM snippets s
-    """
-    
-    # Condiciones y parámetros
-    conditions = []
-    params = {}
-    
-    # Procesar la búsqueda general
-    if search_text:
-        if exact_match:
-            # Si es exacta, busca coincidencia exacta en todos los campos
-            text_conditions = []
-            text_conditions.append("s.filename LIKE :search_text")
-            text_conditions.append("s.path LIKE :search_text")
-            text_conditions.append("s.content LIKE :search_text")
-            text_conditions.append("s.source LIKE :search_text")
-            # También buscar en tags
-            query += " LEFT JOIN snippet_tags st ON s.id = st.snippet_id LEFT JOIN tags t ON st.tag_id = t.id "
-            text_conditions.append("t.name LIKE :search_text")
-            
-            conditions.append("(" + " OR ".join(text_conditions) + ")")
-            params["search_text"] = f"%{search_text}%"
-        else:
-            # Si es difusa, usar la tabla FTS si está disponible
-            try:
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='snippet_fts'")
-                if cursor.fetchone():
-                    # Usar FTS para búsqueda difusa
-                    query = """
-                    SELECT DISTINCT s.id, s.filename, s.path, s.content, s.source, s.last_modified
-                    FROM snippet_fts fts
-                    JOIN snippets s ON s.filename = fts.filename AND s.path = fts.path
-                    """
-                    conditions.append("snippet_fts MATCH :search_text")
-                    params["search_text"] = search_text
-                else:
-                    # Fallback si no hay FTS
-                    text_conditions = []
-                    text_conditions.append("s.filename LIKE :search_text")
-                    text_conditions.append("s.path LIKE :search_text")
-                    text_conditions.append("s.content LIKE :search_text")
-                    text_conditions.append("s.source LIKE :search_text")
-                    
-                    query += " LEFT JOIN snippet_tags st ON s.id = st.snippet_id LEFT JOIN tags t ON st.tag_id = t.id "
-                    text_conditions.append("t.name LIKE :search_text")
-                    
-                    conditions.append("(" + " OR ".join(text_conditions) + ")")
-                    params["search_text"] = f"%{search_text}%"
-            except Exception as e:
-                print(f"Error con FTS: {e}")
-                # Fallback si hay algún error
-                text_conditions = []
-                text_conditions.append("s.filename LIKE :search_text")
-                text_conditions.append("s.path LIKE :search_text")
-                text_conditions.append("s.content LIKE :search_text")
-                text_conditions.append("s.source LIKE :search_text")
-                
-                conditions.append("(" + " OR ".join(text_conditions) + ")")
-                params["search_text"] = f"%{search_text}%"
-    
-    # Si hay tags, unimos con las tablas necesarias si no lo hemos hecho ya
-    if tags and "JOIN tags t ON" not in query:
-        query += """
-        JOIN snippet_tags st ON s.id = st.snippet_id
-        JOIN tags t ON st.tag_id = t.id
-        """
-    
-    if tags:
-        # Convertir la cadena de tags en una lista
-        tag_list = [tag.strip() for tag in tags.split(',')]
-        # Para cada tag, agregamos una condición
-        for i, tag in enumerate(tag_list):
-            conditions.append(f"EXISTS (SELECT 1 FROM tags t JOIN snippet_tags st ON t.id = st.tag_id WHERE st.snippet_id = s.id AND t.name = :tag{i})")
-            params[f"tag{i}"] = tag
-    
-    # Agregar otras condiciones
-    if path:
-        conditions.append("s.path LIKE :path")
-        params["path"] = f"%{path}%"
-    
-    if title:  # En realidad busca en filename
-        conditions.append("s.filename LIKE :title")
-        params["title"] = f"%{title}%"
-    
-    if content:
-        conditions.append("s.content LIKE :content")
-        params["content"] = f"%{content}%"
-    
-    if source:
-        conditions.append("s.source LIKE :source")
-        params["source"] = f"%{source}%"
-    
-    if date:
-        try:
-            date_start, date_end = parse_date(date)
-            conditions.append("s.last_modified BETWEEN :date_start AND :date_end")
-            params["date_start"] = date_start.strftime("%Y-%m-%d %H:%M:%S")
-            params["date_end"] = date_end.strftime("%Y-%m-%d %H:%M:%S")
-        except ValueError as e:
-            print(f"Error al procesar la fecha: {e}")
-            conn.close()
-            return []
-    
-    # Completar la consulta con las condiciones
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-    
-    # Ejecutar la consulta
-    try:
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-    except sqlite3.Error as e:
-        print(f"Error en consulta SQL: {e}")
-        print(f"Query: {query}")
-        print(f"Params: {params}")
-        conn.close()
-        return []
-    
-    # Obtener tags para cada snippet encontrado
-    snippets_with_tags = []
-    for row in results:
-        snippet_dict = dict(row)
-        
-        # Obtener tags para este snippet
-        cursor.execute("""
-            SELECT t.name 
-            FROM tags t 
-            JOIN snippet_tags st ON t.id = st.tag_id 
-            WHERE st.snippet_id = ?
-        """, (row['id'],))
-        
-        tags = [tag[0] for tag in cursor.fetchall()]
-        snippet_dict['tags'] = tags
-        snippets_with_tags.append(snippet_dict)
-    
-    conn.close()
-    print(f"Resultados encontrados: {len(snippets_with_tags)}")
-    return snippets_with_tags
-
-    
-def update_snippet_content(db_path, snippet_id, new_content):
-    """Actualiza el contenido de un snippet en la base de datos"""
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Actualizar el contenido y la fecha de modificación
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute(
-            "UPDATE snippets SET content = ?, last_modified = ? WHERE id = ?",
-            (new_content, current_time, snippet_id)
-        )
-        
-        # Comprobar si también hay que actualizar la tabla FTS si existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='snippet_fts'")
-        if cursor.fetchone():
-            # Obtener la información del snippet
-            cursor.execute("SELECT filename, path, source FROM snippets WHERE id = ?", (snippet_id,))
-            row = cursor.fetchone()
-            if row:
-                filename, path, source = row
-                # Actualizar FTS
-                cursor.execute(
-                    "UPDATE snippet_fts SET content = ? WHERE filename = ? AND path = ?",
-                    (new_content, filename, path)
-                )
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error al actualizar snippet: {e}")
-        return False
-
-def delete_snippet(db_path, snippet_id):
-    """Elimina un snippet de la base de datos"""
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Obtener información del snippet antes de eliminarlo
-        cursor.execute("SELECT filename, path FROM snippets WHERE id = ?", (snippet_id,))
-        snippet_info = cursor.fetchone()
-        
-        # Eliminar registros de tablas relacionadas primero
-        cursor.execute("DELETE FROM snippet_tags WHERE snippet_id = ?", (snippet_id,))
-        
-        # Eliminar el snippet principal
-        cursor.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
-        
-        # Si existe la tabla FTS, actualizar también
-        if snippet_info:
-            filename, path = snippet_info
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='snippet_fts'")
-            if cursor.fetchone():
-                cursor.execute(
-                    "DELETE FROM snippet_fts WHERE filename = ? AND path = ?",
-                    (filename, path)
-                )
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error al eliminar snippet: {e}")
-        return False
-
-class SnippetViewer(QMainWindow):
-    def __init__(self, db_path):
-        super().__init__()
-        self.db_path = db_path
-        self.current_snippet_id = None
-        self.current_snippet_path = None
-        # Theme system
-        self.themes = {
-            "Default": {
-                'bg': '#ffffff', 
-                'fg': '#000000',
-                'accent': '#2979ff',
-                'secondary_bg': '#f0f0f0',
-                'border': '#cccccc',
-                'selection': '#e0e0e0',
-                'button_hover': '#d0d0d0'
-            },
-            "Dark": {
-                'bg': '#2d2d2d',
-                'fg': '#ffffff',
-                'accent': '#03a9f4',
-                'secondary_bg': '#3d3d3d',
-                'border': '#555555',
-                'selection': '#505050',
-                'button_hover': '#606060'
-            },
-            "Synthwave": {
-                'bg': '#262335',
-                'fg': '#f8f8f2',
-                'accent': '#ff8adc',
-                'secondary_bg': '#3b315e',
-                'border': '#7d77a9',
-                'selection': '#4b3c83',
-                'button_hover': '#fe5f86'
-            },
-            "Catppuccin": {
-                'bg': '#1e1e2e',
-                'fg': '#cdd6f4',
-                'accent': '#89b4fa',
-                'secondary_bg': '#313244',
-                'border': '#6c7086',
-                'selection': '#45475a',
-                'button_hover': '#585b70'
-            }
-        }
-        self.current_theme = "Catppuccin"  # Default theme
-        
-        self.initUI()
-    
+from markdown.extensions import codehilite, fenced_code
+import os
+from functools import partial
+from db_md_async_search import SearchWorker
+import json
 
 
-    def initUI(self):
-        self.setWindowTitle("Visor de Snippets")
-        self.setGeometry(100, 100, 1200, 800)
-        
-        # Widget principal
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QVBoxLayout(main_widget)
-        
-         # Panel superior: búsqueda y botones
-        search_panel = QWidget()
-        search_layout = QHBoxLayout(search_panel)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_panel.setMaximumHeight(50)  # Ajustar según necesidad
+class CatppuccinDarkTheme:
+    # Colores del tema Catppuccin Mocha (variante oscura)
+    base = "#1e1e2e"
+    mantle = "#181825"
+    crust = "#11111b"
+    text = "#cdd6f4"
+    subtext0 = "#a6adc8"
+    subtext1 = "#bac2de"
+    surface0 = "#313244"
+    surface1 = "#45475a"
+    surface2 = "#585b70"
+    overlay0 = "#6c7086"
+    blue = "#89b4fa"
+    lavender = "#b4befe"
+    sapphire = "#74c7ec"
+    sky = "#89dceb"
+    teal = "#94e2d5"
+    green = "#a6e3a1"
+    yellow = "#f9e2af"
+    peach = "#fab387"
+    maroon = "#eba0ac"
+    red = "#f38ba8"
+    mauve = "#cba6f7"
+    pink = "#f5c2e7"
+    flamingo = "#f2cdcd"
+    rosewater = "#f5e0dc"
 
-        # Selector de temas
-        self.theme_selector = QComboBox()
-        self.theme_selector.addItems(list(self.themes.keys()))
-        self.theme_selector.setCurrentText(self.current_theme)
-        self.theme_selector.currentTextChanged.connect(self.apply_theme)
-        search_layout.addWidget(QLabel("Tema:"))
-        search_layout.addWidget(self.theme_selector)
-
-        # Caja de búsqueda unificada
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar snippets... (t:título p:ruta tag:etiquetas d:fecha s:fuente)")
-        self.search_input.returnPressed.connect(self.perform_search)
-        search_layout.addWidget(self.search_input)
+    @classmethod
+    def apply_to_app(cls, app):
+        # Aplicar el tema Catppuccin a toda la aplicación
+        palette = QPalette()
         
-        # Checkbox para búsqueda exacta
-        self.exact_match_checkbox = QCheckBox("Búsqueda exacta")
-        search_layout.addWidget(self.exact_match_checkbox)
+        # Colores generales
+        palette.setColor(QPalette.ColorRole.Window, QColor(cls.base))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(cls.text))
+        palette.setColor(QPalette.ColorRole.Base, QColor(cls.mantle))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(cls.crust))
+        palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(cls.mantle))
+        palette.setColor(QPalette.ColorRole.ToolTipText, QColor(cls.text))
+        palette.setColor(QPalette.ColorRole.Text, QColor(cls.text))
+        palette.setColor(QPalette.ColorRole.Button, QColor(cls.surface0))
+        palette.setColor(QPalette.ColorRole.ButtonText, QColor(cls.text))
+        palette.setColor(QPalette.ColorRole.BrightText, QColor(cls.rosewater))
         
-        # Checkbox para editable
-        self.editable_checkbox = QCheckBox("Editable")
-        search_layout.addWidget(self.editable_checkbox)
-        self.editable_checkbox.stateChanged.connect(self.toggle_editable)
+        # Colores para elementos deshabilitados - corregido para PyQt6
+        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(cls.overlay0))
+        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(cls.overlay0))
+        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(cls.overlay0))
         
-        # Botones para acciones
-        self.btn_open_folder = QPushButton("Abrir carpeta")
-        self.btn_open_folder.setToolTip("Abrir carpeta del snippet (Ctrl+O)")
-        self.btn_open_folder.clicked.connect(self.open_folder)
-        search_layout.addWidget(self.btn_open_folder)
+        # Colores para selección
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(cls.mauve))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(cls.crust))
         
-        self.btn_open_obsidian = QPushButton("Abrir en Obsidian")
-        self.btn_open_obsidian.setToolTip("Abrir en Obsidian (Ctrl+E)")
-        self.btn_open_obsidian.clicked.connect(self.open_in_obsidian)
-        search_layout.addWidget(self.btn_open_obsidian)
+        # Aplica la paleta a la aplicación
+        app.setPalette(palette)
         
-        self.btn_delete = QPushButton("Eliminar")
-        self.btn_delete.setToolTip("Eliminar snippet (Ctrl+Delete)")
-        self.btn_delete.clicked.connect(self.delete_current_snippet)
-        search_layout.addWidget(self.btn_delete)
-        
-        # Botón de ayuda para mostrar la sintaxis de búsqueda
-        self.btn_help = QPushButton("?")
-        self.btn_help.setToolTip("Mostrar ayuda de búsqueda")
-        self.btn_help.setMaximumWidth(30)
-        self.btn_help.clicked.connect(self.show_search_help)
-        search_layout.addWidget(self.btn_help)
-        
-        main_layout.addWidget(search_panel)
-        
-        # # Panel de filtros avanzados
-        # filter_panel = QWidget()
-        # filter_layout = QHBoxLayout(filter_panel)
-        # filter_layout.setContentsMargins(0, 0, 0, 0)
-        # filter_panel.setMaximumHeight(50)  # Ajustar según necesidad
-
-
-        # # Labels y campos de filtro
-        # filter_layout.addWidget(QLabel("Título:"))
-        # self.title_filter = QLineEdit()
-        # filter_layout.addWidget(self.title_filter)
-        
-        # filter_layout.addWidget(QLabel("Ruta:"))
-        # self.path_filter = QLineEdit()
-        # filter_layout.addWidget(self.path_filter)
-        
-        # filter_layout.addWidget(QLabel("Tags:"))
-        # self.tags_filter = QLineEdit()
-        # filter_layout.addWidget(self.tags_filter)
-        
-        # filter_layout.addWidget(QLabel("Fecha:"))
-        # self.date_filter = QLineEdit()
-        # self.date_filter.setPlaceholderText("ej: hoy, ayer, 2023-01-01")
-        # filter_layout.addWidget(self.date_filter)
-        
-        # filter_layout.addWidget(QLabel("Fuente:"))
-        # self.source_filter = QLineEdit()
-        # filter_layout.addWidget(self.source_filter)
-        
-        # main_layout.addWidget(filter_panel)
-        
-        # Splitter para paneles izquierdo y derecho
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Panel izquierdo: resultados de búsqueda
-        self.results_tree = QTreeWidget()
-        self.results_tree.setHeaderLabels(["Nombre", "Tags", "Ruta", "Fecha"])
-        self.results_tree.setColumnWidth(0, 150)  # Ancho para la columna de tags
-        self.results_tree.setColumnWidth(1, 200)
-        self.results_tree.setColumnWidth(2, 300)
-        self.results_tree.itemClicked.connect(self.snippet_selected)
-        splitter.addWidget(self.results_tree)
-        
-        # Hacer que las columnas sean ordenables
-        self.results_tree.setSortingEnabled(True)
-        self.results_tree.header().setSectionsClickable(True)
-
-        # Panel derecho: contenido del snippet y vista renderizada
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Vista renderizada del markdown
-        self.markdown_view = QWebEngineView()
-        self.markdown_view.setMinimumWidth(500)
-        
-        # Editor de texto para contenido
-        self.content_editor = QTextEdit()
-        self.content_editor.setVisible(False)  # Inicialmente oculto
-        self.content_editor.textChanged.connect(self.content_changed)
-        
-        right_layout.addWidget(self.markdown_view)
-        right_layout.addWidget(self.content_editor)
-        
-        splitter.addWidget(right_panel)
-        
-        # Configurar proporción inicial del splitter
-        splitter.setSizes([300, 900])  # Proporciones iniciales
-        
-        main_layout.addWidget(splitter)
-        
-        # Configurar atajos de teclado
-        self.shortcut_open_folder = QShortcut(QKeySequence("Ctrl+O"), self)
-        self.shortcut_open_folder.activated.connect(self.open_folder)
-        
-        self.shortcut_open_obsidian = QShortcut(QKeySequence("Ctrl+E"), self)
-        self.shortcut_open_obsidian.activated.connect(self.open_in_obsidian)
-        
-        self.shortcut_delete = QShortcut(QKeySequence("Ctrl+Delete"), self)
-        self.shortcut_delete.activated.connect(self.delete_current_snippet)
-
-        self.apply_theme(self.current_theme)
-
-        # Desactivar botones inicialmente
-        self.update_button_states()
-        
-        # Realizar búsqueda inicial vacía para mostrar todos los resultados
-    
-        self.perform_search()
-    
-
-
-    def apply_theme(self, theme_name):
-        """Aplica el tema seleccionado a la interfaz"""
-        if theme_name not in self.themes:
-            return
-            
-        self.current_theme = theme_name
-        theme = self.themes[theme_name]
-        
-        # Set application style sheet
-        self.setStyleSheet(f"""
-            QMainWindow, QWidget {{
-                background-color: {theme['bg']};
-                color: {theme['fg']};
-            }}
-            
-            QTreeWidget {{
-                background-color: {theme['secondary_bg']};
-                color: {theme['fg']};
-                border: 1px solid {theme['border']};
-            }}
-            
-            QTreeWidget::item:selected {{
-                background-color: {theme['selection']};
-            }}
-            
-            QLineEdit, QTextEdit {{
-                background-color: {theme['secondary_bg']};
-                color: {theme['fg']};
-                border: 1px solid {theme['border']};
-                border-radius: 3px;
-                padding: 2px 4px;
+        # Estilo adicional para widgets específicos
+        app.setStyleSheet(f"""
+            QLineEdit, QTextEdit, QListWidget {{
+                background-color: {cls.surface0};
+                color: {cls.text};
+                border: 1px solid {cls.surface2};
+                border-radius: 4px;
+                padding: 4px;
             }}
             
             QPushButton {{
-                background-color: {theme['secondary_bg']};
-                color: {theme['fg']};
-                border: 1px solid {theme['border']};
-                border-radius: 3px;
-                padding: 4px 8px;
+                background-color: {cls.surface1};
+                color: {cls.text};
+                border: 1px solid {cls.surface2};
+                border-radius: 4px;
+                padding: 6px 12px;
             }}
             
             QPushButton:hover {{
-                background-color: {theme['button_hover']};
+                background-color: {cls.surface2};
             }}
             
             QPushButton:pressed {{
-                background-color: {theme['accent']};
-            }}
-            
-            QCheckBox {{
-                color: {theme['fg']};
+                background-color: {cls.blue};
+                color: {cls.crust};
             }}
             
             QSplitter::handle {{
-                background-color: {theme['border']};
+                background-color: {cls.surface1};
+            }}
+            
+            QScrollBar:vertical {{
+                background-color: {cls.surface0};
+                width: 12px;
+                margin: 0px;
+            }}
+            
+            QScrollBar::handle:vertical {{
+                background-color: {cls.surface2};
+                min-height: 20px;
+                border-radius: 4px;
+            }}
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            
+            QCheckBox {{
+                color: {cls.text};
+            }}
+            
+            QCheckBox::indicator:checked {{
+                background-color: {cls.blue};
             }}
             
             QLabel {{
-                color: {theme['fg']};
+                color: {cls.text};
             }}
         """)
+
+class PathFilterDialog(QDialog):
+    def __init__(self, parent, db_path, root_folders):
+        super().__init__(parent)
+        self.db_path = db_path
+        self.root_folders = root_folders
+        self.selected_folders = []
         
-        # Custom WebView background
-        if theme_name != "Default":  # Only for dark themes
-            script = f"""
-            (function() {{
-                document.body.style.backgroundColor = "{theme['bg']}";
-                document.body.style.color = "{theme['fg']}";
-            }})()
-            """
-            self.markdown_view.page().runJavaScript(script)
+        # Cargar filtros guardados previamente
+        self.load_saved_filters()
+        
+        self.setup_ui()
+    
+    def load_saved_filters(self):
+        try:
+            if os.path.exists('filter_settings.json'):
+                with open('filter_settings.json', 'r') as f:
+                    data = json.load(f)
+                    if 'selected_folders' in data and isinstance(data['selected_folders'], list):
+                        self.selected_folders = data['selected_folders']
+                        print(f"Dialog: Filtros cargados: {self.selected_folders}")
+        except Exception as e:
+            print(f"Dialog: Error cargando filtros: {e}")
+    
+    def setup_ui(self):
+        self.setWindowTitle("Filtrar por carpetas")
+        layout = QVBoxLayout(self)
+        
+        # Lista de carpetas con checkboxes
+        self.folder_list = QListWidget()
+        
+        # Añadir las carpetas a la lista
+        for folder in self.root_folders:
+            item = QListWidgetItem(folder)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            
+            # Marcar las carpetas que estaban seleccionadas previamente
+            if folder in self.selected_folders:
+                item.setCheckState(Qt.CheckState.Checked)
+            else:
+                item.setCheckState(Qt.CheckState.Unchecked)
+            
+            self.folder_list.addItem(item)
+        
+        layout.addWidget(self.folder_list)
+        
+        # Botones
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | 
+                                      QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+        self.resize(400, 300)
+    
+    def get_selected_folders(self):
+        selected = []
+        for i in range(self.folder_list.count()):
+            item = self.folder_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected
 
-
-    def show_search_help(self):
-        """Muestra un diálogo con ayuda sobre la sintaxis de búsqueda"""
-        help_text = """
-        <h3>Sintaxis de búsqueda</h3>
-        <p>Puedes usar los siguientes atajos para filtrar tu búsqueda:</p>
-        <ul>
-            <li><b>t:</b> o <b>title:</b> - Buscar en el título del archivo</li>
-            <li><b>p:</b> o <b>path:</b> - Buscar en la ruta del archivo</li>
-            <li><b>tag:</b> o <b>tags:</b> - Buscar por etiquetas (separadas por comas)</li>
-            <li><b>d:</b> o <b>date:</b> - Buscar por fecha (hoy, ayer, este mes, etc.)</li>
-            <li><b>s:</b> o <b>source:</b> - Buscar por fuente del snippet</li>
-        </ul>
-        <p>Ejemplos:</p>
-        <ul>
-            <li><code>python t:tutorial</code> - Busca "python" en contenido y "tutorial" en el título</li>
-            <li><code>p:proyectos tag:importante,urgente</code> - Snippets en la ruta "proyectos" con etiquetas "importante" y "urgente"</li>
-            <li><code>d:este mes s:web</code> - Snippets de este mes con fuente "web"</li>
-        </ul>
-        <p>Puedes usar comillas para términos con espacios: <code>t:"mi proyecto"</code></p>
+class MarkdownRenderer:
+    @staticmethod
+    def render_markdown(text):
+        # Configurar extensiones de markdown para resaltado de sintaxis
+        md = markdown.Markdown(extensions=[
+            'fenced_code',
+            'codehilite',
+            'tables',
+            'nl2br'
+        ])
+        
+        # Convertir markdown a HTML
+        html = md.convert(text)
+        
+        # Añadir estilos CSS personalizados para el tema Catppuccin
+        styled_html = f"""
+        <style>
+            body {{
+                background-color: #1e1e2e;
+                color: #cdd6f4;
+                font-family: 'Roboto', 'Segoe UI', 'Arial', sans-serif;
+                line-height: 1.6;
+                padding: 10px;
+            }}
+            h1, h2, h3, h4, h5, h6 {{
+                color: #f5c2e7;
+                margin-top: 20px;
+                margin-bottom: 10px;
+            }}
+            a {{
+                color: #89b4fa;
+                text-decoration: none;
+            }}
+            a:hover {{
+                text-decoration: underline;
+            }}
+            code {{
+                font-family: 'Fira Code', 'Consolas', monospace;
+                background-color: #313244;
+                color: #a6e3a1;
+                padding: 2px 4px;
+                border-radius: 3px;
+            }}
+            pre {{
+                background-color: #313244;
+                padding: 10px;
+                border-radius: 5px;
+                overflow-x: auto;
+            }}
+            pre code {{
+                background-color: transparent;
+                padding: 0;
+            }}
+            blockquote {{
+                border-left: 4px solid #74c7ec;
+                margin-left: 0;
+                padding-left: 10px;
+                color: #a6adc8;
+            }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+                margin: 15px 0;
+            }}
+            th, td {{
+                border: 1px solid #585b70;
+                padding: 8px;
+                text-align: left;
+            }}
+            th {{
+                background-color: #45475a;
+            }}
+            img {{
+                max-width: 100%;
+                height: auto;
+            }}
+            ul, ol {{
+                padding-left: 20px;
+            }}
+            hr {{
+                border: none;
+                border-top: 1px solid #45475a;
+                margin: 20px 0;
+            }}
+            /* Colores de resaltado de código para Catppuccin */
+            .codehilite .hll {{ background-color: #45475a }}
+            .codehilite .c {{ color: #6c7086 }} /* Comentario */
+            .codehilite .k {{ color: #cba6f7 }} /* Keyword */
+            .codehilite .n {{ color: #cdd6f4 }} /* Name */
+            .codehilite .o {{ color: #89dceb }} /* Operator */
+            .codehilite .p {{ color: #cdd6f4 }} /* Punctuation */
+            .codehilite .cm {{ color: #6c7086 }} /* Comment.Multiline */
+            .codehilite .cp {{ color: #6c7086 }} /* Comment.Preproc */
+            .codehilite .c1 {{ color: #6c7086 }} /* Comment.Single */
+            .codehilite .cs {{ color: #6c7086 }} /* Comment.Special */
+            .codehilite .kc {{ color: #cba6f7 }} /* Keyword.Constant */
+            .codehilite .kd {{ color: #cba6f7 }} /* Keyword.Declaration */
+            .codehilite .kn {{ color: #cba6f7 }} /* Keyword.Namespace */
+            .codehilite .kp {{ color: #cba6f7 }} /* Keyword.Pseudo */
+            .codehilite .kr {{ color: #cba6f7 }} /* Keyword.Reserved */
+            .codehilite .kt {{ color: #cba6f7 }} /* Keyword.Type */
+            .codehilite .m {{ color: #fab387 }} /* Literal.Number */
+            .codehilite .s {{ color: #a6e3a1 }} /* Literal.String */
+            .codehilite .na {{ color: #f5c2e7 }} /* Name.Attribute */
+            .codehilite .nb {{ color: #89b4fa }} /* Name.Builtin */
+            .codehilite .nc {{ color: #f9e2af }} /* Name.Class */
+            .codehilite .no {{ color: #f38ba8 }} /* Name.Constant */
+            .codehilite .nd {{ color: #f9e2af }} /* Name.Decorator */
+            .codehilite .ni {{ color: #cdd6f4 }} /* Name.Entity */
+            .codehilite .ne {{ color: #f38ba8 }} /* Name.Exception */
+            .codehilite .nf {{ color: #89b4fa }} /* Name.Function */
+            .codehilite .nl {{ color: #cdd6f4 }} /* Name.Label */
+            .codehilite .nn {{ color: #f9e2af }} /* Name.Namespace */
+            .codehilite .nt {{ color: #f38ba8 }} /* Name.Tag */
+            .codehilite .nv {{ color: #cdd6f4 }} /* Name.Variable */
+            .codehilite .ow {{ color: #89dceb }} /* Operator.Word */
+            .codehilite .mb {{ color: #fab387 }} /* Literal.Number.Bin */
+            .codehilite .mf {{ color: #fab387 }} /* Literal.Number.Float */
+            .codehilite .mh {{ color: #fab387 }} /* Literal.Number.Hex */
+            .codehilite .mi {{ color: #fab387 }} /* Literal.Number.Integer */
+            .codehilite .mo {{ color: #fab387 }} /* Literal.Number.Oct */
+            .codehilite .sb {{ color: #a6e3a1 }} /* Literal.String.Backtick */
+            .codehilite .sc {{ color: #a6e3a1 }} /* Literal.String.Char */
+            .codehilite .sd {{ color: #a6e3a1 }} /* Literal.String.Doc */
+            .codehilite .s2 {{ color: #a6e3a1 }} /* Literal.String.Double */
+            .codehilite .se {{ color: #fab387 }} /* Literal.String.Escape */
+            .codehilite .sh {{ color: #a6e3a1 }} /* Literal.String.Heredoc */
+            .codehilite .si {{ color: #fab387 }} /* Literal.String.Interpol */
+            .codehilite .sx {{ color: #a6e3a1 }} /* Literal.String.Other */
+            .codehilite .sr {{ color: #a6e3a1 }} /* Literal.String.Regex */
+            .codehilite .s1 {{ color: #a6e3a1 }} /* Literal.String.Single */
+            .codehilite .ss {{ color: #a6e3a1 }} /* Literal.String.Symbol */
+        </style>
+        {html}
         """
         
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Ayuda de búsqueda")
-        msg_box.setTextFormat(Qt.TextFormat.RichText)
-        msg_box.setText(help_text)
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
+        return styled_html
+
+class MarkdownSearchViewer(QMainWindow):
+    def __init__(self, db_path, root_folders=None,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+        self.cursor = self.conn.cursor()
+        self.root_folders = root_folders or [
+            "/mnt/windows/FTP/Obsidian/Spaces/Wiki",
+            "/mnt/windows/FTP/Obsidian/Spaces/Blogs",
+            "/mnt/windows/FTP/Obsidian/Spaces/Proyectos Interesantes",
+            "/mnt/windows/FTP/Obsidian/Spaces/Scripts",
+            "/mnt/windows/FTP/Obsidian/Recortes"
+        ]
+        self.selected_folders = []
+        # Primero cargar las carpetas seleccionadas antes de iniciar búsquedas
+        self.load_selected_folders()
+        
+        # Añadir variable para controlar el thread de búsqueda
+        self.search_thread = None
+        
+        self.init_ui()
+    
+    def init_ui(self):
+        self.setWindowTitle("Buscador de Snippets Markdown")
+        self.setMinimumSize(900, 600)
+        
+        # Widget principal
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Layout principal
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Barra de búsqueda y botón de filtro
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Buscar en título, contenido o tags...")
+        self.search_timer = None
+        self.search_input.textChanged.connect(self.delayed_search)
+        self.search_input.textChanged.connect(self.search_snippets)
+        
+        self.filter_btn = QPushButton("Filtrar por Carpetas")
+        self.filter_btn.clicked.connect(self.open_folder_filter)
+        
+        search_layout.addWidget(self.search_input, 5)
+        search_layout.addWidget(self.filter_btn, 1)
+        
+        main_layout.addLayout(search_layout)
+        
+        # Splitter vertical para dividir la pantalla entre paneles y status
+        main_splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # Panel superior: contiene el splitter horizontal con los dos paneles
+        top_widget = QWidget()
+        top_layout = QVBoxLayout(top_widget)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Splitter horizontal para los paneles de listado y contenido
+        horizontal_splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Panel izquierdo: Lista de resultados
+        self.results_list = QListWidget()
+        self.results_list.currentItemChanged.connect(self.show_snippet)
+        # Añadir espacio vertical entre los elementos
+        self.results_list.setStyleSheet("""
+            QListWidget::item { 
+                padding-top: 5px; 
+                padding-bottom: 5px; 
+            }
+        """)      
 
 
-    def content_changed(self):
-        """Maneja los cambios en el editor de contenido"""
-        if self.current_snippet_id and self.content_editor.isVisible():
-            new_content = self.content_editor.toPlainText()
-            
-            # Obtener colores del tema actual
-            theme = self.themes[self.current_theme]
-            bg_color = theme['bg']
-            text_color = theme['fg']
-            
-            # Actualizar la vista renderizada del markdown
-            html_content = markdown.markdown(new_content)
-            styled_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        line-height: 1.6;
-                        margin: 20px;
-                        background-color: {bg_color};
-                        color: {text_color};
-                    }}
-                    h1, h2, h3, h4, h5, h6 {{
-                        color: {text_color};
-                        margin-top: 20px;
-                    }}
-                    code {{
-                        background-color: {theme['secondary_bg']};
-                        padding: 2px 4px;
-                        border-radius: 3px;
-                    }}
-                    pre {{
-                        background-color: {theme['secondary_bg']};
-                        padding: 10px;
-                        border-radius: 5px;
-                        overflow-x: auto;
-                    }}
-                    blockquote {{
-                        border-left: 4px solid {theme['border']};
-                        padding-left: 16px;
-                        margin-left: 0;
-                        color: {theme['accent']};
-                    }}
-                </style>
-            </head>
-            <body>
-                {html_content}
-            </body>
-            </html>
-            """
-            self.markdown_view.setHtml(styled_html)
-            
-    def perform_search(self):
-        """Realiza la búsqueda según los criterios especificados en la caja de búsqueda unificada"""
-        query = self.search_input.text()
-        exact_match = self.exact_match_checkbox.isChecked()
+        # Panel derecho: Visualizador de markdown
+        self.markdown_view = QTextEdit()
+        self.markdown_view.setReadOnly(True)
         
-        # Analizar la consulta para extraer filtros
-        filters = self.parse_search_query(query)
+        # Añade ambos widgets al splitter horizontal
+        horizontal_splitter.addWidget(self.results_list)
+        horizontal_splitter.addWidget(self.markdown_view)
         
-        # Realizar la búsqueda
-        results = search_snippets(
-            self.db_path, 
-            search_text=filters['search_text'], 
-            exact_match=exact_match,
-            title=filters['title'],
-            path=filters['path'],
-            tags=filters['tags'],
-            date=filters['date'],
-            source=filters['source']
-        )
+        # Configurar tamaños iniciales para el splitter horizontal (50% cada uno)
+        horizontal_splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
         
-        # Actualizar el árbol de resultados
-        self.update_results_tree(results)
+        top_layout.addWidget(horizontal_splitter)
+        main_splitter.addWidget(top_widget)
+        
+        # Panel inferior: Etiqueta de estado
+        status_widget = QWidget()
+        status_layout = QVBoxLayout(status_widget)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.status_label = QLabel("Resultados: 0")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet(f"""
+            background-color: {CatppuccinDarkTheme.surface0};
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        """)
+        
+        status_layout.addWidget(self.status_label)
+        main_splitter.addWidget(status_widget)
+        
+        # Configurar tamaños del splitter vertical (90% contenido, 10% status)
+        main_splitter.setSizes([int(self.height() * 0.9), int(self.height() * 0.1)])
+        
+        main_layout.addWidget(main_splitter)
+        
+        # Cargar todos los snippets al inicio
+        self.search_snippets()
+    
+    def load_selected_folders(self):
+        """Carga las carpetas seleccionadas desde un archivo JSON"""
+        try:
+            # Intentar cargar la configuración guardada
+            if os.path.exists('filter_settings.json'):
+                with open('filter_settings.json', 'r') as f:
+                    data = json.load(f)
+                    if 'selected_folders' in data and isinstance(data['selected_folders'], list):
+                        # Filtrar para asegurarnos que solo se incluyen carpetas válidas
+                        self.selected_folders = [folder for folder in data['selected_folders'] 
+                                                if folder in self.root_folders]
+                        print(f"Filtros cargados: {self.selected_folders}")
+                    else:
+                        # Si la estructura no es correcta, usar todas las carpetas
+                        self.selected_folders = self.root_folders.copy()
+                        print("Formato de filtros incorrecto, usando todas las carpetas")
+            else:
+                # Si el archivo no existe, usar todas las carpetas
+                self.selected_folders = self.root_folders.copy()
+                print("No hay filtros guardados, usando todas las carpetas")
+        except Exception as e:
+            print(f"Error cargando filtros: {e}")
+            # Si hay algún error, usar todas las carpetas
+            self.selected_folders = self.root_folders.copy()
+
+    def save_selected_folders(self):
+        """Guarda las carpetas seleccionadas en un archivo JSON"""
+        try:
+            # Crear diccionario de configuración
+            config = {
+                'selected_folders': self.selected_folders if self.selected_folders else []
+            }
+            
+            # Guardar en formato JSON
+            with open('filter_settings.json', 'w') as f:
+                json.dump(config, f, indent=4)
+            
+            print(f"Filtros guardados: {self.selected_folders}")
+        except Exception as e:
+            print(f"Error guardando filtros: {e}")
+
+    # Modificar el método open_folder_filter para guardar los filtros
+    def open_folder_filter(self):
+        dialog = PathFilterDialog(self, self.db_path, self.root_folders)
+        if dialog.exec():
+            self.selected_folders = dialog.get_selected_folders()
+            print(f"Nuevos filtros seleccionados: {self.selected_folders}")
+            # Guardar los filtros seleccionados
+            self.save_selected_folders()
+            # Actualizar la búsqueda con los filtros seleccionados
+            self.search_snippets()
+
+
+    def delayed_search(self):
+        # "Debounce" technique to avoid many consecutive searches
+        if hasattr(self, 'search_timer') and self.search_timer is not None:
+            self.search_timer.stop()
+            self.search_timer = None
+        
+        # Start search after a small delay
+        QTimer.singleShot(300, self.search_snippets)
+        
+    def search_snippets(self):
+        # Limpiar los resultados anteriores
+        self.results_list.clear()
+        
+        # Verificar si hay carpetas seleccionadas, si no, cargarlas
+        if not hasattr(self, 'selected_folders') or self.selected_folders is None:
+            self.load_selected_folders()
+        
+        # Actualizar la etiqueta de estado a "Buscando..."
+        self.status_label.setText("Buscando...")
+        
+        # Cancelar cualquier búsqueda anterior en progreso
+        if self.search_thread is not None and self.search_thread.isRunning():
+            self.search_thread.terminate()
+            self.search_thread.wait()
+        
+        # Crear y configurar el worker thread
+        search_term = self.search_input.text()
+        self.search_thread = SearchWorker(self.db_path, search_term, self.selected_folders)
+        
+        # Conectar señales
+        self.search_thread.search_finished.connect(self.process_search_results)
+        self.search_thread.error_occurred.connect(self.handle_search_error)
+        
+        # Iniciar la búsqueda en un hilo separado
+        self.search_thread.start()
+    
+    def process_search_results(self, results):
+        # Procesar los resultados devueltos por el worker
+        for snippet_id, filename, path, content, tags in results:
+            # Mostrar solo el nombre del archivo y las etiquetas
+            display_text = filename
+            
+            if tags:
+                display_text += f" ({', '.join(tags)})"
+            
+            item = self.results_list.addItem(display_text)
+            # Guardar el ID, contenido y ruta completa como datos del item
+            self.results_list.item(self.results_list.count() - 1).setData(Qt.ItemDataRole.UserRole, 
+                                                                        (snippet_id, content, path))
+        
+        # Actualizar etiqueta de estado con el conteo de resultados
+        self.status_label.setText(f"Resultados: {self.results_list.count()}")
+        
+        # Seleccionar el primer resultado si existe
+        if self.results_list.count() > 0:
+            self.results_list.setCurrentRow(0)
 
     
-    def update_results_tree(self, results):
-        """Actualiza el árbol de resultados con los snippets encontrados"""
-        self.results_tree.clear()
-        
-        for snippet in results:
-            item = QTreeWidgetItem(self.results_tree)
-            item.setText(0, snippet['filename'])
-            item.setText(1, snippet['path'])
-            
-            # Mostrar tags en la columna 2 en lugar de como hijos
-            if snippet.get('tags'):
-                item.setText(2, ', '.join(snippet['tags']))
-            
-            # Formatear fecha
-            date_str = snippet['last_modified']
-            try:
-                date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-                formatted_date = date_obj.strftime("%d/%m/%Y %H:%M")
-                item.setText(3, formatted_date)
-            except:
-                item.setText(3, date_str)
-            
-            # Guardar el ID del snippet como datos del item
-            item.setData(0, Qt.ItemDataRole.UserRole, snippet['id'])
-
-        self.results_tree.sortItems(1, Qt.SortOrder.AscendingOrder)
-
-        # No expandir todos los elementos ya que no hay hijos
-        # self.results_tree.expandAll()
-        
-        # Actualizar estado de los botones
-        self.update_button_states()
-
-    def snippet_selected(self, item):
-        """Maneja la selección de un snippet en el árbol de resultados"""
-        # Ignorar si es un item hijo (tags)
-        if item.parent() is not None:
+    def show_snippet(self, current, previous):
+        if current is None:
             return
         
-        # Recuperar ID del snippet
-        snippet_id = item.data(0, Qt.ItemDataRole.UserRole)
-        if snippet_id:
-            self.current_snippet_id = snippet_id
-            self.load_snippet_content(snippet_id)
-            self.apply_theme(self.current_theme)
-            self.update_button_states()
+        snippet_id, content, path = current.data(Qt.ItemDataRole.UserRole)
+        
+        # Añadir la ruta en la parte superior del contenido
+        content_with_path = f"**Ruta:** {path}\n\n{content}"
+        
+        # Renderizar el markdown a HTML
+        html_content = MarkdownRenderer.render_markdown(content_with_path)
+        
+        # Mostrar el contenido HTML
+        self.markdown_view.setHtml(html_content)
     
-    def load_snippet_content(self, snippet_id):
-        """Carga el contenido del snippet seleccionado"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT content, path, filename FROM snippets WHERE id = ?", 
-            (snippet_id,)
-        )
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            content, path, filename = result
-            self.current_snippet_path = os.path.join(path, filename)
-            
-            # Actualizar el editor de texto si está visible
-            if self.content_editor.isVisible():
-                self.content_editor.setPlainText(content)
-            
-            # Renderizar el markdown
-            html_content = markdown.markdown(content)
-            
-            # Aplicar estilos CSS básicos para mejorar la visualización
-            styled_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        line-height: 1.6;
-                        margin: 20px;
-                    }}
-                    h1, h2, h3, h4, h5, h6 {{
-                        color: #333;
-                        margin-top: 20px;
-                    }}
-                    code {{
-                        background-color: #f4f4f4;
-                        padding: 2px 4px;
-                        border-radius: 3px;
-                    }}
-                    pre {{
-                        background-color: #f4f4f4;
-                        padding: 10px;
-                        border-radius: 5px;
-                        overflow-x: auto;
-                    }}
-                    blockquote {{
-                        border-left: 4px solid #ddd;
-                        padding-left: 16px;
-                        margin-left: 0;
-                        color: #666;
-                    }}
-                </style>
-            </head>
-            <body>
-                {html_content}
-            </body>
-            </html>
-            """
-            
-            self.markdown_view.setHtml(styled_html)
+    def handle_search_error(self, error_message):
+        # Manejar errores de búsqueda
+        QMessageBox.critical(self, "Error de búsqueda", error_message)
+        self.status_label.setText("Error en la búsqueda")
     
-    def load_snippet_content(self, snippet_id):
-        """Carga el contenido del snippet seleccionado"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT content, path, filename FROM snippets WHERE id = ?", 
-            (snippet_id,)
-        )
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            content, path, filename = result
-            self.current_snippet_path = os.path.join(path, filename)
-            
-            # Actualizar el editor de texto si está visible
-            if self.content_editor.isVisible():
-                self.content_editor.setPlainText(content)
-            
-            # Renderizar el markdown
-            html_content = markdown.markdown(content)
-            
-            # Obtener colores del tema actual
-            theme = self.themes[self.current_theme]
-            bg_color = theme['bg']
-            text_color = theme['fg']
-            
-            # Aplicar estilos CSS básicos para mejorar la visualización
-            styled_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        line-height: 1.6;
-                        margin: 20px;
-                        background-color: {bg_color};
-                        color: {text_color};
-                    }}
-                    h1, h2, h3, h4, h5, h6 {{
-                        color: {text_color};
-                        margin-top: 20px;
-                    }}
-                    code {{
-                        background-color: {theme['secondary_bg']};
-                        padding: 2px 4px;
-                        border-radius: 3px;
-                    }}
-                    pre {{
-                        background-color: {theme['secondary_bg']};
-                        padding: 10px;
-                        border-radius: 5px;
-                        overflow-x: auto;
-                    }}
-                    blockquote {{
-                        border-left: 4px solid {theme['border']};
-                        padding-left: 16px;
-                        margin-left: 0;
-                        color: {theme['accent']};
-                    }}
-                </style>
-            </head>
-            <body>
-                {html_content}
-            </body>
-            </html>
-            """
-            
-            self.markdown_view.setHtml(styled_html)
-    
-    def save_content(self):
-        """Guarda el contenido editado en la base de datos"""
-        if self.current_snippet_id and self.content_editor.isVisible():
-            new_content = self.content_editor.toPlainText()
-            success = update_snippet_content(self.db_path, self.current_snippet_id, new_content)
-            
-            if success:
-                QMessageBox.information(self, "Guardado", "Contenido guardado correctamente")
-            else:
-                QMessageBox.warning(self, "Error", "Error al guardar el contenido")
-    
-    def toggle_editable(self, state):
-        """Alterna entre vista de solo lectura y editable"""
-        if state == Qt.CheckState.Checked:
-            # Si hay un snippet seleccionado, cargar su contenido en el editor
-            if self.current_snippet_id:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT content FROM snippets WHERE id = ?", (self.current_snippet_id,))
-                result = cursor.fetchone()
-                conn.close()
-                
-                if result:
-                    content = result[0]
-                    self.content_editor.setPlainText(content)
-            
-            # Mostrar editor y ocultar vista renderizada
-            self.content_editor.setVisible(True)
-            self.markdown_view.setVisible(False)
-            
-            # Añadir botón guardar si no existe
-            if not hasattr(self, 'btn_save'):
-                self.btn_save = QPushButton("Guardar cambios")
-                self.btn_save.clicked.connect(self.save_content)
-                # Añadir al layout donde están los otros botones
-                self.btn_save.setParent(self.search_input.parent())
-                self.search_input.parent().layout().addWidget(self.btn_save)
-            else:
-                self.btn_save.setVisible(True)
-        else:
-            # Ocultar editor y mostrar vista renderizada
-            self.content_editor.setVisible(False)
-            self.markdown_view.setVisible(True)
-            
-            # Ocultar botón guardar si existe
-            if hasattr(self, 'btn_save'):
-                self.btn_save.setVisible(False)
-    
-    def open_folder(self):
-        """Abre la carpeta que contiene el snippet actual"""
-        if not self.current_snippet_id:
-            QMessageBox.information(self, "Información", "Selecciona un snippet primero")
-            return
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT path FROM snippets WHERE id = ?", (self.current_snippet_id,))
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result and result[0]:
-            folder_path = result[0]
-            try:
-                # Abrir explorador de archivos según el sistema operativo
-                if os.name == 'nt':  # Windows
-                    os.startfile(folder_path)
-                elif os.name == 'posix':  # Linux, Mac
-                    if sys.platform == 'darwin':  # Mac
-                        subprocess.Popen(['open', folder_path])
-                    else:  # Linux
-                        subprocess.Popen(['xdg-open', folder_path])
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"No se pudo abrir la carpeta: {e}")
-        else:
-            QMessageBox.warning(self, "Error", "No se encontró la ruta del snippet")
-    
-    def open_in_obsidian(self):
-        """Abre el snippet actual en Obsidian"""
-        if not self.current_snippet_id:
-            QMessageBox.information(self, "Información", "Selecciona un snippet primero")
-            return
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT path, filename FROM snippets WHERE id = ?", (self.current_snippet_id,))
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result and result[0] and result[1]:
-            path, filename = result
-            file_path = os.path.join(path, filename)
-            
-            try:
-                # Intentar abrir con Obsidian usando el protocolo obsidian://
-                obsidian_uri = f"obsidian://open?path={os.path.abspath(file_path)}"
-                
-                if os.name == 'nt':  # Windows
-                    os.startfile(obsidian_uri)
-                elif os.name == 'posix':  # Linux, Mac
-                    if sys.platform == 'darwin':  # Mac
-                        subprocess.Popen(['open', obsidian_uri])
-                    else:  # Linux
-                        subprocess.Popen(['xdg-open', obsidian_uri])
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"No se pudo abrir Obsidian: {e}")
-                
-                # Intento alternativo: abrir el archivo con la aplicación predeterminada
-                try:
-                    if os.name == 'nt':  # Windows
-                        os.startfile(file_path)
-                    elif os.name == 'posix':  # Linux, Mac
-                        if sys.platform == 'darwin':  # Mac
-                            subprocess.Popen(['open', file_path])
-                        else:  # Linux
-                            subprocess.Popen(['xdg-open', file_path])
-                except Exception as e2:
-                    QMessageBox.warning(self, "Error", f"No se pudo abrir el archivo: {e2}")
-        else:
-            QMessageBox.warning(self, "Error", "No se encontró la ruta del snippet")
-    
-    def delete_current_snippet(self):
-        """Elimina el snippet actual con confirmación previa"""
-        if not self.current_snippet_id:
-            QMessageBox.information(self, "Información", "Selecciona un snippet primero")
-            return
-        
-        # Obtener nombre del snippet para mostrar en el mensaje de confirmación
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT filename FROM snippets WHERE id = ?", (self.current_snippet_id,))
-        result = cursor.fetchone()
-        conn.close()
-        
-        filename = result[0] if result else "este snippet"
-        
-        # Pedir confirmación
-        reply = QMessageBox.question(
-            self, 
-            "Confirmar eliminación",
-            f"¿Estás seguro de que quieres eliminar '{filename}'?\n\nEsta acción no se puede deshacer.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            # Eliminar el snippet
-            success = delete_snippet(self.db_path, self.current_snippet_id)
-            
-            if success:
-                QMessageBox.information(self, "Eliminado", f"'{filename}' eliminado correctamente")
-                # Actualizar la búsqueda para reflejar los cambios
-                self.perform_search()
-                # Limpiar la vista actual
-                self.markdown_view.setHtml("")
-                if self.content_editor.isVisible():
-                    self.content_editor.clear()
-                # Resetear el snippet actual
-                self.current_snippet_id = None
-                self.current_snippet_path = None
-                # Actualizar estado de botones
-                self.update_button_states()
-            else:
-                QMessageBox.warning(self, "Error", "Error al eliminar el snippet")
-    
-    def update_button_states(self):
-        """Actualiza el estado de los botones según si hay un snippet seleccionado"""
-        snippet_selected = self.current_snippet_id is not None
-        self.btn_open_folder.setEnabled(snippet_selected)
-        self.btn_open_obsidian.setEnabled(snippet_selected)
-        self.btn_delete.setEnabled(snippet_selected)
-        
-        # Si hay botón de guardar y hay un snippet seleccionado y el editor es visible
-        if hasattr(self, 'btn_save'):
-            self.btn_save.setEnabled(snippet_selected and self.content_editor.isVisible())
 
+    
+    def closeEvent(self, event):
+        # Asegurarse de que el hilo de búsqueda termine antes de cerrar
+        if self.search_thread is not None and self.search_thread.isRunning():
+            self.search_thread.terminate()
+            self.search_thread.wait()
+        
+        # Cerrar la conexión a la base de datos al salir
+        if hasattr(self, 'conn') and self.conn:
+            self.conn.close()
+        
+        super().closeEvent(event)
 
-    def parse_search_query(self, query):
-        """
-        Analiza una consulta de búsqueda con atajos y devuelve un diccionario con los filtros.
-        
-        Atajos soportados:
-        - t: o title: - título/filename
-        - p: o path: - ruta
-        - tag: o tags: - etiquetas
-        - d: o date: - fecha
-        - s: o source: - fuente
-        
-        Ejemplo: "python t:tutorial p:programming/python tag:beginner,advanced d:este mes"
-        """
-        filters = {
-            'search_text': '',
-            'title': None,
-            'path': None,
-            'tags': None,
-            'date': None,
-            'source': None
-        }
-        
-        # Patrones para los diferentes atajos
-        patterns = {
-            'title': [r't:', r'title:'],
-            'path': [r'p:', r'path:'],
-            'tags': [r'tag:', r'tags:'],
-            'date': [r'd:', r'date:'],
-            'source': [r's:', r'source:']
-        }
-        
-        # Divide la consulta por espacios pero mantiene unidos los valores con comillas
-        tokens = []
-        in_quotes = False
-        current_token = ''
-        
-        for char in query + ' ':  # Añadimos un espacio al final para procesar el último token
-            if char == '"':
-                in_quotes = not in_quotes
-                current_token += char
-            elif char == ' ' and not in_quotes:
-                if current_token:
-                    tokens.append(current_token)
-                    current_token = ''
-            else:
-                current_token += char
-        
-        remaining_tokens = []
-        
-        # Procesar cada token
-        for token in tokens:
-            matched = False
-            
-            # Comprobar si el token tiene alguno de los atajos
-            for filter_name, prefixes in patterns.items():
-                for prefix in prefixes:
-                    if token.lower().startswith(prefix):
-                        # Extraer el valor eliminando el prefijo
-                        value = token[len(prefix):].strip()
-                        
-                        # Si el valor está entre comillas, quitar las comillas
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        
-                        filters[filter_name] = value
-                        matched = True
-                        break
-                if matched:
-                    break
-            
-            # Si no coincide con ningún patrón, agregarlo al texto de búsqueda general
-            if not matched:
-                remaining_tokens.append(token)
-        
-        # El texto restante se considera texto de búsqueda general
-        filters['search_text'] = ' '.join(remaining_tokens)
-        
-        return filters
 
 def main():
     app = QApplication(sys.argv)
     
-    # Si se especifica la ruta a la base de datos como argumento
-    if len(sys.argv) > 1:
-        db_path = os.path.normpath(os.path.abspath(sys.argv[1]))
-
-        print(f"Usando base de datos: {db_path}")  # Mensaje para depuración
-    else:
-        db_path, _ = QFileDialog.getOpenFileName(
-            None, 
-            "Seleccionar base de datos SQLite", 
-            "", 
-            "Archivos SQLite (*.sqlite *.db);;Todos los archivos (*)"
-        )
-        
-        if not db_path:
-            sys.exit(0)
+    # Aplicar el tema Catppuccin
+    CatppuccinDarkTheme.apply_to_app(app)
     
-    # Verificar que la base de datos existe y tiene la estructura correcta
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Verificar que existe la tabla snippets
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='snippets'")
-        if not cursor.fetchone():
-            QMessageBox.critical(None, "Error", "La base de datos seleccionada no contiene la tabla 'snippets'")
-            conn.close()
-            sys.exit(1)
-        
-        # Verificar que hay datos en la tabla
-        cursor.execute("SELECT COUNT(*) FROM snippets")
-        count = cursor.fetchone()[0]
-        print(f"Encontrados {count} snippets en la base de datos")
-        
-        conn.close()
-    except sqlite3.Error as e:
-        QMessageBox.critical(None, "Error", f"Error al acceder a la base de datos: {e}")
-        sys.exit(1)
+    # Ruta de la base de datos
+    db_path = 'wiki_obsidian.db'  # Cambiar por la ruta real de tu base de datos
     
-    viewer = SnippetViewer(db_path)
+    # Lista de carpetas raíz para el filtro
+    root_folders = [
+        "/mnt/windows/FTP/Obsidian/Spaces/Wiki",
+        "/mnt/windows/FTP/Obsidian/Spaces/Blogs",
+        "/mnt/windows/FTP/Obsidian/Spaces/Proyectos Interesantes",
+        "/mnt/windows/FTP/Obsidian/Spaces/Scripts",
+        "/mnt/windows/FTP/Obsidian/Recortes"
+    ]
+    
+    viewer = MarkdownSearchViewer(db_path, root_folders)
     viewer.show()
+    
     sys.exit(app.exec())
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

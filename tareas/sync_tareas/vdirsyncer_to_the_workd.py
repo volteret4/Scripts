@@ -325,7 +325,7 @@ def get_todoman_task_details(task_id):
     """
     Gets detailed information about a task using todoman's show command.
     """
-    cmd = f'todo --config "/home/huan/.config/todoman/config_tareas.py" show {task_id}'
+    cmd = f'todo --colour --config "/home/huan/.config/todoman/config_tareas.py" show {task_id}'
     output, return_code = run_command(cmd, shell=True)
     
     if return_code != 0:
@@ -373,6 +373,42 @@ def get_todoman_task_details(task_id):
                 logger.warning(f"Could not parse due date: {due_date_str}")
     
     return details
+
+def get_todoman_tasks():
+    """
+    Gets tasks from todoman in JSON format.
+    """
+    cmd = 'todo --config "/home/huan/.config/todoman/config_tareas.py" --porcelain --colour never list'
+    output, return_code = run_command(cmd, shell=True)
+    
+    if return_code != 0:
+        logger.error(f"Error getting tasks from todoman: {output}")
+        return []
+    
+    try:
+        tasks = json.loads(output)
+        processed_tasks = []
+        
+        for task in tasks:
+            # Extract the required fields
+            task_data = {
+                "id": task["id"],
+                "text": task["summary"],
+                "summary": task["summary"],
+                "description": task["description"],
+                "priority": max(0, 9 - task["priority"]) if task["priority"] else 0,  # Convert todoman priority (0-9) to your scale
+                "due_date": datetime.datetime.fromtimestamp(task["due"]).strftime('%Y-%m-%d') if task["due"] else None,
+                "start_date": datetime.datetime.fromtimestamp(task["start"]).strftime('%Y-%m-%d') if task["start"] else None,
+                "categories": task["categories"],
+                "hash": hashlib.md5(f"{task['id']}-{task['summary']}".encode('utf-8', errors='ignore')).hexdigest()
+            }
+            processed_tasks.append(task_data)
+            
+        return processed_tasks
+    except json.JSONDecodeError:
+        logger.error(f"Error parsing JSON output from todoman: {output}")
+        return []
+
 def process_task(task_data, processed_tasks, existing_obsidian_tasks, use_task_show=False):
     """
     Processes a task and adds it to the systems.
@@ -682,36 +718,13 @@ def main():
         processed_count = 0
         new_processed_tasks = processed_tasks.copy()
         
-        # Create temp file directory if it doesn't exist
-        TEMP_TODOMAN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Before running todo.sh add command or any other shell command
-        todo_txt_clean = clean_text_for_shell(TEMP_TODOMAN_FILE)
-        todo_sh_cmd = f'todo.sh add "{todo_txt_clean}"'
-
-        # Get tasks from todoman and save to temp file
-        cmd = f'todo --config "/home/huan/.config/todoman/config_tareas.py" list > {TEMP_TODOMAN_FILE}'
-        _, result = run_command(cmd, shell=True)
-        
-        if result != 0:
-            logger.error("Error getting tasks from todoman")
-            run_command('notify-send -u critical "Error getting tasks from todoman"', shell=True)
-            return 1
-        
-        # Check if temp file was created and has content
-        if not TEMP_TODOMAN_FILE.exists() or TEMP_TODOMAN_FILE.stat().st_size == 0:
-            logger.error("Todoman task file is empty or was not created")
-            run_command('notify-send -u critical "Error: Todoman task file is empty"', shell=True)
-            return 1
-        
-        # Parse tasks from file
-        tasks = parse_todoman_tasks_from_file(TEMP_TODOMAN_FILE)
+        # Get tasks directly from todoman in JSON format
+        tasks = get_todoman_tasks()
         logger.info(f"Found {len(tasks)} tasks in todoman")
         
         # Process each task
         for task in tasks:
             # Force re-processing if checkpoint was recently deleted
-            # (assumes checkpoint file doesn't exist or was recently created)
             force_reprocess = not CHECKPOINT_FILE.exists() or (
                 CHECKPOINT_FILE.exists() and 
                 datetime.datetime.fromtimestamp(CHECKPOINT_FILE.stat().st_mtime) > 
@@ -719,7 +732,8 @@ def main():
             )
             
             if force_reprocess or task["hash"] not in processed_tasks:
-                if process_task(task, processed_tasks if not force_reprocess else [], existing_obsidian_tasks):
+                if process_task(task, processed_tasks if not force_reprocess else [], existing_obsidian_tasks, 
+                               use_task_show=False):  # No need for task show as we have all details
                     processed_count += 1
                     new_processed_tasks.append(task["hash"])
         

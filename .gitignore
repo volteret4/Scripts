@@ -147,3 +147,6 @@ menus/musica/spotify/.token
 menus/musica/actualizaciones/scripts_config.json
 menus/musica/menu_blogs/mpv/lastfm_credentials.py
 menus/musica/base_datos/config.yaml
+utilities/tiddlywiki/wiki_obsidian.db
+utilities/tiddlywiki/wiki_obsidian_plus.db
+utilities/cron/obtener_json_datahoarder.py
