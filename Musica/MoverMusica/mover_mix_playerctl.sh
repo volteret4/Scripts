@@ -5,7 +5,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #     La idea de este script es poder tener en una carpeta aparte una selección de música con otro criterio (género por ej.)
 #
@@ -101,10 +100,10 @@ if [ -z "$dup" ]
             # tags
             copia="$destino/$archivo"
             echo "copia: ${copia}"
-            echo "esperando 5s a que se copie para renombrar archivo"
-            sleep 5
-            tagutil -Yp clear:comment $copia
-            tagutil -Yp add:comment="${comentario}" $copia
+            echo "esperando 10s a que se copie para renombrar archivo"
+            sleep 10
+            tagutil -Yp clear:comment "$copia"
+            tagutil -Yp add:comment="${comentario}" "$copia"
             tagutil -Yp rename:"%artist - %title [%date - %album]" "$copia" # renombra nueva canción
             
                         
@@ -131,6 +130,8 @@ if [ -z "$dup" ]
                         )
             fi
 fi
+
+
 echo "${porcohone}"
 if [[ ${porcohone} =~ 'Comentar TAG' ]]
       then
@@ -183,6 +184,10 @@ if [[ "${porcohone}" =~ 'Copiar' ]]
                        
 fi
 
+# Playlist spotify
+source "${HOME}/Scripts/python_venv/bin/activate"
+python "${HOME}/Scripts/Musica/playlists/spotify/spotify_add_song.py"
+
 if [[ "${porcohone}" =~ 'Mover' ]]
       then
             carpeta_seleccionada="$(python3 $HOME/Scripts/utilities/menu_pollo2.py $botones | awk 'NR==1 {print $1}')"
@@ -233,12 +238,13 @@ if [[ "${porcohone}" =~ 'Mover' ]]
             fi
 fi      
 
+
+
 # Actualizar playlists para Mixxx
 rm ${mixxx}/*.m3u
-cd ${mixxx}
+cd "${mixxx}" || exit
 for dir in *; do find "$dir" -type f > "${dir}.m3u"; done
 
-bash "${HOME}/Scripts/Musica/playlists/spotify/spotify_add_song.sh"
 
-# Log de movimiento de canciones
+
 

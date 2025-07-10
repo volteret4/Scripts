@@ -1,0 +1,9 @@
+{
+    "files": [
+        "main.py",
+        "main.qml",
+        "scripts_fuzzy.ui",
+        "emojis.ui",
+        "copy_mix_playerctl.ui"
+    ]
+}

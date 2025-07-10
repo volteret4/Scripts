@@ -5,7 +5,6 @@
 # Author: volteret4
 # Repository: 
 # License: 
-# TODO: 
 # Notes:
 #
 
@@ -17,7 +16,6 @@ header_bash="#!/usr/bin/env bash
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #
 #
@@ -35,7 +33,6 @@ header_python="#!/usr/bin/env python
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #
 #

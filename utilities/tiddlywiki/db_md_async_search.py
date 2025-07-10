@@ -1,7 +1,5 @@
 from PyQt6.QtCore import QThread, pyqtSignal, QTimer
 
-
-
 class SearchWorker(QThread):
     # Señal que emite los resultados de la búsqueda
     search_finished = pyqtSignal(list)
@@ -25,7 +23,7 @@ class SearchWorker(QThread):
             if search_term:
                 # Construir consulta SQL con búsqueda en FTS y posible filtro de carpetas
                 query = """
-                SELECT s.id, s.filename, s.path, s.content
+                SELECT DISTINCT s.id, s.filename, s.path, s.content
                 FROM snippets s
                 LEFT JOIN snippet_tags st ON s.id = st.snippet_id
                 LEFT JOIN tags t ON st.tag_id = t.id
@@ -45,7 +43,12 @@ class SearchWorker(QThread):
                 OR t.name LIKE ?
                 """
                 
-                query += fts_condition + tag_condition
+                # Buscar en filename directamente
+                filename_condition = """
+                OR s.filename LIKE ?
+                """
+                
+                query += fts_condition + tag_condition + filename_condition
                 
                 # Añadir filtro de carpetas si está definido
                 folder_condition = ""
@@ -61,11 +64,11 @@ class SearchWorker(QThread):
                     
                 query += folder_condition
                 
-                # Agrupar para evitar duplicados y ordenar por nombre
+                # Agrupar para evitar duplicados y ordenar
                 query += " GROUP BY s.id ORDER BY s.filename"
                 
-                # Parámetros para la consulta
-                params = [search_term, f"%{search_term}%"] + folder_params
+                # Parámetros para la consulta (3 parámetros ahora: FTS, tag LIKE, filename LIKE)
+                params = [search_term, f"%{search_term}%", f"%{search_term}%"] + folder_params
                 
                 # Ejecutar la consulta
                 cursor.execute(query, params)
@@ -105,6 +108,7 @@ class SearchWorker(QThread):
                 SELECT t.name FROM tags t
                 JOIN snippet_tags st ON t.id = st.tag_id
                 WHERE st.snippet_id = ?
+                ORDER BY t.name
                 """, (snippet_id,))
                 
                 tags = [tag[0] for tag in cursor.fetchall()]
@@ -122,4 +126,3 @@ class SearchWorker(QThread):
             self.error_occurred.emit(f"Error al buscar snippets: {e}")
         except Exception as e:
             self.error_occurred.emit(f"Error inesperado: {e}")
-

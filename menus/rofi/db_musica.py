@@ -7,7 +7,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
-# TODO: 
 # Notes:
 #   Dependencies:   - python3, mutagen, pylast, dotenv, sqlite3
 #                   - carpeta con musica en flac o mp3

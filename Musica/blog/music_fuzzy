@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Script para convertir archivos Markdown de Obsidian a formato Hugo.
+"""
+
+import os
+import re
+import shutil
+import argparse
+import yaml
+
+
+def parse_frontmatter(content):
+    """Extrae el frontmatter de un archivo markdown y elimina patrones específicos."""
+    # Enfoque simple: si empieza con '---', elimina hasta el segundo '---'
+    if content.strip().startswith('---'):
+        first_marker = content.find('---')
+        second_marker = content.find('---', first_marker + 3)
+        
+        if second_marker != -1:
+            # Extraer todo después del segundo '---'
+            content_without_fm = content[second_marker + 3:].strip()
+        else:
+            content_without_fm = content
+    else:
+        content_without_fm = content
+    
+    # Eliminar líneas con el patrón ^[[foo]] |
+    content_without_fm = re.sub(r'^\^?\[\[.*?\]\]\s*\|.*$', '', content_without_fm, flags=re.MULTILINE)
+    
+    # Eliminar líneas vacías adicionales al principio
+    content_without_fm = content_without_fm.lstrip()
+    
+    return {}, content_without_fm
+
+
+def create_frontmatter(title, weight):
+    """Crea un frontmatter para Hugo."""
+    fm = {
+        'title': title,
+        'weight': weight
+    }
+    return f"---\n{yaml.dump(fm, default_flow_style=False)}---\n\n"
+
+
+def find_file_in_folder(filename, folder_path):
+    """Busca un archivo en una carpeta y sus subcarpetas."""
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file == filename + '.md':
+                return os.path.join(root, file)
+    return None
+
+
+def transform_headers_to_code_blocks(content):
+    """
+    Transforma los encabezados específicos a bloques de código.
+    Esta versión busca encabezados de nivel 4 específicos y captura su contenido
+    hasta el siguiente encabezado de nivel 4.
+    """
+    # Definir los headers que queremos transformar
+    headers_to_transform = ['Argumentos', 'Credenciales', 'Datos', 'Archivos']
+    
+    # Dividir el contenido por encabezados de nivel 4
+    # Usamos lookahead para mantener los encabezados en los resultados divididos
+    parts = re.split(r'(?=####\s+[^\n]+\n)', content)
+    
+    # Lista para almacenar el resultado reconstruido
+    result = []
+    
+    # Procesar cada parte
+    for part in parts:
+        # Si la parte está vacía, saltar
+        if not part.strip():
+            continue
+            
+        # Verificar si esta parte comienza con un encabezado que queremos transformar
+        match = re.match(r'####\s+([^\n]+)\n', part)
+        
+        if match and any(match.group(1).strip().startswith(h) for h in headers_to_transform):
+            # Extraer el nombre del encabezado
+            header_name = match.group(1).strip()
+            
+            # Extraer el contenido (todo lo que viene después del encabezado)
+            header_content = part[match.end():]
+            
+            # Crear el bloque de código con el formato deseado
+            transformed = f'```{header_name.upper()}\n{header_content.strip()}\n```\n\n'
+            result.append(transformed)
+        else:
+            # Mantener la parte sin cambios
+            result.append(part)
+    
+    # Unir todas las partes
+    return ''.join(result)
+
+
+def process_obsidian_file(base_file, destination_folder, content_folder):
+    """Procesa un archivo de Obsidian para convertirlo a formato Hugo."""
+    # Crear carpeta de destino si no existe
+    os.makedirs(destination_folder, exist_ok=True)
+    
+    # Obtener el nombre del archivo base sin extensión
+    base_filename = os.path.basename(base_file)
+    base_name_without_ext = os.path.splitext(base_filename)[0]
+    
+    # Definir la ruta del archivo principal en el destino
+    main_file_path = os.path.join(destination_folder, 'main.md')
+    
+    # Copiar el archivo base al destino como main.md
+    shutil.copy2(base_file, main_file_path)
+    
+    # Leer el contenido del archivo principal
+    with open(main_file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+    
+    # Eliminar frontmatter duplicado y obtener contenido limpio
+    _, content_without_fm = parse_frontmatter(content)
+    
+    # Crear nuevo frontmatter
+    new_frontmatter = create_frontmatter(base_name_without_ext, 10)
+    new_content = new_frontmatter + content_without_fm
+    
+    # Transformar los encabezados específicos a bloques de código
+    new_content = transform_headers_to_code_blocks(new_content)
+    
+    # Encontrar todas las referencias a archivos en el formato ![[archivo]]
+    references = re.findall(r'!\[\[(.*?)\]\]', new_content)
+    
+    # Procesar cada referencia
+    weight_counter = 1
+    for ref in references:
+        # Buscar el archivo referenciado
+        ref_file_path = find_file_in_folder(ref, content_folder)
+        
+        if ref_file_path:
+            # Definir nombre de archivo en destino
+            ref_dest_path = os.path.join(destination_folder, f"{ref}.md")
+            
+            # Copiar archivo referenciado al destino
+            shutil.copy2(ref_file_path, ref_dest_path)
+            
+            # Procesar el archivo referenciado
+            with open(ref_dest_path, 'r', encoding='utf-8') as file:
+                ref_content = file.read()
+            
+            # Eliminar frontmatter duplicado y obtener contenido limpio
+            _, ref_content_without_fm = parse_frontmatter(ref_content)
+            
+            # Crear nuevo frontmatter
+            ref_new_frontmatter = create_frontmatter(ref, 10 + weight_counter)
+            
+            # Transformar los encabezados específicos a bloques de código
+            ref_content_without_fm = transform_headers_to_code_blocks(ref_content_without_fm)
+            
+            # Combinar frontmatter nuevo y contenido transformado
+            ref_new_content = ref_new_frontmatter + ref_content_without_fm
+            
+            # Guardar el archivo procesado
+            with open(ref_dest_path, 'w', encoding='utf-8') as file:
+                file.write(ref_new_content)
+            
+            # Incrementar el contador de weight
+            weight_counter += 1
+        
+        # Eliminar la referencia del archivo principal
+        new_content = new_content.replace(f'![[{ref}]]', '')
+    
+    # Escribir el contenido actualizado en el archivo principal
+    with open(main_file_path, 'w', encoding='utf-8') as file:
+        file.write(new_content)
+    
+    print(f"Proceso completado. Archivos generados en: {destination_folder}")
+    print(f"- Archivo principal: main.md (weight: 10)")
+    for i, ref in enumerate(references, 1):
+        if find_file_in_folder(ref, content_folder):
+            print(f"- Archivo referenciado: {ref}.md (weight: {10 + i})")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Convierte archivos Markdown de Obsidian a formato Hugo.')
+    parser.add_argument('--md-base-file', required=True, help='Archivo Markdown base de Obsidian')
+    parser.add_argument('--destino-md', required=True, help='Carpeta de destino para los archivos generados')
+    parser.add_argument('--content-folder', required=True, help='Carpeta donde buscar los archivos referenciados')
+    
+    args = parser.parse_args()
+    
+    process_obsidian_file(args.md_base_file, args.destino_md, args.content_folder)
+
+
+if __name__ == "__main__":
+    main()

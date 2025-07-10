@@ -5,7 +5,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #   The script must have an .env file with $VARS in the same folder.
 #   Depends on

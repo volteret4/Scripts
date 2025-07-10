@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 #
-# Script Name: todofi.sh 
+# Script Name: todofi.sh
 # Description: _ _ _
 # Author: volteret4
 # Repository: https://github.com/volteret4/
-# License: 
-# TODO: 
+# License:
 # Notes:
 #
 #
@@ -129,9 +128,6 @@ cleanup() {
     codigo="$(todo list | grep $titulito | awk '{print $3}')"
     todo done $codigo
     vdirsyncer sync
-    id_todotxt="a98e9b72-891d-4827-bac8-1a2c4e1ba47d"
-    curl -X "POST" -H "x-api-user:67897ba5-3a4b-4556-93fe-5d3fa94dc8db" -H "x-api-key:02734383-9029-4025-92c1-2c80f48f10be" https://habitica.com/api/v3/tasks/$id_todotxt/score/up
-
     exit 0
 }
 
@@ -164,7 +160,7 @@ ${projcon}" -p "> ")
       runtodo add $new_todo
       echo $new_todo
       bash ${HOME}/Scripts/tareas/crear_tarea_caldav.sh ${new_todo} & # añade la tarea a caldav tambien
-      
+
       echo "creando tarea caldav"
     fi
 }
@@ -473,8 +469,8 @@ main() {
         elif [[ $val -eq 12 ]]; then
             edit $lineno "$selection"
         elif [[ $val -eq 11 ]]; then
-            confirm "mark as done" "$selection" && runtodo do "$lineno" 
-            # pollo 
+            confirm "mark as done" "$selection" && runtodo do "$lineno"
+            # pollo
         elif [[ $val -eq 17 ]]; then
             termfilter
         elif [[ $val -eq 13 ]]; then
@@ -544,4 +540,3 @@ if [[ $ADD_MODE ]]; then
 else
     main
 fi
-

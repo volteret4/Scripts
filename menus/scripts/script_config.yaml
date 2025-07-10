@@ -1,0 +1,34 @@
+# Configuración para el indexador de scripts
+
+# Carpetas donde buscar scripts
+script_folders:
+  - "~/Scripts"
+  # Agrega más carpetas según tus necesidades
+
+# Carpetas a excluir (además de las por defecto)
+excluded_folders:
+  - ".git"
+  - "__pycache__"
+  - ".vscode"
+  - "node_modules"
+  - ".pytest_cache"
+  - "python_venv"
+  - "venv"
+  - ".env"
+  - ".mypy_cache"
+  - ".tox"
+  - "dist"
+  - "build"
+  - ".eggs"
+  - "backup"
+  - "old"
+  - "deprecated"
+
+# Extensiones de archivos a indexar
+extensions:
+  - ".py"
+  - ".sh"
+  - ".ini"
+  - ".env"
+  - ".yml"
+  - ".yaml"

@@ -1,0 +1,65 @@
+# Configuración de temas para Icon Browser
+# Cada tema define los colores principales de la interfaz
+
+solarized-dark:
+  bg_color: "#002b36" # Fondo principal
+  text_color: "#839496" # Color del texto
+  accent_color: "#268bd2" # Color de acento (botones, selecciones)
+  widget_bg: "#073642" # Fondo de widgets (botones, campos)
+  border_color: "#586e75" # Color de bordes
+  search_bg: "#073642" # Fondo del campo de búsqueda
+  search_border: "#586e75" # Borde del campo de búsqueda
+
+tokyo-night:
+  bg_color: "#1a1b26"
+  text_color: "#c0caf5"
+  accent_color: "#7aa2f7"
+  widget_bg: "#24283b"
+  border_color: "#414868"
+  search_bg: "#24283b"
+  search_border: "#414868"
+
+catppucin:
+  bg_color: "#1e1e2e"
+  text_color: "#cdd6f4"
+  accent_color: "#89b4fa"
+  widget_bg: "#313244"
+  border_color: "#45475a"
+  search_bg: "#313244"
+  search_border: "#45475a"
+
+gruvbox:
+  bg_color: "#282828"
+  text_color: "#ebdbb2"
+  accent_color: "#83a598"
+  widget_bg: "#3c3836"
+  border_color: "#504945"
+  search_bg: "#3c3836"
+  search_border: "#504945"
+
+kanagawa:
+  bg_color: "#1f1f28"
+  text_color: "#dcd7ba"
+  accent_color: "#7e9cd8"
+  widget_bg: "#2a2a37"
+  border_color: "#54546d"
+  search_bg: "#2a2a37"
+  search_border: "#54546d"
+
+forest-dark:
+  bg_color: "#2d3142"
+  text_color: "#bfc7d5"
+  accent_color: "#56c596"
+  widget_bg: "#3d405b"
+  border_color: "#4f5b66"
+  search_bg: "#3d405b"
+  search_border: "#4f5b66"
+
+neon:
+  bg_color: "#0d1117"
+  text_color: "#00ff88"
+  accent_color: "#ff0080"
+  widget_bg: "#161b22"
+  border_color: "#00ff88"
+  search_bg: "#161b22"
+  search_border: "#00ff88"

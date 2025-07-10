@@ -5,8 +5,7 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO:
-#   Change termite
+# TODO: Change termite
 # Notes:
 #   Dependencies:
 #       ytfzf

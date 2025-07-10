@@ -1,0 +1,42 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Servidor web para el dashboard
+  dashboard-web:
+    image: nginx:alpine
+    container_name: server-dashboard-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - dashboard
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard.localhost`)"
+      - "traefik.http.services.dashboard.loadbalancer.server.port=80"
+
+  # Generador automático del dashboard (opcional)
+  dashboard-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    container_name: server-dashboard-generator
+    volumes:
+      - ./dashboard:/app/dashboard
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Para detectar contenedores
+    environment:
+      - PYTHONUNBUFFERED=1
+      - UPDATE_INTERVAL=300  # 5 minutos
+    restart: unless-stopped
+    networks:
+      - dashboard
+    depends_on:
+      - dashboard-web
+
+networks:
+  dashboard:
+    driver: bridge

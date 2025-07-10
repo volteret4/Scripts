@@ -1,0 +1,3 @@
+[submodule "Musica/blog/vvmm/hugo_scripts"]
+	path = Musica/blog/vvmm/hugo_scripts
+	url = git@github.com:volteret4/hugo_scripts.git

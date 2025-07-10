@@ -5,7 +5,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #     La idea de este script es poder tener en una carpeta aparte una selección de música con otro criterio (género por ej.)
 #

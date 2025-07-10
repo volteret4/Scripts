@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Gestor de Emojis</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">/* Tema oscuro personalizado */
+QMainWindow {
+    background-color: #14141e;
+    color: white;
+}
+
+QWidget {
+    background-color: #14141e;
+    color: white;
+}
+
+QLineEdit {
+    background-color: #2a2a35;
+    border: 2px solid #9a7ecc;
+    border-radius: 5px;
+    padding: 5px;
+    color: white;
+    font-size: 14px;
+}
+
+QLineEdit:focus {
+    border-color: #b59bd6;
+    background-color: #32323f;
+}
+
+QListWidget {
+    background-color: #1e1e2a;
+    border: 1px solid #9a7ecc;
+    border-radius: 5px;
+    color: white;
+    selection-background-color: #9a7ecc;
+    selection-color: white;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #2a2a35;
+}
+
+QListWidget::item:hover {
+    background-color: #2a2a35;
+}
+
+QListWidget::item:selected {
+    background-color: #9a7ecc;
+    color: white;
+}
+
+QPushButton {
+    background-color: #9a7ecc;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 16px;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+QPushButton:hover {
+    background-color: #b59bd6;
+}
+
+QPushButton:pressed {
+    background-color: #8a6ebc;
+}
+
+QLabel {
+    color: white;
+    font-size: 13px;
+}
+
+QFrame {
+    background-color: #1e1e2a;
+    border: 1px solid #9a7ecc;
+    border-radius: 5px;
+}
+
+QStatusBar {
+    background-color: #14141e;
+    color: white;
+    border-top: 1px solid #9a7ecc;
+}
+
+QSplitter::handle {
+    background-color: #9a7ecc;
+    width: 3px;
+}
+
+QTextEdit {
+    background-color: #2a2a35;
+    border: 2px solid #9a7ecc;
+    border-radius: 5px;
+    color: white;
+    padding: 5px;
+    font-size: 13px;
+}
+
+QTextEdit:focus {
+    border-color: #b59bd6;
+    background-color: #32323f;
+}
+
+QScrollArea {
+    background-color: #1e1e2a;
+    border: 1px solid #9a7ecc;
+    border-radius: 5px;
+}
+
+QScrollBar:vertical {
+    background-color: #2a2a35;
+    width: 12px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #9a7ecc;
+    border-radius: 6px;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #b59bd6;
+}</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_main">
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_search">
+      <item>
+       <widget class="QLabel" name="label_search">
+        <property name="text">
+         <string>Buscar:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineEdit_search">
+        <property name="placeholderText">
+         <string>Busca por nombre o tags...</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_clear">
+        <property name="text">
+         <string>Limpiar</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_toggleView">
+        <property name="text">
+         <string>Vista Cuadrícula</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QSplitter" name="splitter_main">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QWidget" name="widget_emojiContainer">
+       <layout class="QVBoxLayout" name="verticalLayout_emojiContainer">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QListWidget" name="listWidget_emojis">
+          <property name="font">
+           <font>
+            <pointsize>16</pointsize>
+           </font>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QScrollArea" name="scrollArea_emojiGrid">
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <property name="visible">
+           <bool>false</bool>
+          </property>
+          <widget class="QWidget" name="scrollAreaWidgetContents">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>594</width>
+             <height>588</height>
+            </rect>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_emojis">
+            <property name="spacing">
+             <number>5</number>
+            </property>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QFrame" name="frame_infoPanel">
+       <property name="frameShape">
+        <enum>QFrame::StyledPanel</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Raised</enum>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_infoPanel">
+        <item>
+         <widget class="QLabel" name="label_selectedEmoji">
+          <property name="font">
+           <font>
+            <pointsize>72</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>120</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_emojiInfo">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_tags">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_actions">
+          <item>
+           <widget class="QPushButton" name="pushButton_copyAndClose">
+            <property name="text">
+             <string>Copiar y Cerrar (Enter)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_editTags">
+            <property name="text">
+             <string>Editar Tags (Ctrl+E)</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <spacer name="verticalSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <widget class="QLabel" name="label_status">
+    <property name="text">
+     <string>Total: 0 emojis</string>
+    </property>
+   </widget>
+  </widget>
+  <action name="actionCopyEmoji">
+   <property name="text">
+    <string>Copiar Emoji</string>
+   </property>
+   <property name="shortcut">
+    <string>Return</string>
+   </property>
+  </action>
+  <action name="actionEditTags">
+   <property name="text">
+    <string>Editar Tags</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionFocusSearch">
+   <property name="text">
+    <string>Buscar</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+F</string>
+   </property>
+  </action>
+  <action name="actionClearSearch">
+   <property name="text">
+    <string>Limpiar Búsqueda</string>
+   </property>
+   <property name="shortcut">
+    <string>Esc</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>pushButton_clear</sender>
+   <signal>clicked()</signal>
+   <receiver>lineEdit_search</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>899</x>
+     <y>41</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>759</x>
+     <y>41</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

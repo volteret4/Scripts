@@ -1,0 +1,29 @@
+# Configuración personalizada para Icon Browser
+# Este archivo es opcional - permite agregar carpetas adicionales de iconos
+
+# Carpetas adicionales donde buscar iconos
+# Usar rutas absolutas o rutas relativas al home (~)
+icon_folders:
+  - "~/Descargas/Icons" # Carpeta de descargas
+  - "~/Documents/Design/Icons" # Carpeta de diseño
+  - "/mnt/storage/Icons" # Carpeta en disco externo
+  - "~/Pictures/Assets/Icons" # Carpeta de assets
+
+# Configuraciones adicionales (para futuras versiones)
+settings:
+  max_icons_display: 200 # Máximo número de iconos a mostrar
+  icon_size: 64 # Tamaño de los iconos en píxeles
+  grid_columns: 10 # Número de columnas en la grilla
+  search_delay: 300 # Delay en ms para la búsqueda
+
+# Extensiones de archivo soportadas (para futuras versiones)
+supported_extensions:
+  - ".png"
+  - ".jpg"
+  - ".jpeg"
+  - ".svg"
+  - ".ico"
+  - ".bmp"
+  - ".gif"
+  - ".xpm"
+  - ".webp"

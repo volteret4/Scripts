@@ -1,0 +1,159 @@
+{
+  "playlists": {
+    ".old": {
+      "hash": "80f90b9c8a7cc0cc678094b4a8919fd9",
+      "airsonic_id": "6",
+      "last_sync": "2025-06-28T23:47:23.374583",
+      "tracks_found": 2,
+      "tracks_total": 10
+    },
+    "6_house": {
+      "hash": "25d0a0d5d333552a26b7f934ea87eb51",
+      "airsonic_id": "7",
+      "last_sync": "2025-06-28T23:47:36.880737",
+      "tracks_found": 15,
+      "tracks_total": 47
+    },
+    "9_polladas": {
+      "hash": "50a8d8cbed52dce00101f66405af2983",
+      "airsonic_id": "8",
+      "last_sync": "2025-06-28T23:47:44.967993",
+      "tracks_found": 17,
+      "tracks_total": 28
+    },
+    "N_DnB": {
+      "hash": "7ae1c9bf08cb2757910412a03a454131",
+      "airsonic_id": "9",
+      "last_sync": "2025-06-28T23:47:46.199033",
+      "tracks_found": 2,
+      "tracks_total": 3
+    },
+    "Pop": {
+      "hash": "0ca9c236e51c6b5789a01277498e8585",
+      "airsonic_id": "10",
+      "last_sync": "2025-06-28T23:48:00.340039",
+      "tracks_found": 30,
+      "tracks_total": 49
+    },
+    "ambient": {
+      "hash": "b3edaf638f7f1771cf284172c38425eb",
+      "airsonic_id": "11",
+      "last_sync": "2025-06-28T23:48:32.076593",
+      "tracks_found": 56,
+      "tracks_total": 124
+    },
+    "b_dub": {
+      "hash": "ce2fe5d8a999193e1ebc9873bd086bfa",
+      "airsonic_id": "12",
+      "last_sync": "2025-06-28T23:48:46.011674",
+      "tracks_found": 23,
+      "tracks_total": 49
+    },
+    "deep": {
+      "hash": "4f253533305f38ea272033a87622fbc8",
+      "airsonic_id": "13",
+      "last_sync": "2025-06-28T23:49:43.053266",
+      "tracks_found": 70,
+      "tracks_total": 214
+    },
+    "electro": {
+      "hash": "7b1c02e079d89c4ef6b38cd4072d29fb",
+      "airsonic_id": "14",
+      "last_sync": "2025-06-28T23:49:48.632487",
+      "tracks_found": 6,
+      "tracks_total": 20
+    },
+    "flamenco": {
+      "hash": "9f5838367344cdd5d0897ffc0c05d5cd",
+      "airsonic_id": "15",
+      "last_sync": "2025-06-28T23:49:51.431896",
+      "tracks_found": 7,
+      "tracks_total": 8
+    },
+    "hip-hop": {
+      "hash": "ac472432be05797d7b82f96e59dbd7b9",
+      "airsonic_id": "16",
+      "last_sync": "2025-06-28T23:49:59.848406",
+      "tracks_found": 10,
+      "tracks_total": 31
+    },
+    "idm": {
+      "hash": "01bc001bcd1804b754c4ada531ee75ed",
+      "airsonic_id": "17",
+      "last_sync": "2025-06-28T23:50:12.338930",
+      "tracks_found": 23,
+      "tracks_total": 45
+    },
+    "jazz": {
+      "hash": "5ce0b28e9a507e2c6b8840fded8c7644",
+      "airsonic_id": "18",
+      "last_sync": "2025-06-28T23:50:25.343708",
+      "tracks_found": 26,
+      "tracks_total": 44
+    },
+    "keet": {
+      "hash": "1799afc7d13f296b06bca9af5947d9a8",
+      "airsonic_id": "19",
+      "last_sync": "2025-06-28T23:50:36.695402",
+      "tracks_found": 18,
+      "tracks_total": 36
+    },
+    "musica_disco": {
+      "hash": "ba148d4dcce63ab4c78a7fc3d35b55fc",
+      "airsonic_id": "20",
+      "last_sync": "2025-06-28T23:51:03.005829",
+      "tracks_found": 40,
+      "tracks_total": 102
+    },
+    "opiates": {
+      "hash": "e1476bccb00687377dfee421a66279e5",
+      "airsonic_id": "21",
+      "last_sync": "2025-06-28T23:51:04.678751",
+      "tracks_found": 4,
+      "tracks_total": 4
+    },
+    "rock_metal": {
+      "hash": "a0913c2b56e2ca565a02d28201583488",
+      "airsonic_id": "22",
+      "last_sync": "2025-06-28T23:51:18.797198",
+      "tracks_found": 36,
+      "tracks_total": 45
+    },
+    "shoegaze": {
+      "hash": "802ddd202e4113176c8e5c97a71495ff",
+      "airsonic_id": "23",
+      "last_sync": "2025-06-28T23:51:19.522283",
+      "tracks_found": 1,
+      "tracks_total": 2
+    },
+    "soul-funk": {
+      "hash": "d26349e84679e8729830c9dbf16ec63f",
+      "airsonic_id": "24",
+      "last_sync": "2025-06-28T23:51:27.068746",
+      "tracks_found": 14,
+      "tracks_total": 26
+    },
+    "techno": {
+      "hash": "7f89c9bee9099c1a78fc409c75e41794",
+      "airsonic_id": "25",
+      "last_sync": "2025-06-28T23:51:57.710999",
+      "tracks_found": 41,
+      "tracks_total": 114
+    },
+    "verano": {
+      "hash": "3e09cb9e45e63bcabbed5099f1cd63aa",
+      "airsonic_id": "26",
+      "last_sync": "2025-06-28T23:52:11.302699",
+      "tracks_found": 27,
+      "tracks_total": 44
+    },
+    "w_awakenings": {
+      "hash": "96b529d0d86b2b047b6fa071cb38648d",
+      "airsonic_id": "27",
+      "last_sync": "2025-06-28T23:52:26.586811",
+      "tracks_found": 38,
+      "tracks_total": 47
+    }
+  },
+  "last_sync": "2025-06-28T23:52:26.586831"
+}

@@ -5,7 +5,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
 # Notes:
 #   Dependencies:   Need to be logged in at orpheus.network.
 #       Firefox     Thorium-browser      chromium       xdotool

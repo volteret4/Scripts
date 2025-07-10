@@ -1,0 +1,4796 @@
+[
+  {
+    "id": 6,
+    "album_name": "Music for Lovers, Music Versus Time",
+    "artist_name": "F.S. Blumm",
+    "year": "2010-06-18"
+  },
+  {
+    "id": 8,
+    "album_name": "Romance",
+    "artist_name": "Fontaines D.C.",
+    "year": "2024-08-23"
+  },
+  {
+    "id": 14,
+    "album_name": "High Expectations/Low Results",
+    "artist_name": "Faunts",
+    "year": "2005"
+  },
+  {
+    "id": 16,
+    "album_name": "La gran obra maestra",
+    "artist_name": "Frank T",
+    "year": "1998"
+  },
+  {
+    "id": 24,
+    "album_name": "98.12.28 男達の別れ",
+    "artist_name": "Fishmans",
+    "year": "1999-09-29"
+  },
+  {
+    "id": 30,
+    "album_name": "Promises",
+    "artist_name": "Floating Points, Pharoah Sanders",
+    "year": "2021-03-26"
+  },
+  {
+    "id": 32,
+    "album_name": "There Is Love in You",
+    "artist_name": "Four Tet",
+    "year": "2010-01-25"
+  },
+  {
+    "id": 40,
+    "album_name": "Slow Focus",
+    "artist_name": "Fuck Buttons",
+    "year": "2013-07-22"
+  },
+  {
+    "id": 42,
+    "album_name": "Float On",
+    "artist_name": "The Floaters",
+    "year": "1989"
+  },
+  {
+    "id": 48,
+    "album_name": "Nuits Sonores / Nectarines",
+    "artist_name": "Floating Points",
+    "year": "2014-12-08"
+  },
+  {
+    "id": 56,
+    "album_name": "Still Life in Decay",
+    "artist_name": "FACS",
+    "year": "2023-04-07"
+  },
+  {
+    "id": 64,
+    "album_name": "People Who Aren’t There Anymore",
+    "artist_name": "Future Islands",
+    "year": "2024-01-26"
+  },
+  {
+    "id": 66,
+    "album_name": "Donde duele inspira",
+    "artist_name": "Flowklorikos",
+    "year": "2007-02-26"
+  },
+  {
+    "id": 72,
+    "album_name": "Everybody Is Somebody",
+    "artist_name": "Red Snapper",
+    "year": "2022-05-06"
+  },
+  {
+    "id": 73,
+    "album_name": "Gabriel",
+    "artist_name": "Roy Davis Jr. featuring Peven Everett",
+    "year": "1997"
+  },
+  {
+    "id": 75,
+    "album_name": "I'll take care of you",
+    "artist_name": "Rafael Lechowski -  Bobby Blue",
+    "year": "2010"
+  },
+  {
+    "id": 80,
+    "album_name": "Invisible Miracles",
+    "artist_name": "Rocio Zavala",
+    "year": "2022-05-06"
+  },
+  {
+    "id": 82,
+    "album_name": "Roy Ayers JID002",
+    "artist_name": "Roy Ayers, Adrian Younge",
+    "year": "2020-06-19"
+  },
+  {
+    "id": 88,
+    "album_name": "Solo Postres",
+    "artist_name": "Ramper",
+    "year": "2024-09-18"
+  },
+  {
+    "id": 92,
+    "album_name": "Monster (Original Motion Picture Soundtrack)",
+    "artist_name": "Ryuichi Sakamoto",
+    "year": "2023-11-22"
+  },
+  {
+    "id": 96,
+    "album_name": "Amused to Death",
+    "artist_name": "Roger Waters",
+    "year": "1992-09-01"
+  },
+  {
+    "id": 104,
+    "album_name": "Life Cycle of a Massive Star",
+    "artist_name": "Roly Porter",
+    "year": "2013-10"
+  },
+  {
+    "id": 111,
+    "album_name": "Trilogy",
+    "artist_name": "Ricochet Gathering",
+    "year": "2008-09-27"
+  },
+  {
+    "id": 112,
+    "album_name": "Okefenokee 2000",
+    "artist_name": "Ricochet Gathering",
+    "year": "2007-03-19"
+  },
+  {
+    "id": 120,
+    "album_name": "Daemmerlicht",
+    "artist_name": "Recondite",
+    "year": "2018-02-16"
+  },
+  {
+    "id": 126,
+    "album_name": "Destrozares. Canciones para el final de los tiempos",
+    "artist_name": "Robe",
+    "year": "2016-11-18"
+  },
+  {
+    "id": 128,
+    "album_name": "Overflow",
+    "artist_name": "Rival Consoles",
+    "year": "2021-12-03"
+  },
+  {
+    "id": 133,
+    "album_name": "Nocturnes",
+    "artist_name": "Rainer",
+    "year": "1995"
+  },
+  {
+    "id": 136,
+    "album_name": "Robson Jorge & Lincoln Olivetti",
+    "artist_name": "Robson Jorge",
+    "year": "2006"
+  },
+  {
+    "id": 140,
+    "album_name": "In the Dark / You Might Be Surprised",
+    "artist_name": "Roy Ayers",
+    "year": "1998"
+  },
+  {
+    "id": 144,
+    "album_name": "Perfection",
+    "artist_name": "Roy Ayers",
+    "year": "2000"
+  },
+  {
+    "id": 151,
+    "album_name": "Vibesman: Live at Ronnie Scotts",
+    "artist_name": "Roy Ayers",
+    "year": "1995"
+  },
+  {
+    "id": 152,
+    "album_name": "Virgin Ubiquity II: Unreleased Recordings 1976-1981",
+    "artist_name": "Roy Ayers",
+    "year": "2005"
+  },
+  {
+    "id": 160,
+    "album_name": "In The Dark",
+    "artist_name": "Roy Ayers",
+    "year": "2012-06"
+  },
+  {
+    "id": 165,
+    "album_name": "OK Computer: OKNOTOK 1997 2017",
+    "artist_name": "Radiohead",
+    "year": "2017-06-22"
+  },
+  {
+    "id": 168,
+    "album_name": "Green",
+    "artist_name": "Robohands",
+    "year": "2018-04-23"
+  },
+  {
+    "id": 169,
+    "album_name": "Jazz Abroad",
+    "artist_name": "Roy Haynes and Quincy Jones",
+    "year": "1957-02"
+  },
+  {
+    "id": 170,
+    "album_name": "Body Talk, Pt 1",
+    "artist_name": "Robyn",
+    "year": "2010-06-15"
+  },
+  {
+    "id": 173,
+    "album_name": "Body Talk, Pt 2",
+    "artist_name": "Robyn",
+    "year": "2010-09-07"
+  },
+  {
+    "id": 176,
+    "album_name": "Band of Joy",
+    "artist_name": "Robert Plant",
+    "year": "2010"
+  },
+  {
+    "id": 182,
+    "album_name": "A Sea Symphony (no. 1)",
+    "artist_name": "Ralph Vaughan Williams; Bryden Thomson, London Symphony Orchestra, London Symphony Chorus",
+    "year": "1989-08"
+  },
+  {
+    "id": 184,
+    "album_name": "Run the Jewels 3",
+    "artist_name": "Run the Jewels",
+    "year": "2017-01-20"
+  },
+  {
+    "id": 188,
+    "album_name": "CLUSTERFUNK",
+    "artist_name": "Ric Wilson, Chromeo",
+    "year": "2023-03-31"
+  },
+  {
+    "id": 196,
+    "album_name": "Superiouryouareinferior",
+    "artist_name": "Rae Spoon",
+    "year": "2008"
+  },
+  {
+    "id": 199,
+    "album_name": "Live in Japan",
+    "artist_name": "Rodrigo y Gabriela",
+    "year": "2008-09-30"
+  },
+  {
+    "id": 204,
+    "album_name": "Live: Manchester and Dublin",
+    "artist_name": "Rodrigo y Gabriela",
+    "year": "2004-01-01"
+  },
+  {
+    "id": 207,
+    "album_name": "Se nos lleva el aire",
+    "artist_name": "Robe",
+    "year": "2023-12-15"
+  },
+  {
+    "id": 208,
+    "album_name": "Mayéutica",
+    "artist_name": "Robe",
+    "year": "2021-04-30"
+  },
+  {
+    "id": 209,
+    "album_name": "Lo que aletea en nuestras cabezas",
+    "artist_name": "Robe",
+    "year": "2015-06-09"
+  },
+  {
+    "id": 213,
+    "album_name": "R de Rumba",
+    "artist_name": "R de Rumba",
+    "year": "2004-09-07"
+  },
+  {
+    "id": 214,
+    "album_name": "Iola",
+    "artist_name": "Rafael Lechowski",
+    "year": "2008"
+  },
+  {
+    "id": 222,
+    "album_name": "Mystic Voyage",
+    "artist_name": "Roy Ayers Ubiquity",
+    "year": "1975"
+  },
+  {
+    "id": 230,
+    "album_name": "Orchestral Works",
+    "artist_name": "Ralph Vaughan Williams; Sir Neville Marriner, Sir Adrian Boult, Barry Wordsworth",
+    "year": "1999"
+  },
+  {
+    "id": 234,
+    "album_name": "キャット",
+    "artist_name": "Hiroshi Suzuki",
+    "year": "2007-04-18"
+  },
+  {
+    "id": 238,
+    "album_name": "Send Return",
+    "artist_name": "",
+    "year": "2021-11-12"
+  },
+  {
+    "id": 244,
+    "album_name": "CBL [CD BABY LOVE]",
+    "artist_name": "hoon",
+    "year": "2003-05-14"
+  },
+  {
+    "id": 245,
+    "album_name": "Helena Hauff Meets Andreas Gehm",
+    "artist_name": "Helena Hauff Meets Andreas Gehm",
+    "year": "2014-09-08"
+  },
+  {
+    "id": 248,
+    "album_name": "Actio Reactio",
+    "artist_name": "Helena Hauff",
+    "year": "2013-08-05"
+  },
+  {
+    "id": 252,
+    "album_name": "Private Energy",
+    "artist_name": "Helado Negro",
+    "year": "2017"
+  },
+  {
+    "id": 260,
+    "album_name": "Deathconsciousness",
+    "artist_name": "Have a Nice Life",
+    "year": "2012-06-12"
+  },
+  {
+    "id": 261,
+    "album_name": "The Pearl",
+    "artist_name": "Harold Budd/Brian Eno",
+    "year": "2005-09-19"
+  },
+  {
+    "id": 267,
+    "album_name": "The Moon and the Melodies",
+    "artist_name": "Harold Budd, Simon Raymonde, Robin Guthrie",
+    "year": "1986"
+  },
+  {
+    "id": 268,
+    "album_name": "Blade Runner 2049: Original Motion Picture Soundtrack",
+    "artist_name": "Hans Zimmer",
+    "year": "2017-10-05"
+  },
+  {
+    "id": 276,
+    "album_name": "Soundscape 1: Surround",
+    "artist_name": "Hiroshi Yoshimura",
+    "year": "1986-02-10"
+  },
+  {
+    "id": 277,
+    "album_name": "On The Way To The Peak Of Normal (24/96 vinyl rip)",
+    "artist_name": "Holger Czukay",
+    "year": ""
+  },
+  {
+    "id": 281,
+    "album_name": "Polarity",
+    "artist_name": "Hoff Ensemble, Anders Jormin, Audun Kleive",
+    "year": "2018-04-06"
+  },
+  {
+    "id": 284,
+    "album_name": "Hijos del sol",
+    "artist_name": "Hermanos Gutiérrez",
+    "year": "2020-09-25"
+  },
+  {
+    "id": 290,
+    "album_name": "Variation",
+    "artist_name": "Hiroshi Suzuki - Masahiko Togashi Quintet",
+    "year": "1985"
+  },
+  {
+    "id": 292,
+    "album_name": "Nigredo Edition",
+    "artist_name": "I Hate Models / Vittorio Di Mango",
+    "year": "2017-04-17"
+  },
+  {
+    "id": 300,
+    "album_name": "Beautronics",
+    "artist_name": "ISAN",
+    "year": "1998-11-16"
+  },
+  {
+    "id": 308,
+    "album_name": "Shaft",
+    "artist_name": "Isaac Hayes",
+    "year": "2000-04-25"
+  },
+  {
+    "id": 320,
+    "album_name": "Megla EP",
+    "artist_name": "Ichisan",
+    "year": "2018"
+  },
+  {
+    "id": 323,
+    "album_name": "Joy as an Act of Resistance.",
+    "artist_name": "IDLES",
+    "year": "2018-08-31"
+  },
+  {
+    "id": 329,
+    "album_name": "Galope",
+    "artist_name": "Mu‐Ziq",
+    "year": "2023-11-03"
+  },
+  {
+    "id": 330,
+    "album_name": "1977",
+    "artist_name": "Mu‐Ziq",
+    "year": "2023-04-07"
+  },
+  {
+    "id": 331,
+    "album_name": "Senzatempo",
+    "artist_name": "Ozmotic | Fennesz",
+    "year": "2023-04-14"
+  },
+  {
+    "id": 336,
+    "album_name": "Good Time: Original Motion Picture Soundtrack",
+    "artist_name": "Oneohtrix Point Never",
+    "year": "2017-08-10"
+  },
+  {
+    "id": 339,
+    "album_name": "Age Of",
+    "artist_name": "Oneohtrix Point Never",
+    "year": "2018-05-25"
+  },
+  {
+    "id": 343,
+    "album_name": "Who b/w Sad Face",
+    "artist_name": "Odyssey",
+    "year": "1974"
+  },
+  {
+    "id": 347,
+    "album_name": "Dyad 1909",
+    "artist_name": "Ólafur Arnalds",
+    "year": "2009-12-07"
+  },
+  {
+    "id": 355,
+    "album_name": "Gimme Shelter",
+    "artist_name": "Ólafur Arnalds",
+    "year": "2014-02-06"
+  },
+  {
+    "id": 363,
+    "album_name": "Metri",
+    "artist_name": "Ø",
+    "year": "1994-02"
+  },
+  {
+    "id": 366,
+    "album_name": "Syväys",
+    "artist_name": "Ø",
+    "year": "2012-12"
+  },
+  {
+    "id": 369,
+    "album_name": "Atomit EP",
+    "artist_name": "Ø",
+    "year": "1995"
+  },
+  {
+    "id": 371,
+    "album_name": "Kantamoinen",
+    "artist_name": "Ø",
+    "year": "2005-05"
+  },
+  {
+    "id": 374,
+    "album_name": "Cantate Domino",
+    "artist_name": "The Oscar’s Motet Choir, Torsten Nilsson",
+    "year": "2003"
+  },
+  {
+    "id": 376,
+    "album_name": "Aftersun (Original Motion Picture Soundtrack)",
+    "artist_name": "Oliver Coates",
+    "year": "2023-01-13"
+  },
+  {
+    "id": 379,
+    "album_name": "A lo cubano",
+    "artist_name": "Orishas",
+    "year": "2000"
+  },
+  {
+    "id": 381,
+    "album_name": "Mikro Makro",
+    "artist_name": "Ø + Noto",
+    "year": "1997-02"
+  },
+  {
+    "id": 387,
+    "album_name": "Damnation",
+    "artist_name": "Opeth",
+    "year": "2003-04-14"
+  },
+  {
+    "id": 393,
+    "album_name": "Collaborative Works",
+    "artist_name": "Ólafur Arnalds and Nils Frahm",
+    "year": "2015-10-30"
+  },
+  {
+    "id": 395,
+    "album_name": "Humanz",
+    "artist_name": "Gorillaz",
+    "year": "2017-05-24"
+  },
+  {
+    "id": 397,
+    "album_name": "When I Was Young",
+    "artist_name": "Genesis Breyer P-Orridge",
+    "year": "2004"
+  },
+  {
+    "id": 403,
+    "album_name": "Cover the Windows and the Walls",
+    "artist_name": "Grouper",
+    "year": "2009-06-01"
+  },
+  {
+    "id": 411,
+    "album_name": "F♯ A♯ ∞",
+    "artist_name": "Godspeed You! Black Emperor",
+    "year": "2000"
+  },
+  {
+    "id": 413,
+    "album_name": "Lift Your Skinny Fists Like Antennas to Heaven!",
+    "artist_name": "Godspeed You! Black Emperor",
+    "year": "2000-10-09"
+  },
+  {
+    "id": 419,
+    "album_name": "Talk to the Sea",
+    "artist_name": "Gigi Masin",
+    "year": "2014-09"
+  },
+  {
+    "id": 427,
+    "album_name": "’Allelujah! Don’t Bend! Ascend!",
+    "artist_name": "Godspeed You! Black Emperor",
+    "year": "2012-12-26"
+  },
+  {
+    "id": 435,
+    "album_name": "v2.0",
+    "artist_name": "GoGo Penguin",
+    "year": "2014-03-17"
+  },
+  {
+    "id": 441,
+    "album_name": "Soft Lights and Sweet Music",
+    "artist_name": "Gerry Mulligan meets Scott Hamilton",
+    "year": "1992-01-25"
+  },
+  {
+    "id": 442,
+    "album_name": "A Thing",
+    "artist_name": "Gimbrère",
+    "year": "2018"
+  },
+  {
+    "id": 443,
+    "album_name": "'Hideaway' EP",
+    "artist_name": "Gold Suite",
+    "year": "2021"
+  },
+  {
+    "id": 451,
+    "album_name": "Smiling with No Teeth",
+    "artist_name": "Genesis Owusu",
+    "year": "2021-03-05"
+  },
+  {
+    "id": 453,
+    "album_name": "Viento y tiempo: Live at Blue Note Tokyo",
+    "artist_name": "Gonzalo Rubalcaba",
+    "year": "2010-05-29"
+  },
+  {
+    "id": 456,
+    "album_name": "All is Violent, All is Bright (Remasterd)",
+    "artist_name": "God Is An Astronaut",
+    "year": "2011"
+  },
+  {
+    "id": 459,
+    "album_name": "Postcards From Nowhere",
+    "artist_name": "Gigi Masin",
+    "year": "2019-07-19"
+  },
+  {
+    "id": 467,
+    "album_name": "Return",
+    "artist_name": "deathcrash",
+    "year": "2022-01-28"
+  },
+  {
+    "id": 475,
+    "album_name": "Ricercar nell'ombra",
+    "artist_name": "Blutwurst",
+    "year": "2020"
+  },
+  {
+    "id": 483,
+    "album_name": "Gore Motel",
+    "artist_name": "Bohren",
+    "year": "2015-05-15"
+  },
+  {
+    "id": 489,
+    "album_name": "Cassette for You",
+    "artist_name": "Boy Dude",
+    "year": "2017"
+  },
+  {
+    "id": 490,
+    "album_name": "The Blank Generation: Blank Tapes NYC 1975-1987",
+    "artist_name": "Bob Blank",
+    "year": "2010-02-01"
+  },
+  {
+    "id": 491,
+    "album_name": "All That You Love Will Be Eviscerated",
+    "artist_name": "Ben Frost",
+    "year": "2018-03-23"
+  },
+  {
+    "id": 499,
+    "album_name": "Peaks Remixes Two",
+    "artist_name": "Brain Machine",
+    "year": "2017-03-25"
+  },
+  {
+    "id": 500,
+    "album_name": "B12 Records Archive, Volume 4",
+    "artist_name": "B12",
+    "year": "2009-02-23"
+  },
+  {
+    "id": 502,
+    "album_name": "B12 Records Archive, Volume 5",
+    "artist_name": "B12",
+    "year": "2009-03-30"
+  },
+  {
+    "id": 503,
+    "album_name": "B12 Records Archive, Volume 3",
+    "artist_name": "B12",
+    "year": "2009-01"
+  },
+  {
+    "id": 505,
+    "album_name": "B12 Records Archive, Volume 2",
+    "artist_name": "B12",
+    "year": "2008-12-15"
+  },
+  {
+    "id": 506,
+    "album_name": "B12 Records Archive, Volume 1",
+    "artist_name": "B12",
+    "year": "2008-11-17"
+  },
+  {
+    "id": 507,
+    "album_name": "Electro-Soma",
+    "artist_name": "B12",
+    "year": "1993"
+  },
+  {
+    "id": 510,
+    "album_name": "B12 Records Archive, Volume 7",
+    "artist_name": "B12",
+    "year": "2009-05-25"
+  },
+  {
+    "id": 511,
+    "album_name": "B12 Records Archive, Volume 6",
+    "artist_name": "B12",
+    "year": "2009-04-27"
+  },
+  {
+    "id": 515,
+    "album_name": "Follow the Blind",
+    "artist_name": "Blind Guardian",
+    "year": "2018-09-14"
+  },
+  {
+    "id": 521,
+    "album_name": "LateNightTales: BADBADNOTGOOD",
+    "artist_name": "BADBADNOTGOOD",
+    "year": "2017-07-28"
+  },
+  {
+    "id": 523,
+    "album_name": "III",
+    "artist_name": "BADBADNOTGOOD",
+    "year": "2014-05-03"
+  },
+  {
+    "id": 531,
+    "album_name": "Nasty Gal",
+    "artist_name": "Betty Davis",
+    "year": "2009-10-06"
+  },
+  {
+    "id": 536,
+    "album_name": "Flight of the Cosmic Hippo",
+    "artist_name": "Béla Fleck and the Flecktones",
+    "year": "1991-06-11"
+  },
+  {
+    "id": 539,
+    "album_name": "I Thought I Was Better Than You",
+    "artist_name": "Baxter Dury",
+    "year": "2023-06-02"
+  },
+  {
+    "id": 543,
+    "album_name": "Keeper of the Password EP",
+    "artist_name": "Bot1500",
+    "year": "2018-04-24"
+  },
+  {
+    "id": 546,
+    "album_name": "Tastes and Textures EP, Volume One",
+    "artist_name": "Beaumont Hannant",
+    "year": "1993"
+  },
+  {
+    "id": 548,
+    "album_name": "Tastes and Textures, Volume 2: Basic Data Manipulation",
+    "artist_name": "Beaumont Hannant",
+    "year": "1993"
+  },
+  {
+    "id": 554,
+    "album_name": "Geogaddi",
+    "artist_name": "Boards Of Canada",
+    "year": "2002"
+  },
+  {
+    "id": 562,
+    "album_name": "Dahlia",
+    "artist_name": "Bicep",
+    "year": "2015-09-25"
+  },
+  {
+    "id": 570,
+    "album_name": "Dilate",
+    "artist_name": "Bardo Pond",
+    "year": "2001-04-24"
+  },
+  {
+    "id": 578,
+    "album_name": "Untrue",
+    "artist_name": "Burial",
+    "year": "2007-11-05"
+  },
+  {
+    "id": 582,
+    "album_name": "Kindred EP",
+    "artist_name": "Burial",
+    "year": "2012-03-07"
+  },
+  {
+    "id": 586,
+    "album_name": "Visions of Backbeat",
+    "artist_name": "BoomBox",
+    "year": "2005"
+  },
+  {
+    "id": 594,
+    "album_name": "Two Hands",
+    "artist_name": "Big Thief",
+    "year": "2019-10-11"
+  },
+  {
+    "id": 595,
+    "album_name": "Panic of Looking",
+    "artist_name": "Brian Eno and the words of Rick Holland",
+    "year": "2011-11-07"
+  },
+  {
+    "id": 602,
+    "album_name": "Death of a Typographer",
+    "artist_name": "Byetone",
+    "year": "2008-06-11"
+  },
+  {
+    "id": 605,
+    "album_name": "Brian Eno x Nicolas Jaar x Grizzly Bear",
+    "artist_name": "Brian Eno x Nicolas Jaar x Grizzly Bear",
+    "year": "2013-04-20"
+  },
+  {
+    "id": 606,
+    "album_name": "'Nard + Funky Beat",
+    "artist_name": "Bernard Wright",
+    "year": "2011-01-17"
+  },
+  {
+    "id": 607,
+    "album_name": "Amazing Grace",
+    "artist_name": "Harold Alfred Blanchard, Georg Philipp Telemann; Hubert Laws, Quincy Jones, Chick Corea",
+    "year": ""
+  },
+  {
+    "id": 608,
+    "album_name": "Alive In The East?",
+    "artist_name": "Binker Golding and Moses Boyd",
+    "year": "2018-06-22"
+  },
+  {
+    "id": 609,
+    "album_name": "Journey to the Mountain of Forever",
+    "artist_name": "Binker Golding and Moses Boyd",
+    "year": "2017-06-02"
+  },
+  {
+    "id": 610,
+    "album_name": "The Legendary Albums: One, Two, Three & BJ4",
+    "artist_name": "Bob James",
+    "year": "2003-02-17"
+  },
+  {
+    "id": 616,
+    "album_name": "Soulful Truth",
+    "artist_name": "Barbara Mason",
+    "year": "2020"
+  },
+  {
+    "id": 618,
+    "album_name": "I Am Your Woman, She Is Your Wife",
+    "artist_name": "Barbara Mason",
+    "year": "1978"
+  },
+  {
+    "id": 626,
+    "album_name": "Once Twice Melody",
+    "artist_name": "Beach House",
+    "year": "2022-02-18"
+  },
+  {
+    "id": 634,
+    "album_name": "Monsters and Robots",
+    "artist_name": "Buckethead",
+    "year": "1999-09-08"
+  },
+  {
+    "id": 637,
+    "album_name": "Brutu Guru",
+    "artist_name": "Brutus The Guru Guru",
+    "year": "2015-10-10"
+  },
+  {
+    "id": 642,
+    "album_name": "Stretchin’ Out in Bootsy’s Rubber Band",
+    "artist_name": "Bootsy Collins",
+    "year": "2007-06-12"
+  },
+  {
+    "id": 643,
+    "album_name": "Lesser Man (extended version)",
+    "artist_name": "Boy Harsher",
+    "year": "2017-11-24"
+  },
+  {
+    "id": 650,
+    "album_name": "Ambient 4: On Land",
+    "artist_name": "Brian Eno",
+    "year": "1987-01"
+  },
+  {
+    "id": 652,
+    "album_name": "Noli Me Tangere",
+    "artist_name": "Biological-Events",
+    "year": "1998"
+  },
+  {
+    "id": 653,
+    "album_name": "Bio-Net (Molecular World Wide Web)",
+    "artist_name": "Biological-Events",
+    "year": "1996-08-19"
+  },
+  {
+    "id": 654,
+    "album_name": "Mutabor",
+    "artist_name": "Biological-Events",
+    "year": "1997-05-12"
+  },
+  {
+    "id": 655,
+    "album_name": "Life Morphing",
+    "artist_name": "Biological-Events",
+    "year": "1995-07"
+  },
+  {
+    "id": 658,
+    "album_name": "Lost and Found",
+    "artist_name": "Buena Vista Social Club",
+    "year": "2015"
+  },
+  {
+    "id": 659,
+    "album_name": "La Torre Ibiza - Volumen Quatro",
+    "artist_name": "Bassekou Kouyate, Ngoni Ba, Zoumana Tereta",
+    "year": "2022"
+  },
+  {
+    "id": 663,
+    "album_name": "ESP Mirror",
+    "artist_name": "Brett Naucke",
+    "year": "2017-05"
+  },
+  {
+    "id": 665,
+    "album_name": "EMS Hallucinations",
+    "artist_name": "Brett Naucke",
+    "year": "2020-09-11"
+  },
+  {
+    "id": 666,
+    "album_name": "The Back of the Garden",
+    "artist_name": "Brett Naucke",
+    "year": "2018-02-09"
+  },
+  {
+    "id": 667,
+    "album_name": "Transparency",
+    "artist_name": "Brett Naucke",
+    "year": "2014-02-01"
+  },
+  {
+    "id": 669,
+    "album_name": "Electronic Hypnosis Program",
+    "artist_name": "Brett Naucke",
+    "year": "2019"
+  },
+  {
+    "id": 671,
+    "album_name": "Ketan",
+    "artist_name": "Gyedu-Blay Ambolley",
+    "year": "2017-05-12"
+  },
+  {
+    "id": 672,
+    "album_name": "Nova/Moth",
+    "artist_name": "Burial + Four Tet",
+    "year": "2022-02-10"
+  },
+  {
+    "id": 674,
+    "album_name": "Timewave Zero",
+    "artist_name": "Blood Incantation",
+    "year": "2022-02-25"
+  },
+  {
+    "id": 682,
+    "album_name": "Ark",
+    "artist_name": "Brendan Perry",
+    "year": "2010"
+  },
+  {
+    "id": 684,
+    "album_name": "B.E.D",
+    "artist_name": "Baxter Dury, Étienne de Crécy",
+    "year": "2018-10-26"
+  },
+  {
+    "id": 690,
+    "album_name": "Departed Glories",
+    "artist_name": "Biosphere",
+    "year": "2016-09-23"
+  },
+  {
+    "id": 698,
+    "album_name": "Stranger",
+    "artist_name": "Balmorhea",
+    "year": "2012-02-10"
+  },
+  {
+    "id": 700,
+    "album_name": "All Is Wild, All Is Silent Remixes",
+    "artist_name": "Balmorhea",
+    "year": "2009-08"
+  },
+  {
+    "id": 702,
+    "album_name": "何者",
+    "artist_name": "ポルカドットスティングレイ",
+    "year": "2020"
+  },
+  {
+    "id": 703,
+    "album_name": "Sandwell Disctrict",
+    "artist_name": "Sandwell District",
+    "year": "2011"
+  },
+  {
+    "id": 706,
+    "album_name": "Off the Wall",
+    "artist_name": "Michael Jackson",
+    "year": "1979"
+  },
+  {
+    "id": 713,
+    "album_name": "As We Speak",
+    "artist_name": "Bela Fleck, Zakir Hussain, Edgar Meyer",
+    "year": "2023"
+  },
+  {
+    "id": 714,
+    "album_name": "Zen Hôyô (Liturgie Du Bouddhisme Zen = Liturgy Of Zen Buddhism)",
+    "artist_name": "Myôhô Takada, Tôgaku Kamba, Geppô Kobori, Sôshô Yamada, Yôdô Fukushiro, Kankei Fujita, Seizan Toda, Kaidô Iwatsuki, Stomu Yamash'ta, Genzan Miyoshi",
+    "year": "2010"
+  },
+  {
+    "id": 715,
+    "album_name": "音の窓",
+    "artist_name": "志方あきこ",
+    "year": "2025"
+  },
+  {
+    "id": 716,
+    "album_name": "Salt And Sugar Look The Same",
+    "artist_name": "Tim Koh, An Sun",
+    "year": "2024-06-21"
+  },
+  {
+    "id": 722,
+    "album_name": "Reachy Prints",
+    "artist_name": "Plaid",
+    "year": "2014"
+  },
+  {
+    "id": 730,
+    "album_name": "Music For Dance & Theatre - Volume Two",
+    "artist_name": "Various Artists",
+    "year": "2020"
+  },
+  {
+    "id": 737,
+    "album_name": "Axiat",
+    "artist_name": "Tangerine Dream",
+    "year": "2009"
+  },
+  {
+    "id": 738,
+    "album_name": "Hollywood Lightning",
+    "artist_name": "Tangerine Dream",
+    "year": "2009"
+  },
+  {
+    "id": 746,
+    "album_name": "Zeit",
+    "artist_name": "Tangerine Dream",
+    "year": "1986"
+  },
+  {
+    "id": 753,
+    "album_name": "Logos: Tangerine Dream Live 1982",
+    "artist_name": "Tangerine Dream",
+    "year": "1994"
+  },
+  {
+    "id": 754,
+    "album_name": "Recurring Dreams",
+    "artist_name": "Tangerine Dream",
+    "year": "2019-12-10"
+  },
+  {
+    "id": 756,
+    "album_name": "Atem (2011 Esoteric Remaster) (Disc2)",
+    "artist_name": "Tangerine Dream",
+    "year": "1973"
+  },
+  {
+    "id": 762,
+    "album_name": "Galactic Supermarket",
+    "artist_name": "The Cosmic Jokers",
+    "year": "1974"
+  },
+  {
+    "id": 764,
+    "album_name": "STP EP",
+    "artist_name": "The Cyclist",
+    "year": "2022-11-18"
+  },
+  {
+    "id": 770,
+    "album_name": "Igor",
+    "artist_name": "Tyler, The Creator",
+    "year": "2019-08-23"
+  },
+  {
+    "id": 773,
+    "album_name": "Scum Fuck Flower Boy",
+    "artist_name": "Tyler, The Creator",
+    "year": "2017-07-21"
+  },
+  {
+    "id": 776,
+    "album_name": "Bastard",
+    "artist_name": "Tyler, The Creator",
+    "year": "2009-12-25"
+  },
+  {
+    "id": 778,
+    "album_name": "All Mornin' Long",
+    "artist_name": "The Red Garland Quintet",
+    "year": "1958"
+  },
+  {
+    "id": 786,
+    "album_name": "Weighing Souls With Sand",
+    "artist_name": "The Angelic Process",
+    "year": "2018-09-18"
+  },
+  {
+    "id": 794,
+    "album_name": "(II)",
+    "artist_name": "Toundra",
+    "year": "2010-05-25"
+  },
+  {
+    "id": 801,
+    "album_name": "Música para enfermos",
+    "artist_name": "Tote King",
+    "year": "2002"
+  },
+  {
+    "id": 802,
+    "album_name": "Un tipo cualquiera",
+    "artist_name": "ToteKing",
+    "year": "2006-05-04"
+  },
+  {
+    "id": 803,
+    "album_name": "Sky High!",
+    "artist_name": "Tavares",
+    "year": "1976"
+  },
+  {
+    "id": 810,
+    "album_name": "Mystic Thickness",
+    "artist_name": "TOBACCO",
+    "year": "2010-05"
+  },
+  {
+    "id": 818,
+    "album_name": "Loose Grooves & Bastard Blues",
+    "artist_name": "Tommy Guerrero",
+    "year": "2007-08-08"
+  },
+  {
+    "id": 821,
+    "album_name": "Genetically Modified: Remix Album",
+    "artist_name": "The Black Dog",
+    "year": "2003-03-31"
+  },
+  {
+    "id": 826,
+    "album_name": "Spirit of Eden",
+    "artist_name": "Talk Talk",
+    "year": "2014-03-09"
+  },
+  {
+    "id": 834,
+    "album_name": "We Are the Night",
+    "artist_name": "The Chemical Brothers",
+    "year": "2007-07-17"
+  },
+  {
+    "id": 842,
+    "album_name": "Exit Planet Dust",
+    "artist_name": "The Chemical Brothers",
+    "year": "1995-08-15"
+  },
+  {
+    "id": 857,
+    "album_name": "Tranklements",
+    "artist_name": "The Black Dog",
+    "year": "2013-05-20"
+  },
+  {
+    "id": 858,
+    "album_name": "Liber Kult, Book 1 ov 3",
+    "artist_name": "The Black Dog",
+    "year": "2011-08-01"
+  },
+  {
+    "id": 863,
+    "album_name": "Thee Lounge EP",
+    "artist_name": "The Black Dog",
+    "year": "2018-12-18"
+  },
+  {
+    "id": 865,
+    "album_name": "Temple of Transparent Balls",
+    "artist_name": "The Black Dog",
+    "year": "2007-10-15"
+  },
+  {
+    "id": 866,
+    "album_name": "Liber Temple, Book 2 ov 3",
+    "artist_name": "The Black Dog",
+    "year": "2011-09-05"
+  },
+  {
+    "id": 873,
+    "album_name": "Sleep Deprivation",
+    "artist_name": "The Black Dog",
+    "year": "2024-11-01"
+  },
+  {
+    "id": 875,
+    "album_name": "Liber Nox, Book 3 ov 3",
+    "artist_name": "The Black Dog",
+    "year": "2011-10-24"
+  },
+  {
+    "id": 876,
+    "album_name": "Final Collected Vexations",
+    "artist_name": "The Black Dog",
+    "year": "2010-10-25"
+  },
+  {
+    "id": 881,
+    "album_name": "Zigzagger",
+    "artist_name": "Takuya Kuroda",
+    "year": "2016-09-02"
+  },
+  {
+    "id": 886,
+    "album_name": "Metallic Spheres",
+    "artist_name": "The Orb featuring David Gilmour",
+    "year": "2010-10-12"
+  },
+  {
+    "id": 889,
+    "album_name": "Boys for Pele",
+    "artist_name": "Tori Amos",
+    "year": "2016-11-18"
+  },
+  {
+    "id": 892,
+    "album_name": "Luna de mayo",
+    "artist_name": "Tabletom",
+    "year": "2016"
+  },
+  {
+    "id": 893,
+    "album_name": "Mezclalina",
+    "artist_name": "Tabletom",
+    "year": "1980"
+  },
+  {
+    "id": 895,
+    "album_name": "New Others, Part Two",
+    "artist_name": "This Will Destroy You",
+    "year": "2018-10-16"
+  },
+  {
+    "id": 897,
+    "album_name": "The Crying Out of Things",
+    "artist_name": "The Body",
+    "year": "2024-11-08"
+  },
+  {
+    "id": 900,
+    "album_name": "Tu madre es una foca",
+    "artist_name": "ToteKing",
+    "year": "2002"
+  },
+  {
+    "id": 905,
+    "album_name": "Jo in Nine G Hell",
+    "artist_name": "The Hair",
+    "year": "1992"
+  },
+  {
+    "id": 910,
+    "album_name": "Persian Surgery Dervishes performance One",
+    "artist_name": "Terry Riley",
+    "year": "1972"
+  },
+  {
+    "id": 913,
+    "album_name": "No Tourists",
+    "artist_name": "The Prodigy",
+    "year": "2018-11-02"
+  },
+  {
+    "id": 918,
+    "album_name": "Intimate Immensity / A Call from the Eaves",
+    "artist_name": "Tomaga",
+    "year": "2022-12-02"
+  },
+  {
+    "id": 921,
+    "album_name": "Gold Digger: With True Love",
+    "artist_name": "Toshiki Kadomatsu",
+    "year": "1985-04-21"
+  },
+  {
+    "id": 923,
+    "album_name": "Jazz Impressions of Japan",
+    "artist_name": "The Dave Brubeck Quartet",
+    "year": "2009"
+  },
+  {
+    "id": 929,
+    "album_name": "The Soft Bulletin",
+    "artist_name": "The Flaming Lips",
+    "year": "2002"
+  },
+  {
+    "id": 937,
+    "album_name": "Orbus Terrarum",
+    "artist_name": "The Orb",
+    "year": "2008-06-20"
+  },
+  {
+    "id": 945,
+    "album_name": "Strangeways, Here We Come",
+    "artist_name": "The Smiths",
+    "year": "1987-09-28"
+  },
+  {
+    "id": 953,
+    "album_name": "...Llegó el día",
+    "artist_name": "Triana",
+    "year": "1991"
+  },
+  {
+    "id": 954,
+    "album_name": "Un mal sueño",
+    "artist_name": "Triana",
+    "year": "1990"
+  },
+  {
+    "id": 956,
+    "album_name": "Triana (El patio)",
+    "artist_name": "Triana",
+    "year": "1988"
+  },
+  {
+    "id": 960,
+    "album_name": "The Midnight Hour",
+    "artist_name": "The Midnight Hour",
+    "year": "2018-07-13"
+  },
+  {
+    "id": 961,
+    "album_name": "10,000 Days",
+    "artist_name": "Tool",
+    "year": "2006-05-02"
+  },
+  {
+    "id": 966,
+    "album_name": "The Cascading Voices Of (The Hugo And Luigi Chorus)",
+    "artist_name": "The Hugo And Luigi Chorus",
+    "year": "2016"
+  },
+  {
+    "id": 968,
+    "album_name": "1812 / Capriccio Italien / Marche Slave / Festival Coronation March / Polonaise / Cossack Dance",
+    "artist_name": "Pyotr Ilyich Tchaikovsky; Cincinnati Pops Orchestra, Kiev Symphony Chorus, Children's Choir of Greater Cincinnati, Erich Kunzel",
+    "year": "2001-05-22"
+  },
+  {
+    "id": 969,
+    "album_name": "Neo Neo Acid",
+    "artist_name": "Tin Man",
+    "year": "2012-06-18"
+  },
+  {
+    "id": 971,
+    "album_name": "The System EP",
+    "artist_name": "The System",
+    "year": "2016"
+  },
+  {
+    "id": 972,
+    "album_name": "Postcards",
+    "artist_name": "Turtle Creek Chorale",
+    "year": "1994"
+  },
+  {
+    "id": 977,
+    "album_name": "Say or Do",
+    "artist_name": "Traumprinz",
+    "year": "2012-12-12"
+  },
+  {
+    "id": 985,
+    "album_name": "Fuck Off Get Free We Pour Light on Everything",
+    "artist_name": "A Silver Mt. Zion",
+    "year": "2014-01-21"
+  },
+  {
+    "id": 993,
+    "album_name": "A Weird Exits",
+    "artist_name": "Osees",
+    "year": "2016-08-12"
+  },
+  {
+    "id": 994,
+    "album_name": "Smote Reverser",
+    "artist_name": "Osees",
+    "year": "2018-08-17"
+  },
+  {
+    "id": 1001,
+    "album_name": "Bobby Tacker EP",
+    "artist_name": "Tuff City Kids",
+    "year": "2012-06-04"
+  },
+  {
+    "id": 1003,
+    "album_name": "Light Up the Night",
+    "artist_name": "The Brothers Johnson",
+    "year": "1980-02-12"
+  },
+  {
+    "id": 1004,
+    "album_name": "Blast!",
+    "artist_name": "The Brothers Johnson",
+    "year": "1982-11-16"
+  },
+  {
+    "id": 1005,
+    "album_name": "Winners",
+    "artist_name": "The Brothers Johnson",
+    "year": "1981-06-19"
+  },
+  {
+    "id": 1006,
+    "album_name": "Look Out For #1",
+    "artist_name": "The Brothers Johnson",
+    "year": "1976"
+  },
+  {
+    "id": 1007,
+    "album_name": "Blam!!",
+    "artist_name": "The Brothers Johnson",
+    "year": "1996-04-16"
+  },
+  {
+    "id": 1008,
+    "album_name": "Right on Time",
+    "artist_name": "The Brothers Johnson",
+    "year": "1977"
+  },
+  {
+    "id": 1009,
+    "album_name": "Literature",
+    "artist_name": "Tomotsugu Nakamura",
+    "year": "2020-07-13"
+  },
+  {
+    "id": 1017,
+    "album_name": "Dance Mania",
+    "artist_name": "Tito Puente",
+    "year": "2009-04-21"
+  },
+  {
+    "id": 1018,
+    "album_name": "Lucus",
+    "artist_name": "Thomas Strønen, Time Is a Blind Guide",
+    "year": "2018-01-19"
+  },
+  {
+    "id": 1021,
+    "album_name": "Tomorrow Comes the Harvest",
+    "artist_name": "Tony Allen, Jeff Mills",
+    "year": "2018-09-28"
+  },
+  {
+    "id": 1025,
+    "album_name": "But Not For Me",
+    "artist_name": "The Ahmad Jamal Trio",
+    "year": "2012"
+  },
+  {
+    "id": 1026,
+    "album_name": "Big Silver Shining Motor of Sin EP",
+    "artist_name": "Two Lone Swordsmen",
+    "year": "2004-10-18"
+  },
+  {
+    "id": 1033,
+    "album_name": "Cotton Club",
+    "artist_name": "Tortoise",
+    "year": "1998-05-12"
+  },
+  {
+    "id": 1035,
+    "album_name": "Jack Wilson Quartet Featuring Roy Ayers",
+    "artist_name": "The Jack Wilson Quartet",
+    "year": "1963"
+  },
+  {
+    "id": 1041,
+    "album_name": "The Seeds of Love",
+    "artist_name": "Tears for Fears",
+    "year": "1999-06-28"
+  },
+  {
+    "id": 1042,
+    "album_name": "The Social Network",
+    "artist_name": "Trent Reznor and Atticus Ross",
+    "year": "2010-10-15"
+  },
+  {
+    "id": 1043,
+    "album_name": "Before the Flood: Music From the Motion Picture",
+    "artist_name": "Trent Reznor and Atticus Ross, Gustavo Santaolalla, Mogwai",
+    "year": "2016-10-21"
+  },
+  {
+    "id": 1049,
+    "album_name": "Looping State of Mind",
+    "artist_name": "The Field",
+    "year": "2011-10-10"
+  },
+  {
+    "id": 1057,
+    "album_name": "Harmony in Ultraviolet",
+    "artist_name": "Tim Hecker",
+    "year": "2006-10-16"
+  },
+  {
+    "id": 1065,
+    "album_name": "Mort aux vaches",
+    "artist_name": "Tim Hecker",
+    "year": "2004-10-03"
+  },
+  {
+    "id": 1073,
+    "album_name": "The Men Parted The Sea To Devour The Water",
+    "artist_name": "The Haxan Cloak",
+    "year": "2012"
+  },
+  {
+    "id": 1078,
+    "album_name": "Neckodeemus / Solid Foundation",
+    "artist_name": "The Congos / The Congos",
+    "year": "1977"
+  },
+  {
+    "id": 1081,
+    "album_name": "Anicca",
+    "artist_name": "Teebs",
+    "year": "2019-10-25"
+  },
+  {
+    "id": 1084,
+    "album_name": "Shades Amaze Concept EP",
+    "artist_name": "The 7th Plain",
+    "year": "1995"
+  },
+  {
+    "id": 1089,
+    "album_name": "V",
+    "artist_name": "Unknown Mortal Orchestra",
+    "year": "2023-03-17"
+  },
+  {
+    "id": 1097,
+    "album_name": "Rez / Cowgirl",
+    "artist_name": "Underworld",
+    "year": "1994-03-29"
+  },
+  {
+    "id": 1105,
+    "album_name": "Second Toughest in the Infants",
+    "artist_name": "Underworld",
+    "year": "2015-11-20"
+  },
+  {
+    "id": 1107,
+    "album_name": "Drift Series 1 - Complete",
+    "artist_name": "Underworld",
+    "year": "2020-06-12"
+  },
+  {
+    "id": 1113,
+    "album_name": "Messe I.X–VI.X",
+    "artist_name": "Ulver",
+    "year": "2013-08-01"
+  },
+  {
+    "id": 1121,
+    "album_name": "LESS IS MOOR",
+    "artist_name": "Zebra Katz",
+    "year": "2020-03-20"
+  },
+  {
+    "id": 1129,
+    "album_name": "Silver Haze",
+    "artist_name": "SQÜRL",
+    "year": "2023-05-05"
+  },
+  {
+    "id": 1132,
+    "album_name": "Tourist Travel Versions",
+    "artist_name": "St Germain",
+    "year": "2021-01-29"
+  },
+  {
+    "id": 1144,
+    "album_name": "Suicide (The Second Album)",
+    "artist_name": "Suicide",
+    "year": "1999-06-28"
+  },
+  {
+    "id": 1152,
+    "album_name": "Growing",
+    "artist_name": "Sound Me",
+    "year": "2016-08-19"
+  },
+  {
+    "id": 1155,
+    "album_name": "And in His Eyes I Saw Death",
+    "artist_name": "Sleeparchive",
+    "year": "2015-05-01"
+  },
+  {
+    "id": 1156,
+    "album_name": "Windows EP",
+    "artist_name": "Sleeparchive",
+    "year": "2015-07-06"
+  },
+  {
+    "id": 1160,
+    "album_name": "We Like It Here",
+    "artist_name": "Snarky Puppy",
+    "year": "2014-02-25"
+  },
+  {
+    "id": 1161,
+    "album_name": "Jazz Samba",
+    "artist_name": "Stan Getz/Charlie Byrd",
+    "year": "2008"
+  },
+  {
+    "id": 1168,
+    "album_name": "Odin’s Raven Magic",
+    "artist_name": "Sigur Rós",
+    "year": "2020-12-04"
+  },
+  {
+    "id": 1169,
+    "album_name": "Quimera",
+    "artist_name": "Sólo los Solo",
+    "year": "2001"
+  },
+  {
+    "id": 1170,
+    "album_name": "Retorno al principio",
+    "artist_name": "Sólo los Solo",
+    "year": "1998"
+  },
+  {
+    "id": 1176,
+    "album_name": "(初心) GrimmRobes Live 101008",
+    "artist_name": "Sunn O)))",
+    "year": "2009"
+  },
+  {
+    "id": 1182,
+    "album_name": "Agharti Live 09-10",
+    "artist_name": "Sunn O)))",
+    "year": "2011-03-01"
+  },
+  {
+    "id": 1184,
+    "album_name": "The Grimmrobe Demos // extended",
+    "artist_name": "Sunn O)))",
+    "year": "2013-04-22"
+  },
+  {
+    "id": 1192,
+    "album_name": "Floating Music",
+    "artist_name": "Stomu Yamashta",
+    "year": "1972"
+  },
+  {
+    "id": 1199,
+    "album_name": "Symphonies nos. 3 & 7",
+    "artist_name": "Jean Sibelius; London Symphony Orchestra, Sir Colin Davis",
+    "year": "2003"
+  },
+  {
+    "id": 1200,
+    "album_name": "The Healer",
+    "artist_name": "SUMAC",
+    "year": "2024-06-21"
+  },
+  {
+    "id": 1204,
+    "album_name": "Despues de...",
+    "artist_name": "SFDK",
+    "year": "2004"
+  },
+  {
+    "id": 1205,
+    "album_name": "Outta kranny",
+    "artist_name": "SFDK",
+    "year": "1993"
+  },
+  {
+    "id": 1207,
+    "album_name": "Merry Christmas",
+    "artist_name": "SFDK",
+    "year": ""
+  },
+  {
+    "id": 1208,
+    "album_name": "Siempre fuertes 2",
+    "artist_name": "SFDK",
+    "year": "2009-11-05"
+  },
+  {
+    "id": 1209,
+    "album_name": "Esto va en serio",
+    "artist_name": "SFDK",
+    "year": "1996"
+  },
+  {
+    "id": 1212,
+    "album_name": "Después de...",
+    "artist_name": "SFDK",
+    "year": "2005-03-21"
+  },
+  {
+    "id": 1213,
+    "album_name": "Tras mil vueltas",
+    "artist_name": "SFDK",
+    "year": "1995"
+  },
+  {
+    "id": 1216,
+    "album_name": "Tesoros y caras B",
+    "artist_name": "SFDK",
+    "year": "2010-08-20"
+  },
+  {
+    "id": 1218,
+    "album_name": "Llámalo como lo quieras",
+    "artist_name": "SFDK",
+    "year": "1997"
+  },
+  {
+    "id": 1220,
+    "album_name": "Original Rap University",
+    "artist_name": "SFDK",
+    "year": "2006-11-29"
+  },
+  {
+    "id": 1224,
+    "album_name": "AS IT IS",
+    "artist_name": "Steve Roach",
+    "year": "2021-04-02"
+  },
+  {
+    "id": 1226,
+    "album_name": "Structures From Silence (30th Anniversary Remastered Edition)",
+    "artist_name": "Steve Roach",
+    "year": "2014-02-12"
+  },
+  {
+    "id": 1232,
+    "album_name": "Everything Was Beautiful",
+    "artist_name": "Spiritualized",
+    "year": "2022-04-22"
+  },
+  {
+    "id": 1240,
+    "album_name": "And She Closed Her Eyes",
+    "artist_name": "Stina Nordenstam",
+    "year": "1994"
+  },
+  {
+    "id": 1246,
+    "album_name": "velocity: design: comfort",
+    "artist_name": "Sweet Trip",
+    "year": "2020-05-01"
+  },
+  {
+    "id": 1248,
+    "album_name": "Menos mal que nos queda Portugal",
+    "artist_name": "Siniestro Total",
+    "year": "2002"
+  },
+  {
+    "id": 1250,
+    "album_name": "La historia del Blues",
+    "artist_name": "Siniestro Total",
+    "year": "2000"
+  },
+  {
+    "id": 1254,
+    "album_name": "Şelale",
+    "artist_name": "DJ Sofa, Houschyar, Okay Temiz",
+    "year": "2021-07-05"
+  },
+  {
+    "id": 1256,
+    "album_name": "Aja",
+    "artist_name": "Steely Dan",
+    "year": "1980-07"
+  },
+  {
+    "id": 1264,
+    "album_name": "Ufabulum",
+    "artist_name": "Squarepusher",
+    "year": "2012-05-14"
+  },
+  {
+    "id": 1265,
+    "album_name": "Maximum Priest EP",
+    "artist_name": "Squarepusher",
+    "year": "1999"
+  },
+  {
+    "id": 1272,
+    "album_name": "Port Rhombus EP",
+    "artist_name": "Squarepusher",
+    "year": "1996-07-01"
+  },
+  {
+    "id": 1280,
+    "album_name": "Square Window",
+    "artist_name": "Squarepusher",
+    "year": "2004-03-08"
+  },
+  {
+    "id": 1284,
+    "album_name": "Venus No. 17",
+    "artist_name": "Squarepusher",
+    "year": "2004-07-12"
+  },
+  {
+    "id": 1288,
+    "album_name": "Just for a Day",
+    "artist_name": "Slowdive",
+    "year": "2010-09-16"
+  },
+  {
+    "id": 1294,
+    "album_name": "Soundboy Punishments",
+    "artist_name": "Various Artists",
+    "year": "2007-05"
+  },
+  {
+    "id": 1295,
+    "album_name": "Panorama Bar 05",
+    "artist_name": "Steffi",
+    "year": "2013-04"
+  },
+  {
+    "id": 1296,
+    "album_name": "Yours & Mine",
+    "artist_name": "Steffi",
+    "year": "2011"
+  },
+  {
+    "id": 1304,
+    "album_name": "Causas y azares",
+    "artist_name": "Silvio Rodríguez",
+    "year": "1992"
+  },
+  {
+    "id": 1310,
+    "album_name": "Why Is It? (Funk Dat)",
+    "artist_name": "Sagatmanchu",
+    "year": "1993"
+  },
+  {
+    "id": 1312,
+    "album_name": "Way Out West",
+    "artist_name": "Sonny Rollins",
+    "year": "1984"
+  },
+  {
+    "id": 1319,
+    "album_name": "Give the People What They Want",
+    "artist_name": "Sharon Jones and the Dap‐Kings",
+    "year": "2014-01"
+  },
+  {
+    "id": 1320,
+    "album_name": "Dap Dippin' With Sharon Jones and the Dap-Kings",
+    "artist_name": "Sharon Jones and the Dap‐Kings",
+    "year": "2002-05-14"
+  },
+  {
+    "id": 1328,
+    "album_name": "Drommon",
+    "artist_name": "Smote",
+    "year": "2021-10-01"
+  },
+  {
+    "id": 1329,
+    "album_name": "Akriliko",
+    "artist_name": "Sandro Brugnolini / Alessandro Alessandroni / Teimar",
+    "year": "2016"
+  },
+  {
+    "id": 1330,
+    "album_name": "Musa: Ancestral Streams",
+    "artist_name": "Stanley Cowell",
+    "year": "1974"
+  },
+  {
+    "id": 1336,
+    "album_name": "The End, So Far",
+    "artist_name": "Slipknot",
+    "year": "2022-09-30"
+  },
+  {
+    "id": 1344,
+    "album_name": "Ágætis byrjun",
+    "artist_name": "Sigur Rós",
+    "year": "2000-08-07"
+  },
+  {
+    "id": 1345,
+    "album_name": "( ) 20th Anniversary Edition",
+    "artist_name": "Sigur Rós",
+    "year": "2022-10-28"
+  },
+  {
+    "id": 1351,
+    "album_name": "Late Night Delight",
+    "artist_name": "SAINT PEPSI // luxury elite",
+    "year": "2013-02-02"
+  },
+  {
+    "id": 1352,
+    "album_name": "AIR",
+    "artist_name": "SAULT",
+    "year": "2022-04-13"
+  },
+  {
+    "id": 1360,
+    "album_name": "Shaman",
+    "artist_name": "Santana",
+    "year": "2002-10-22"
+  },
+  {
+    "id": 1363,
+    "album_name": "It's a Holiday Soul Party",
+    "artist_name": "Sharon Jones and the Dap‐Kings",
+    "year": "2015"
+  },
+  {
+    "id": 1365,
+    "album_name": "Saudade",
+    "artist_name": "Steve Cobby",
+    "year": "2014-03-24"
+  },
+  {
+    "id": 1367,
+    "album_name": "Illusion Suite",
+    "artist_name": "Stanley Cowell Trio",
+    "year": "1973"
+  },
+  {
+    "id": 1368,
+    "album_name": "The Turning Wheel",
+    "artist_name": "SPELLLING",
+    "year": "2021-06-25"
+  },
+  {
+    "id": 1374,
+    "album_name": "SIRS CUTS VOL 1",
+    "artist_name": "SIRS",
+    "year": "2019"
+  },
+  {
+    "id": 1378,
+    "album_name": "Different Trains / Electric Counterpoint",
+    "artist_name": "Steve Reich; Kronos Quartet, Pat Metheny",
+    "year": "1989-03-03"
+  },
+  {
+    "id": 1383,
+    "album_name": "VVVLLLLVVV",
+    "artist_name": "SHXCXCHCXSH",
+    "year": "2014-03"
+  },
+  {
+    "id": 1384,
+    "album_name": "RJRJRFFRJRJ",
+    "artist_name": "SHXCXCHCXSH",
+    "year": "2013"
+  },
+  {
+    "id": 1387,
+    "album_name": "STRGTHS RCNSTRCTNS",
+    "artist_name": "SHXCXCHCXSH",
+    "year": "2013-06-21"
+  },
+  {
+    "id": 1391,
+    "album_name": "Five Finger Discount",
+    "artist_name": "Savages",
+    "year": "2008-09"
+  },
+  {
+    "id": 1394,
+    "album_name": "Junun",
+    "artist_name": "Shye Ben-Tzur, Jonny Greenwood and The Rajasthan Express",
+    "year": "2015-11-20"
+  },
+  {
+    "id": 1395,
+    "album_name": "Chrysalis",
+    "artist_name": "Sophia Loizou",
+    "year": "2014-09-16"
+  },
+  {
+    "id": 1399,
+    "album_name": "Murray Street ",
+    "artist_name": "Sonic Youth",
+    "year": "2002"
+  },
+  {
+    "id": 1407,
+    "album_name": "The Eternal",
+    "artist_name": "Sonic Youth",
+    "year": "2009-06-08"
+  },
+  {
+    "id": 1415,
+    "album_name": "Soundboy's Suicide Note",
+    "artist_name": "Shackleton",
+    "year": "2008-09-01"
+  },
+  {
+    "id": 1421,
+    "album_name": "Sons and Fascination / Sister Feelings Call",
+    "artist_name": "Simple Minds",
+    "year": "1986-04"
+  },
+  {
+    "id": 1429,
+    "album_name": "EGR45-00003",
+    "artist_name": "Silent Servant",
+    "year": "2016-03-29"
+  },
+  {
+    "id": 1437,
+    "album_name": "V.",
+    "artist_name": "Wooden Shjips",
+    "year": "2018-05-25"
+  },
+  {
+    "id": 1445,
+    "album_name": "Circles",
+    "artist_name": "William S. Fischer",
+    "year": "1970"
+  },
+  {
+    "id": 1453,
+    "album_name": "Tomorrow",
+    "artist_name": "William Onyeabor",
+    "year": "1979"
+  },
+  {
+    "id": 1461,
+    "album_name": "Lamentations",
+    "artist_name": "William Basinski",
+    "year": "2020-11-13"
+  },
+  {
+    "id": 1467,
+    "album_name": "Enter the Wu‐Tang (36 Chambers)",
+    "artist_name": "Wu‐Tang Clan",
+    "year": "2009-12-17"
+  },
+  {
+    "id": 1468,
+    "album_name": "Spanish Grease & Uno Dos Tres 1-2-3",
+    "artist_name": "Willie Bobo",
+    "year": "1994"
+  },
+  {
+    "id": 1472,
+    "album_name": "Revolución",
+    "artist_name": "WarCry",
+    "year": "2008"
+  },
+  {
+    "id": 1473,
+    "album_name": "Inmortal",
+    "artist_name": "WarCry",
+    "year": "2013-09-09"
+  },
+  {
+    "id": 1476,
+    "album_name": "Momentos",
+    "artist_name": "WarCry",
+    "year": "2017-11-17"
+  },
+  {
+    "id": 1480,
+    "album_name": "Donde el silencio se rompió...",
+    "artist_name": "WarCry",
+    "year": "2017-05-29"
+  },
+  {
+    "id": 1481,
+    "album_name": "Alfa",
+    "artist_name": "WarCry",
+    "year": "2011-04-15"
+  },
+  {
+    "id": 1484,
+    "album_name": "The Best of Don McCaslin's Warmth",
+    "artist_name": "Warmth",
+    "year": "2015"
+  },
+  {
+    "id": 1487,
+    "album_name": "Uptown (CD Single)",
+    "artist_name": "Woma",
+    "year": "1990"
+  },
+  {
+    "id": 1492,
+    "album_name": "Enter the 37th Chamber",
+    "artist_name": "El Michels Affair",
+    "year": "2009-05-11"
+  },
+  {
+    "id": 1494,
+    "album_name": "Après la pluie…",
+    "artist_name": "Erik Satie",
+    "year": "1995"
+  },
+  {
+    "id": 1500,
+    "album_name": "Driving Under the Influence of Jams",
+    "artist_name": "Electric Octopus",
+    "year": "2017-05-17"
+  },
+  {
+    "id": 1507,
+    "album_name": "virtua.zip",
+    "artist_name": "Esprit Fantasy",
+    "year": "2016-12-25"
+  },
+  {
+    "id": 1508,
+    "album_name": "Spanish Model",
+    "artist_name": "Elvis Costello",
+    "year": "2021-09-10"
+  },
+  {
+    "id": 1512,
+    "album_name": "American Primeval (Soundtrack from the Netflix Limited Series)",
+    "artist_name": "Explosions in the Sky",
+    "year": "2025-01-08"
+  },
+  {
+    "id": 1516,
+    "album_name": "‘Out to Lunch!’",
+    "artist_name": "Eric Dolphy",
+    "year": "1999-03-23"
+  },
+  {
+    "id": 1519,
+    "album_name": "Percepção",
+    "artist_name": "Eumir Deodato",
+    "year": "2006-01-20"
+  },
+  {
+    "id": 1520,
+    "album_name": "Eumir Deodato Plays Marcos Valle: Summer Samba",
+    "artist_name": "Eumir Deodato",
+    "year": "2002"
+  },
+  {
+    "id": 1523,
+    "album_name": "5 leyendas",
+    "artist_name": "Eliades Ochoa, Compay Segundo, Ibrahim Ferrer, Omara Portuondo",
+    "year": "2005"
+  },
+  {
+    "id": 1525,
+    "album_name": "MCMXC a.D. “The Limited Edition”",
+    "artist_name": "Enigma",
+    "year": "1991-11-04"
+  },
+  {
+    "id": 1531,
+    "album_name": "Rendez-Vous",
+    "artist_name": "Erik Truffaz",
+    "year": "2008"
+  },
+  {
+    "id": 1539,
+    "album_name": "E",
+    "artist_name": "Ecco2K",
+    "year": "2019-11-27"
+  },
+  {
+    "id": 1541,
+    "album_name": "One on One",
+    "artist_name": "Earl Klugh and Bob James",
+    "year": "2009"
+  },
+  {
+    "id": 1543,
+    "album_name": "Niña Valeria",
+    "artist_name": "Erik Truffaz Quintet",
+    "year": "1994"
+  },
+  {
+    "id": 1547,
+    "album_name": "Agila",
+    "artist_name": "Extremoduro",
+    "year": "1996"
+  },
+  {
+    "id": 1555,
+    "album_name": "Love Not Money",
+    "artist_name": "Everything but the Girl",
+    "year": "1985-04-19"
+  },
+  {
+    "id": 1562,
+    "album_name": "82-92: Essence and Rare",
+    "artist_name": "Everything but the Girl",
+    "year": "1992-12-01"
+  },
+  {
+    "id": 1567,
+    "album_name": "Super Natural",
+    "artist_name": "Edwin Birdsong",
+    "year": "2003"
+  },
+  {
+    "id": 1568,
+    "album_name": "Keegi / Meid kaasa muusika viib",
+    "artist_name": "Elektra",
+    "year": "2014-05-23"
+  },
+  {
+    "id": 1570,
+    "album_name": "Bedroom Tapes",
+    "artist_name": "Ebi Soda",
+    "year": "2019-06-21"
+  },
+  {
+    "id": 1575,
+    "album_name": "Flamenco: en directo",
+    "artist_name": "Enrique Morente",
+    "year": "2009"
+  },
+  {
+    "id": 1578,
+    "album_name": "Lorca",
+    "artist_name": "Enrique Morente",
+    "year": "1998"
+  },
+  {
+    "id": 1585,
+    "album_name": "Emmanuel presents. \"Stealth\" 002",
+    "artist_name": "Emmanuel",
+    "year": "2021"
+  },
+  {
+    "id": 1586,
+    "album_name": "Emmanuel presents. \"Stealth\"",
+    "artist_name": "Emmanuel",
+    "year": "2020"
+  },
+  {
+    "id": 1587,
+    "album_name": "Stamina EP",
+    "artist_name": "Emmanuel",
+    "year": "2019"
+  },
+  {
+    "id": 1593,
+    "album_name": "Trilogie de la Mort (Disc3)",
+    "artist_name": "Eliane Radigue",
+    "year": ""
+  },
+  {
+    "id": 1594,
+    "album_name": "Trilogie de la Mort (Disc1)",
+    "artist_name": "Eliane Radigue",
+    "year": "1990"
+  },
+  {
+    "id": 1595,
+    "album_name": "Trilogie de la Mort (Disc2)",
+    "artist_name": "Eliane Radigue",
+    "year": "1990"
+  },
+  {
+    "id": 1600,
+    "album_name": "Odyssey",
+    "artist_name": "Nubya Garcia",
+    "year": "2024-09-20"
+  },
+  {
+    "id": 1610,
+    "album_name": "Seven Psalms",
+    "artist_name": "Nick Cave",
+    "year": "2022-07-01"
+  },
+  {
+    "id": 1611,
+    "album_name": "Neu! '72 Non-Public Test",
+    "artist_name": "Neu!",
+    "year": "2010-04-17"
+  },
+  {
+    "id": 1616,
+    "album_name": "The Things You Love",
+    "artist_name": "New Cool Collective, Matt Bianco, Mark Reilly",
+    "year": "2016"
+  },
+  {
+    "id": 1619,
+    "album_name": "Further Down The Spiral",
+    "artist_name": "Nine Inch Nails",
+    "year": "2017"
+  },
+  {
+    "id": 1623,
+    "album_name": "The Downward Spiral (deluxe edition)",
+    "artist_name": "Nine Inch Nails",
+    "year": "2004-11-23"
+  },
+  {
+    "id": 1627,
+    "album_name": "Fixed Broken",
+    "artist_name": "Nine Inch Nails",
+    "year": "2016"
+  },
+  {
+    "id": 1635,
+    "album_name": "On the Beach",
+    "artist_name": "Neil Young",
+    "year": "2003-08-04"
+  },
+  {
+    "id": 1636,
+    "album_name": "Sí, a Miguel Hernández",
+    "artist_name": "Niño de Elche",
+    "year": "2013-06-24"
+  },
+  {
+    "id": 1638,
+    "album_name": "DAT Tapes, Vol 02",
+    "artist_name": "Nuron",
+    "year": "2024-09-24"
+  },
+  {
+    "id": 1643,
+    "album_name": "Graz",
+    "artist_name": "Nils Frahm",
+    "year": "2021-03-29"
+  },
+  {
+    "id": 1651,
+    "album_name": "Screws",
+    "artist_name": "Nils Frahm",
+    "year": "2012-12-03"
+  },
+  {
+    "id": 1654,
+    "album_name": "Endlessness",
+    "artist_name": "Nala Sinephro",
+    "year": "2024-09-06"
+  },
+  {
+    "id": 1657,
+    "album_name": "Pachinko",
+    "artist_name": "New Cool Collective",
+    "year": "2010-04-02"
+  },
+  {
+    "id": 1660,
+    "album_name": "Transsib EP",
+    "artist_name": "Natasha Bai",
+    "year": "2022"
+  },
+  {
+    "id": 1666,
+    "album_name": "Ghosteen",
+    "artist_name": "Nick Cave",
+    "year": "2019-11-08"
+  },
+  {
+    "id": 1671,
+    "album_name": "B-Sides & Rarities, Part II",
+    "artist_name": "Nick Cave",
+    "year": "2021-10-22"
+  },
+  {
+    "id": 1673,
+    "album_name": "Dig, Lazarus, Dig!!!",
+    "artist_name": "Nick Cave",
+    "year": "2008-03-03"
+  },
+  {
+    "id": 1674,
+    "album_name": "The Boatman’s Call",
+    "artist_name": "Nick Cave",
+    "year": "1997-03-03"
+  },
+  {
+    "id": 1678,
+    "album_name": "1/1",
+    "artist_name": "Nils Petter Molvær, Moritz von Oswald",
+    "year": "2013-10-08"
+  },
+  {
+    "id": 1682,
+    "album_name": "Cante a lo Gitano",
+    "artist_name": "Niño de Elche",
+    "year": "2024-10-11"
+  },
+  {
+    "id": 1690,
+    "album_name": "I Put a Spell on You",
+    "artist_name": "Nina Simone",
+    "year": "2006-02-14"
+  },
+  {
+    "id": 1698,
+    "album_name": "Nina’s Back",
+    "artist_name": "Nina Simone",
+    "year": "1989"
+  },
+  {
+    "id": 1699,
+    "album_name": "The Amazing Nina Simone / Nina Simone at Town Hall",
+    "artist_name": "Nina Simone",
+    "year": "1998"
+  },
+  {
+    "id": 1706,
+    "album_name": "Mercuric Dance",
+    "artist_name": "Haruomi Hosono",
+    "year": "1985-11-21"
+  },
+  {
+    "id": 1714,
+    "album_name": "ARTISAN",
+    "artist_name": "Tatsuro Yamashita",
+    "year": "1991-06-18"
+  },
+  {
+    "id": 1716,
+    "album_name": "Before The Daylight ~ Is The Most Darkness Moment In A Day",
+    "artist_name": "Toshiki Kadomatsu",
+    "year": "1988-02-05"
+  },
+  {
+    "id": 1720,
+    "album_name": "Secret Garden",
+    "artist_name": "Mu‐Ziq",
+    "year": "2021-11-19"
+  },
+  {
+    "id": 1722,
+    "album_name": "Variety",
+    "artist_name": "Mariya Takeuchi",
+    "year": "2014-11-19"
+  },
+  {
+    "id": 1729,
+    "album_name": "Peace & Love: Wadadasow",
+    "artist_name": "Dadawah",
+    "year": "2010-05"
+  },
+  {
+    "id": 1730,
+    "album_name": "Perfect Motion",
+    "artist_name": "Dj Ariees",
+    "year": "2003"
+  },
+  {
+    "id": 1736,
+    "album_name": "Danny Krivit Quintessentials",
+    "artist_name": "Various Artists",
+    "year": "2014-12-01"
+  },
+  {
+    "id": 1738,
+    "album_name": "Time Spent Away From U",
+    "artist_name": "DJ Seinfeld",
+    "year": "2017-11-03"
+  },
+  {
+    "id": 1744,
+    "album_name": "Funk Moves EP",
+    "artist_name": "Disco Rogues",
+    "year": "2022-03-30"
+  },
+  {
+    "id": 1745,
+    "album_name": "Playing Without Moving",
+    "artist_name": "Deep 88",
+    "year": "2015-03"
+  },
+  {
+    "id": 1746,
+    "album_name": "Exoticz",
+    "artist_name": "DJ Normal 4",
+    "year": "2018"
+  },
+  {
+    "id": 1749,
+    "album_name": "EP 1",
+    "artist_name": "Diamond Version",
+    "year": "2011-09-24"
+  },
+  {
+    "id": 1753,
+    "album_name": "Toward The Within (2008 MFSL Hybrid SACD)",
+    "artist_name": "Dead Can Dance",
+    "year": "1994"
+  },
+  {
+    "id": 1758,
+    "album_name": "The Serpent's Egg",
+    "artist_name": "Dead Can Dance",
+    "year": "1988-10"
+  },
+  {
+    "id": 1761,
+    "album_name": "Spleen and Ideal",
+    "artist_name": "Dead Can Dance",
+    "year": "1992"
+  },
+  {
+    "id": 1769,
+    "album_name": "Ultra",
+    "artist_name": "Depeche Mode",
+    "year": "1997-04-14"
+  },
+  {
+    "id": 1777,
+    "album_name": "World in My Eyes",
+    "artist_name": "Depeche Mode",
+    "year": "1990-09-17"
+  },
+  {
+    "id": 1783,
+    "album_name": "Diana [Deluxe Edition] Disc 1",
+    "artist_name": "Diana Ross",
+    "year": "1980"
+  },
+  {
+    "id": 1784,
+    "album_name": "Diana [Deluxe Edition] Disc 2",
+    "artist_name": "Diana Ross",
+    "year": "1980"
+  },
+  {
+    "id": 1785,
+    "album_name": "The Hard Sell",
+    "artist_name": "DJ Shadow",
+    "year": "2008-01-11"
+  },
+  {
+    "id": 1793,
+    "album_name": "Dreamfish",
+    "artist_name": "Dreamfish",
+    "year": "1993"
+  },
+  {
+    "id": 1795,
+    "album_name": "EUPHORIA EP",
+    "artist_name": "D-PULSE",
+    "year": "2007"
+  },
+  {
+    "id": 1800,
+    "album_name": "Durand Jones & the Indications (Deluxe Edition)",
+    "artist_name": "Durand Jones",
+    "year": "2016-07-01"
+  },
+  {
+    "id": 1801,
+    "album_name": "American Love Call",
+    "artist_name": "Durand Jones",
+    "year": "2019-03-01"
+  },
+  {
+    "id": 1806,
+    "album_name": "I Told You So",
+    "artist_name": "Delvon Lamarr Organ Trio",
+    "year": "2021-01-29"
+  },
+  {
+    "id": 1816,
+    "album_name": "Dulce compañia",
+    "artist_name": "DJ Python",
+    "year": "2017-09-25"
+  },
+  {
+    "id": 1819,
+    "album_name": "Club sentimientos, Vol. 2",
+    "artist_name": "DJ Python",
+    "year": "2022-01-21"
+  },
+  {
+    "id": 1820,
+    "album_name": "Oshin - 10th Anniversary Reissue",
+    "artist_name": "DIIV",
+    "year": "2022"
+  },
+  {
+    "id": 1824,
+    "album_name": "Wild Style Instrumental Beats",
+    "artist_name": "David Harpur, Lenny Ferrari, Chris Stein",
+    "year": "1998"
+  },
+  {
+    "id": 1832,
+    "album_name": "DJ‐Kicks: Daniel Avery",
+    "artist_name": "Daniel Avery",
+    "year": "2016-11-11"
+  },
+  {
+    "id": 1840,
+    "album_name": "Die Wilde Jagd",
+    "artist_name": "Die Wilde Jagd",
+    "year": "2015-05-01"
+  },
+  {
+    "id": 1841,
+    "album_name": "Geisterfahrer - Single",
+    "artist_name": "Die Wilde Jagd",
+    "year": "2017-02"
+  },
+  {
+    "id": 1844,
+    "album_name": "Homework (25th Anniversary Edition)",
+    "artist_name": "Daft Punk",
+    "year": "2022-02-22"
+  },
+  {
+    "id": 1848,
+    "album_name": "Den Sorte Død",
+    "artist_name": "Den Sorte Død",
+    "year": "2021-03-09"
+  },
+  {
+    "id": 1850,
+    "album_name": "From the Kettle Onto the Coil",
+    "artist_name": "Deafheaven",
+    "year": "2014"
+  },
+  {
+    "id": 1863,
+    "album_name": "Important Small Details",
+    "artist_name": "David Cordero",
+    "year": "2024-06-07"
+  },
+  {
+    "id": 1869,
+    "album_name": "DJ Harvey Live at Rumors",
+    "artist_name": "DJ Harvey",
+    "year": "2020-03-18"
+  },
+  {
+    "id": 1870,
+    "album_name": "Words, Sounds, Colors and Shapes",
+    "artist_name": "Donald Byrd and 125th Street, N.Y.C.",
+    "year": "1982"
+  },
+  {
+    "id": 1871,
+    "album_name": "Breathe",
+    "artist_name": "Dr. Lonnie Smith",
+    "year": "2021-03-26"
+  },
+  {
+    "id": 1872,
+    "album_name": "[standalone recordings]",
+    "artist_name": "Dire Straits",
+    "year": "1985"
+  },
+  {
+    "id": 1879,
+    "album_name": "Morbid Stuff",
+    "artist_name": "PUP",
+    "year": "2019-04-05"
+  },
+  {
+    "id": 1887,
+    "album_name": "Rid of Me",
+    "artist_name": "PJ Harvey",
+    "year": "1993-04-05"
+  },
+  {
+    "id": 1894,
+    "album_name": "Music for Organ",
+    "artist_name": "Philip Glass, Christopher Bowers-Broadbent; Kevin Bowyer",
+    "year": "2001"
+  },
+  {
+    "id": 1895,
+    "album_name": "Behaviour / Further Listening 1990–1991",
+    "artist_name": "Pet Shop Boys",
+    "year": "2018-08-31"
+  },
+  {
+    "id": 1897,
+    "album_name": "Companion [MFSL 24/88.2]",
+    "artist_name": "Patricia Barber",
+    "year": "1999"
+  },
+  {
+    "id": 1903,
+    "album_name": "Higher",
+    "artist_name": "Patricia Barber",
+    "year": "2019"
+  },
+  {
+    "id": 1907,
+    "album_name": "This Heavy Heart",
+    "artist_name": "Pris",
+    "year": "2016-02-22"
+  },
+  {
+    "id": 1908,
+    "album_name": "Faith & Honour",
+    "artist_name": "Pris",
+    "year": "2017-10-04"
+  },
+  {
+    "id": 1911,
+    "album_name": "Conference of Trees",
+    "artist_name": "Pantha du Prince",
+    "year": "2020-03-06"
+  },
+  {
+    "id": 1919,
+    "album_name": "Peel Session",
+    "artist_name": "Plaid",
+    "year": "1999-03-29"
+  },
+  {
+    "id": 1924,
+    "album_name": "Águas da Amazonia",
+    "artist_name": "Philip Glass; Uakti",
+    "year": "1999-08-03"
+  },
+  {
+    "id": 1927,
+    "album_name": "1999",
+    "artist_name": "Prince",
+    "year": "1990"
+  },
+  {
+    "id": 1933,
+    "album_name": "Watch Out! (expanded edition)",
+    "artist_name": "Patrice Rushen",
+    "year": "2012-04"
+  },
+  {
+    "id": 1935,
+    "album_name": "Shout It Out",
+    "artist_name": "Patrice Rushen",
+    "year": "1977"
+  },
+  {
+    "id": 1938,
+    "album_name": "Suspended Music",
+    "artist_name": "Pauline Oliveros / Ellen Fullman; Deep Listening Band, The Long String Instrument",
+    "year": "1997"
+  },
+  {
+    "id": 1939,
+    "album_name": "Pat Thomas And Kwashibu Area Band",
+    "artist_name": "Pat Thomas and Kwashibu Area Band",
+    "year": "2015-05"
+  },
+  {
+    "id": 1950,
+    "album_name": "Square One",
+    "artist_name": "Prins Thomas",
+    "year": "2017-07-07"
+  },
+  {
+    "id": 1951,
+    "album_name": "10 Years of Full Pupp (2004 - 2014)",
+    "artist_name": "Prins Thomas",
+    "year": "2014-05-26"
+  },
+  {
+    "id": 1958,
+    "album_name": "III",
+    "artist_name": "Prins Thomas",
+    "year": "2014-04-28"
+  },
+  {
+    "id": 1960,
+    "album_name": "Prophecies",
+    "artist_name": "Philip Glass; Anton Batagov",
+    "year": "2016-08-26"
+  },
+  {
+    "id": 1961,
+    "album_name": "The Hours / Distant Figure",
+    "artist_name": "Philip Glass; Anton Batagov",
+    "year": "2018-12-07"
+  },
+  {
+    "id": 1963,
+    "album_name": "The Comforts of Madness (30th Anniversary Reissue)",
+    "artist_name": "Pale Saints",
+    "year": "1990"
+  },
+  {
+    "id": 1966,
+    "album_name": "Friday Night in San Francisco",
+    "artist_name": "Paco de Lucía, Al Di Meola",
+    "year": "1997"
+  },
+  {
+    "id": 1967,
+    "album_name": "Passion, Grace & Fire",
+    "artist_name": "Paco de Lucía, Al Di Meola",
+    "year": "1991"
+  },
+  {
+    "id": 1974,
+    "album_name": "The Wall",
+    "artist_name": "Pink Floyd",
+    "year": "1986"
+  },
+  {
+    "id": 1983,
+    "album_name": "Issue Nº Ten",
+    "artist_name": "Phase Fatale",
+    "year": "2016-02-08"
+  },
+  {
+    "id": 1986,
+    "album_name": "Sweetness Is",
+    "artist_name": "Peven  Everett",
+    "year": "2011"
+  },
+  {
+    "id": 1987,
+    "album_name": "Rojo y Negro",
+    "artist_name": "Prok",
+    "year": "2018"
+  },
+  {
+    "id": 1989,
+    "album_name": "Jewels of Thought",
+    "artist_name": "Pharoah Sanders",
+    "year": "1998-03-10"
+  },
+  {
+    "id": 1997,
+    "album_name": "Una notte maledetta",
+    "artist_name": "Pino D’Angiò",
+    "year": "1983"
+  },
+  {
+    "id": 1998,
+    "album_name": "Petra Haden and Bill Frisell",
+    "artist_name": "Petra Haden and Bill Frisell",
+    "year": "2004"
+  },
+  {
+    "id": 2005,
+    "album_name": "Fear of a Blank Planet",
+    "artist_name": "Porcupine Tree",
+    "year": "2007-04-16"
+  },
+  {
+    "id": 2010,
+    "album_name": "Paco de Lucía plays Manuel de Falla",
+    "artist_name": "Paco de Lucía",
+    "year": ""
+  },
+  {
+    "id": 2011,
+    "album_name": "Recital de guitarra de Paco de Lucía",
+    "artist_name": "Paco de Lucía",
+    "year": "1971"
+  },
+  {
+    "id": 2013,
+    "album_name": "Cositas buenas",
+    "artist_name": "Paco de Lucía",
+    "year": "2003"
+  },
+  {
+    "id": 2016,
+    "album_name": "Forgets Me Nots and Remind Me (ベスト)",
+    "artist_name": "Patrice Rushen (Patrice Rushen)",
+    "year": "1998-05-25"
+  },
+  {
+    "id": 2018,
+    "album_name": "Purple Rain",
+    "artist_name": "Prince and The Revolution",
+    "year": "1984-07-27"
+  },
+  {
+    "id": 2022,
+    "album_name": "Medicine Man",
+    "artist_name": "Peven Everett",
+    "year": "2011"
+  },
+  {
+    "id": 2027,
+    "album_name": "Dummy",
+    "artist_name": "Portishead",
+    "year": "1994"
+  },
+  {
+    "id": 2028,
+    "album_name": "Machine Gun",
+    "artist_name": "Portishead",
+    "year": "2008"
+  },
+  {
+    "id": 2035,
+    "album_name": "Misa Criolla",
+    "artist_name": "Los Fronterizos",
+    "year": "1965"
+  },
+  {
+    "id": 2036,
+    "album_name": "Lionel X. Love Presents Electronica! Hits & Misses",
+    "artist_name": "Lionel X. Love",
+    "year": "2015"
+  },
+  {
+    "id": 2043,
+    "album_name": "Skylark",
+    "artist_name": "Lord of the Isles",
+    "year": "2021-01-29"
+  },
+  {
+    "id": 2051,
+    "album_name": "Mourning Jewelry",
+    "artist_name": "Less Bells",
+    "year": "2020-08-21"
+  },
+  {
+    "id": 2059,
+    "album_name": "Una montaña es una montaña",
+    "artist_name": "Los Punsetes",
+    "year": "2012-05-21"
+  },
+  {
+    "id": 2061,
+    "album_name": "LP",
+    "artist_name": "Los Punsetes",
+    "year": "2008"
+  },
+  {
+    "id": 2067,
+    "album_name": "Reflection",
+    "artist_name": "Loraine James",
+    "year": "2021-06-04"
+  },
+  {
+    "id": 2075,
+    "album_name": "Grooved Whale",
+    "artist_name": "Lisa Walker",
+    "year": "2001-10-01"
+  },
+  {
+    "id": 2076,
+    "album_name": "Colours of Air",
+    "artist_name": "loscil // Lawrence English",
+    "year": "2023-02-03"
+  },
+  {
+    "id": 2077,
+    "album_name": "A Song for the Children / Exotic Mysteries",
+    "artist_name": "Lonnie Liston Smith",
+    "year": "2008"
+  },
+  {
+    "id": 2078,
+    "album_name": "Love Is The Answer (Expanded)",
+    "artist_name": "Lonnie Liston Smith",
+    "year": "1980"
+  },
+  {
+    "id": 2083,
+    "album_name": "Déjà vu",
+    "artist_name": "Robson Jorge",
+    "year": "2023-09-01"
+  },
+  {
+    "id": 2091,
+    "album_name": "Datura",
+    "artist_name": "Lorelle Meets the Obsolete",
+    "year": "2023-06-16"
+  },
+  {
+    "id": 2097,
+    "album_name": "Obras escocidas: 1985-2000",
+    "artist_name": "Los Enemigos",
+    "year": "2001"
+  },
+  {
+    "id": 2099,
+    "album_name": "La cuenta atrás",
+    "artist_name": "Los Enemigos",
+    "year": "1991"
+  },
+  {
+    "id": 2103,
+    "album_name": "CD 05  EN DIRECTO-HASTA EL LUNES",
+    "artist_name": "LOS ENEMIGOS-DESDE EL JERGÓN",
+    "year": ""
+  },
+  {
+    "id": 2106,
+    "album_name": "Sibelius - Symphonies Nos. 1-7",
+    "artist_name": "London Symphony Orchestra, Sir Colin Davis",
+    "year": "2016"
+  },
+  {
+    "id": 2107,
+    "album_name": "Buena Onda - Balearic Beats 2021",
+    "artist_name": "La Guardia De La Luz",
+    "year": "2021"
+  },
+  {
+    "id": 2114,
+    "album_name": "Shaka Zulu Revisited",
+    "artist_name": "Ladysmith Black Mambazo",
+    "year": "2017"
+  },
+  {
+    "id": 2122,
+    "album_name": "Canciones para una orquesta química",
+    "artist_name": "Los Planetas",
+    "year": "1999"
+  },
+  {
+    "id": 2124,
+    "album_name": "Los Planetas contra la ley de la gravedad",
+    "artist_name": "Los Planetas",
+    "year": "2004-07-26"
+  },
+  {
+    "id": 2127,
+    "album_name": "Cuatro palos",
+    "artist_name": "Los Planetas",
+    "year": "2009-12-08"
+  },
+  {
+    "id": 2130,
+    "album_name": "Love Oh Love",
+    "artist_name": "Leroy Hutson",
+    "year": "1973"
+  },
+  {
+    "id": 2138,
+    "album_name": "Conqueror",
+    "artist_name": "Jesu",
+    "year": "2007-02-20"
+  },
+  {
+    "id": 2146,
+    "album_name": "Saó",
+    "artist_name": "Jerez-Texas",
+    "year": "2005"
+  },
+  {
+    "id": 2150,
+    "album_name": "La Torre Ibiza - Volumen Quatro",
+    "artist_name": "John Foxx, Robin Guthrie",
+    "year": "2022"
+  },
+  {
+    "id": 2154,
+    "album_name": "Songs of Remembrance",
+    "artist_name": "Jefre Cantu-Ledesma",
+    "year": "2014-05-01"
+  },
+  {
+    "id": 2157,
+    "album_name": "Metropolis Metropolis",
+    "artist_name": "Jeff Mills",
+    "year": "2023-03-03"
+  },
+  {
+    "id": 2161,
+    "album_name": "La nouvelle pauvreté",
+    "artist_name": "Jan Jelinek avec The Exposures",
+    "year": "2003-02-07"
+  },
+  {
+    "id": 2167,
+    "album_name": "LOVE IS A STREAM (2020 Edition)",
+    "artist_name": "JEFRE CANTU-LEDESMA",
+    "year": "2020"
+  },
+  {
+    "id": 2169,
+    "album_name": "Harmonics",
+    "artist_name": "Joe Goddard",
+    "year": "2024-07-12"
+  },
+  {
+    "id": 2171,
+    "album_name": "Dancing With Nature Spirits",
+    "artist_name": "Jack DeJohnette",
+    "year": "1996"
+  },
+  {
+    "id": 2172,
+    "album_name": "Força bruta",
+    "artist_name": "Jorge Ben Jor",
+    "year": "1970"
+  },
+  {
+    "id": 2182,
+    "album_name": "Officium Novum",
+    "artist_name": "Jan Garbarek, The Hilliard Ensemble",
+    "year": "2010-09-17"
+  },
+  {
+    "id": 2184,
+    "album_name": "Cosmic Messenger",
+    "artist_name": "Jean‐Luc Ponty",
+    "year": "1978"
+  },
+  {
+    "id": 2185,
+    "album_name": "João Donato JID007",
+    "artist_name": "João Donato, Adrian Younge",
+    "year": "2021-06-04"
+  },
+  {
+    "id": 2187,
+    "album_name": "Nightgruv / I Want Your Love",
+    "artist_name": "James Mason",
+    "year": "2012-01-30"
+  },
+  {
+    "id": 2192,
+    "album_name": "Life Will See You Now",
+    "artist_name": "Jens Lekman",
+    "year": "2017-02-17"
+  },
+  {
+    "id": 2194,
+    "album_name": "Secret History",
+    "artist_name": "Josquin des Prez, Tomás Luis de Victoria; John Potter",
+    "year": "2017-08-25"
+  },
+  {
+    "id": 2199,
+    "album_name": "Getz/Gilberto '76",
+    "artist_name": "João Gilberto/Stan Getz",
+    "year": "2016-02-19"
+  },
+  {
+    "id": 2200,
+    "album_name": "Pearl",
+    "artist_name": "Janis Joplin",
+    "year": "1970"
+  },
+  {
+    "id": 2205,
+    "album_name": "Cafe Solo (Disc 2)",
+    "artist_name": "Jose Padilla",
+    "year": "2006"
+  },
+  {
+    "id": 2206,
+    "album_name": "Cafe Solo (Disc1)",
+    "artist_name": "Jose Padilla",
+    "year": "2006"
+  },
+  {
+    "id": 2207,
+    "album_name": "Balearic Guru",
+    "artist_name": "José Padilla",
+    "year": "2002"
+  },
+  {
+    "id": 2208,
+    "album_name": "still slipping vol. 1",
+    "artist_name": "Joy Orbison",
+    "year": "2021-08-13"
+  },
+  {
+    "id": 2211,
+    "album_name": "The Goddess: Music for the Ancient of Days",
+    "artist_name": "John Zorn",
+    "year": "2010-06-29"
+  },
+  {
+    "id": 2212,
+    "album_name": "O'o",
+    "artist_name": "John Zorn",
+    "year": "2009-07-28"
+  },
+  {
+    "id": 2213,
+    "album_name": "Somebody Else's Guy",
+    "artist_name": "Jocelyn Brown",
+    "year": "1990"
+  },
+  {
+    "id": 2214,
+    "album_name": "Snake Charmer",
+    "artist_name": "Jah Wobble, The Edge",
+    "year": "1983"
+  },
+  {
+    "id": 2218,
+    "album_name": "Saturday",
+    "artist_name": "Jerome Sydenham and Kerri Chandler",
+    "year": "2001"
+  },
+  {
+    "id": 2222,
+    "album_name": "Listening to Pictures (Pentimento Volume One)",
+    "artist_name": "Jon Hassell",
+    "year": "2018-06-08"
+  },
+  {
+    "id": 2228,
+    "album_name": "Maarifa Street (Magic Realism 2)",
+    "artist_name": "Jon Hassell",
+    "year": "2005-03-10"
+  },
+  {
+    "id": 2229,
+    "album_name": "Fourth World, Volume 2: Dream Theory in Malaya",
+    "artist_name": "Jon Hassell",
+    "year": "1991"
+  },
+  {
+    "id": 2230,
+    "album_name": "Vintage Grooves - Disco Volume 1 CD1",
+    "artist_name": "John Morales",
+    "year": "2007"
+  },
+  {
+    "id": 2232,
+    "album_name": "The M + M Mixes, Volume 2: NYC Underground Disco Anthems & Previously Unreleased Exclusive Disco Mixes",
+    "artist_name": "John Morales",
+    "year": "2011-03-29"
+  },
+  {
+    "id": 2233,
+    "album_name": "The M+M Mixes, Volume 3 Instrumentals",
+    "artist_name": "John Morales",
+    "year": "2013-04-29"
+  },
+  {
+    "id": 2234,
+    "album_name": "The M+M Mixes, Volume 2: NYC Underground Disco Anthems & Previously Unreleased Exclusive Disco Mixes",
+    "artist_name": "John Morales",
+    "year": "2011"
+  },
+  {
+    "id": 2238,
+    "album_name": "Dad Loves His Work",
+    "artist_name": "James Taylor",
+    "year": "2006-11-22"
+  },
+  {
+    "id": 2239,
+    "album_name": "Piano Concertos",
+    "artist_name": "Johannes Brahms; Sunwook Kim, Hallé Orchestra; Sir Mark Elder",
+    "year": "2017-05-05"
+  },
+  {
+    "id": 2240,
+    "album_name": "Streaking!",
+    "artist_name": "Jean-Claude Pelletier",
+    "year": "1974"
+  },
+  {
+    "id": 2243,
+    "album_name": "She’s Lost Control / Atmosphere",
+    "artist_name": "Joy Division",
+    "year": "1980-08"
+  },
+  {
+    "id": 2246,
+    "album_name": "Jean Carne JID012",
+    "artist_name": "Jean Carne, Adrian Younge",
+    "year": "2022-05-27"
+  },
+  {
+    "id": 2247,
+    "album_name": "Memoirs of a Geisha: Original Motion Picture Soundtrack",
+    "artist_name": "John Williams; Yo‐Yo Ma, Itzhak Perlman",
+    "year": "2005-11-22"
+  },
+  {
+    "id": 2249,
+    "album_name": "In Movement",
+    "artist_name": "Jack DeJohnette, Ravi Coltrane, Matthew Garrison",
+    "year": "2016-05-06"
+  },
+  {
+    "id": 2250,
+    "album_name": "Love Makes Magic",
+    "artist_name": "James Baron",
+    "year": "2023-06-02"
+  },
+  {
+    "id": 2252,
+    "album_name": "Suite for Max Brown",
+    "artist_name": "Jeff Parker",
+    "year": "2020-01-24"
+  },
+  {
+    "id": 2256,
+    "album_name": "Mandy (Original Motion Picture Soundtrack) [Deluxe]",
+    "artist_name": "Jóhann Jóhannsson",
+    "year": "2018-09-14"
+  },
+  {
+    "id": 2261,
+    "album_name": "In Waves",
+    "artist_name": "Jamie xx",
+    "year": "2024-09-20"
+  },
+  {
+    "id": 2262,
+    "album_name": "Fourth World, Vol. 1: Possible Musics",
+    "artist_name": "Jon Hassell / Brian Eno",
+    "year": "1990-08-31"
+  },
+  {
+    "id": 2266,
+    "album_name": "Jazz in the Key of Blue",
+    "artist_name": "The Jimmy Cobb Quartet",
+    "year": "2010"
+  },
+  {
+    "id": 2268,
+    "album_name": "Vaciador",
+    "artist_name": "VVV [Trippin'you]",
+    "year": "2023-11-30"
+  },
+  {
+    "id": 2269,
+    "album_name": "Secondo tempo",
+    "artist_name": "Voices From the Lake",
+    "year": "2016-05-02"
+  },
+  {
+    "id": 2274,
+    "album_name": "Future Disco: Poolside Sounds, Vol. 10",
+    "artist_name": "Various Artists",
+    "year": "2022-07-01"
+  },
+  {
+    "id": 2275,
+    "album_name": "Italo Disco: The Lost Legends, Vol. 1",
+    "artist_name": "Various Artists",
+    "year": "2017-03-22"
+  },
+  {
+    "id": 2276,
+    "album_name": "Prime Cuts: Gourmet Selections From Sheffield Lab",
+    "artist_name": "Various Artists",
+    "year": "1990"
+  },
+  {
+    "id": 2277,
+    "album_name": "For the Love of You",
+    "artist_name": "Various Artists",
+    "year": "2020-04-10"
+  },
+  {
+    "id": 2278,
+    "album_name": "all|is|calm 2012",
+    "artist_name": "Various Artists",
+    "year": "2012-12-20"
+  },
+  {
+    "id": 2279,
+    "album_name": "20 Years of Music: A Sonic Celebration from NAD and Sheffield Lab",
+    "artist_name": "Various Artists",
+    "year": "1992"
+  },
+  {
+    "id": 2280,
+    "album_name": "One Swallow Doesn’t Make A Summer Pt. 7",
+    "artist_name": "Various Artists",
+    "year": "2024-08-02"
+  },
+  {
+    "id": 2281,
+    "album_name": "Spaciousness",
+    "artist_name": "Various Artists",
+    "year": "2019-05-17"
+  },
+  {
+    "id": 2282,
+    "album_name": "La torre Ibiza, volumen dos",
+    "artist_name": "Various Artists",
+    "year": "2017-06"
+  },
+  {
+    "id": 2283,
+    "album_name": "10",
+    "artist_name": "Various Artists",
+    "year": "2023-12-15"
+  },
+  {
+    "id": 2284,
+    "album_name": "XCOM Enemy Unknown Soundtrack",
+    "artist_name": "Various Artists",
+    "year": "2012-10-09"
+  },
+  {
+    "id": 2285,
+    "album_name": "Edit Select Remixes",
+    "artist_name": "Edit Select",
+    "year": "2016-04-13"
+  },
+  {
+    "id": 2286,
+    "album_name": "Back to Mine: Jungle",
+    "artist_name": "Various Artists",
+    "year": "2019-10-18"
+  },
+  {
+    "id": 2287,
+    "album_name": "SEMANTICA 2006 - 2016 10.V",
+    "artist_name": "Various Artists",
+    "year": "2016-11-04"
+  },
+  {
+    "id": 2288,
+    "album_name": "Claremont Editions Volume 4",
+    "artist_name": "Various Artists",
+    "year": "2024-05-31"
+  },
+  {
+    "id": 2293,
+    "album_name": "Luxor Necropolitics",
+    "artist_name": "Vatican Shadow",
+    "year": "2017-08-25"
+  },
+  {
+    "id": 2299,
+    "album_name": "Afternoon X",
+    "artist_name": "Vanishing Twin",
+    "year": "2023-10-06"
+  },
+  {
+    "id": 2308,
+    "album_name": "Anima mundi",
+    "artist_name": "Vril",
+    "year": "2018-10-15"
+  },
+  {
+    "id": 2311,
+    "album_name": "Gira 06/07 - Presente",
+    "artist_name": "Violadores del Verso",
+    "year": "2007-11-28"
+  },
+  {
+    "id": 2313,
+    "album_name": "Atr�s",
+    "artist_name": "Violadores del Verso",
+    "year": "2001"
+  },
+  {
+    "id": 2316,
+    "album_name": "Opal's Sunflowers",
+    "artist_name": "Visonia",
+    "year": "2016-02-01"
+  },
+  {
+    "id": 2317,
+    "album_name": "Impossible Romance",
+    "artist_name": "Visonia",
+    "year": "2014-12-11"
+  },
+  {
+    "id": 2318,
+    "album_name": "Nausicaa EP",
+    "artist_name": "Visonia",
+    "year": "2015-04-13"
+  },
+  {
+    "id": 2324,
+    "album_name": "Cave World (Deluxe)",
+    "artist_name": "Viagra Boys",
+    "year": "2023-01-13"
+  },
+  {
+    "id": 2325,
+    "album_name": "Abobo Nation, Part 1",
+    "artist_name": "Afriquoi",
+    "year": "2016-06-17"
+  },
+  {
+    "id": 2327,
+    "album_name": "He Has Left Us Alone, but Shafts of Light Sometimes Grace the Corner of Our Rooms…",
+    "artist_name": "A Silver Mt. Zion",
+    "year": "2000-03-13"
+  },
+  {
+    "id": 2332,
+    "album_name": "Above All Dreams",
+    "artist_name": "Abul Mogard",
+    "year": "2018-06-22"
+  },
+  {
+    "id": 2340,
+    "album_name": "Luxury Problems",
+    "artist_name": "Andy Stott",
+    "year": "2012-10-18"
+  },
+  {
+    "id": 2343,
+    "album_name": "Night Jewel",
+    "artist_name": "Andy Stott",
+    "year": "2009-10"
+  },
+  {
+    "id": 2345,
+    "album_name": "Fear of Heights EP",
+    "artist_name": "Andy Stott",
+    "year": "2007-08-02"
+  },
+  {
+    "id": 2348,
+    "album_name": "Brief Encounter / Drippin",
+    "artist_name": "Andy Stott",
+    "year": "2009-03-30"
+  },
+  {
+    "id": 2356,
+    "album_name": "An Awesome Wave",
+    "artist_name": "alt‐J",
+    "year": "2012-09-18"
+  },
+  {
+    "id": 2357,
+    "album_name": "Albayzín Recopilatorio",
+    "artist_name": "Ayax y Prok",
+    "year": "2016-05-20"
+  },
+  {
+    "id": 2358,
+    "album_name": "Spirit They’re Gone Spirit They’ve Vanished",
+    "artist_name": "Avey Tare and Panda Bear",
+    "year": "2000-08"
+  },
+  {
+    "id": 2360,
+    "album_name": "The Life Parochial",
+    "artist_name": "Automatic Tasty",
+    "year": "2015-07-06"
+  },
+  {
+    "id": 2361,
+    "album_name": "Sentimentalist’s Choice",
+    "artist_name": "Automatic Tasty",
+    "year": "2013-12-02"
+  },
+  {
+    "id": 2364,
+    "album_name": "Grey Over Blue",
+    "artist_name": "Actress",
+    "year": "2013-12-16"
+  },
+  {
+    "id": 2372,
+    "album_name": "AZD",
+    "artist_name": "Actress",
+    "year": "2017-04-14"
+  },
+  {
+    "id": 2377,
+    "album_name": "Outubro",
+    "artist_name": "Azymuth",
+    "year": "1990"
+  },
+  {
+    "id": 2378,
+    "album_name": "Azimüth",
+    "artist_name": "Azymuth",
+    "year": "2007-03-12"
+  },
+  {
+    "id": 2379,
+    "album_name": "Flame - Spectrum",
+    "artist_name": "Azymuth",
+    "year": "1999"
+  },
+  {
+    "id": 2380,
+    "album_name": "We Decode the Future",
+    "artist_name": "Anodyne",
+    "year": "2012-02-27"
+  },
+  {
+    "id": 2385,
+    "album_name": "El Ángel Caído (15 Aniversario)",
+    "artist_name": "Avalanch",
+    "year": "2017"
+  },
+  {
+    "id": 2386,
+    "album_name": "Contrails",
+    "artist_name": "Aleksandir",
+    "year": "2018-08-31"
+  },
+  {
+    "id": 2394,
+    "album_name": "Communion",
+    "artist_name": "As One",
+    "year": "2019-11-22"
+  },
+  {
+    "id": 2402,
+    "album_name": "Stowaway",
+    "artist_name": "Ansome",
+    "year": "2016-04-06"
+  },
+  {
+    "id": 2410,
+    "album_name": "ADHD #2",
+    "artist_name": "ADHD",
+    "year": "2012-04-20"
+  },
+  {
+    "id": 2412,
+    "album_name": "Yggdrasil",
+    "artist_name": "Acronym",
+    "year": "2014-12-10"
+  },
+  {
+    "id": 2418,
+    "album_name": "Second Method",
+    "artist_name": "Ancient Methods",
+    "year": "2012-09-27"
+  },
+  {
+    "id": 2421,
+    "album_name": "HYbr:ID III",
+    "artist_name": "Alva Noto",
+    "year": "2024-07-05"
+  },
+  {
+    "id": 2425,
+    "album_name": "Xerrox Vol.2",
+    "artist_name": "Alva Noto",
+    "year": "2009-01"
+  },
+  {
+    "id": 2429,
+    "album_name": "Rrose Sélavy EP",
+    "artist_name": "Âme",
+    "year": "2010-07"
+  },
+  {
+    "id": 2432,
+    "album_name": "Fiori",
+    "artist_name": "Âme",
+    "year": "2007-10-29"
+  },
+  {
+    "id": 2433,
+    "album_name": "Dream House",
+    "artist_name": "Âme",
+    "year": "2018-06-06"
+  },
+  {
+    "id": 2441,
+    "album_name": "No Way Down",
+    "artist_name": "Air France",
+    "year": "2008-05"
+  },
+  {
+    "id": 2443,
+    "album_name": "Buena Onda - Balearic Beats 2021",
+    "artist_name": "Artisti Vari",
+    "year": "2021"
+  },
+  {
+    "id": 2447,
+    "album_name": "Riot On Broadway / Magic Sky",
+    "artist_name": "Ashley Beedle presents The London Heavy Disco Revue",
+    "year": "2007"
+  },
+  {
+    "id": 2449,
+    "album_name": "Busse Woods",
+    "artist_name": "Acid King",
+    "year": "2004-09-21"
+  },
+  {
+    "id": 2450,
+    "album_name": "Soundtrack From Twin Peaks",
+    "artist_name": "Angelo Badalamenti",
+    "year": "1990-12-10"
+  },
+  {
+    "id": 2451,
+    "album_name": "Berliner Messe / Fratres / Collage uber B-A-C-H / Summa / Cantus in memoriam Benjamin Britten / Mozart-Adagio",
+    "artist_name": "Arvo Pärt; Moscow Virtuosi, Vladimir Spivakov",
+    "year": "2004"
+  },
+  {
+    "id": 2457,
+    "album_name": "To Cy & Lee: Instrumentals, Vol. 1",
+    "artist_name": "Alabaster dePlume",
+    "year": "2020-02-28"
+  },
+  {
+    "id": 2459,
+    "album_name": "FORSE 3",
+    "artist_name": "Alessandro Cortini",
+    "year": "2020-03-20"
+  },
+  {
+    "id": 2474,
+    "album_name": "Kodhi: Trevor Warren's Adventures with Ayub Ogada",
+    "artist_name": "Ayub Ogada",
+    "year": "2015-07-28"
+  },
+  {
+    "id": 2479,
+    "album_name": "Fog FM",
+    "artist_name": "Anthony Naples",
+    "year": "2019-06-14"
+  },
+  {
+    "id": 2480,
+    "album_name": "Anthony Naples + DJ Python - Air Texture VIII",
+    "artist_name": "Anthony Naples",
+    "year": "2022-06-10"
+  },
+  {
+    "id": 2483,
+    "album_name": "Sleeper in Metropolis (97 Remixes)",
+    "artist_name": "Anne Clark",
+    "year": "1997"
+  },
+  {
+    "id": 2487,
+    "album_name": "Evolve",
+    "artist_name": "Ani DiFranco",
+    "year": "2003-03-11"
+  },
+  {
+    "id": 2495,
+    "album_name": "Straight Ahead",
+    "artist_name": "Abbey Lincoln",
+    "year": "1972"
+  },
+  {
+    "id": 2501,
+    "album_name": "Inventions for Electric Guitar",
+    "artist_name": "Ash Ra Tempel",
+    "year": "1991"
+  },
+  {
+    "id": 2503,
+    "album_name": "Sound & Color",
+    "artist_name": "Alabama Shakes",
+    "year": "2015-04-21"
+  },
+  {
+    "id": 2511,
+    "album_name": "Melodies From Mars",
+    "artist_name": "Aphex Twin",
+    "year": "1995"
+  },
+  {
+    "id": 2515,
+    "album_name": "Cheetah EP",
+    "artist_name": "Aphex Twin",
+    "year": "2016-07-08"
+  },
+  {
+    "id": 2516,
+    "album_name": "Selected Ambient Works, Volume II",
+    "artist_name": "Aphex Twin",
+    "year": "1994-03-07"
+  },
+  {
+    "id": 2519,
+    "album_name": "Richard D. James Album",
+    "artist_name": "Aphex Twin",
+    "year": "1996"
+  },
+  {
+    "id": 2527,
+    "album_name": "Ring My Bell (1990 Mega Remix)",
+    "artist_name": "Anita Ward",
+    "year": "1990"
+  },
+  {
+    "id": 2535,
+    "album_name": "Here Comes the Indian",
+    "artist_name": "Animal Collective",
+    "year": "2017-01-27"
+  },
+  {
+    "id": 2542,
+    "album_name": "Acid Guru Pond",
+    "artist_name": "Acid Mothers Temple",
+    "year": "2016-04-16"
+  },
+  {
+    "id": 2543,
+    "album_name": "Oracles",
+    "artist_name": "Ana Silvera",
+    "year": "2018-07-06"
+  },
+  {
+    "id": 2544,
+    "album_name": "Here We Go Again",
+    "artist_name": "A Homeboy, A Hippie",
+    "year": "1993"
+  },
+  {
+    "id": 2551,
+    "album_name": "KiCk i",
+    "artist_name": "Arca",
+    "year": "2020-06-26"
+  },
+  {
+    "id": 2552,
+    "album_name": "Voodoo Ray CD Single",
+    "artist_name": "A Guy Called Gerald",
+    "year": "1989"
+  },
+  {
+    "id": 2553,
+    "album_name": "Peel Sessions (Flac+cue+scans)",
+    "artist_name": "A Guy Called Gerald",
+    "year": ""
+  },
+  {
+    "id": 2556,
+    "album_name": "How Long Is Now",
+    "artist_name": "A Guy Called Gerald",
+    "year": "2013-01-07"
+  },
+  {
+    "id": 2559,
+    "album_name": "Automanikk",
+    "artist_name": "A Guy Called Gerald",
+    "year": "1990"
+  },
+  {
+    "id": 2562,
+    "album_name": "An-Tonio",
+    "artist_name": "An-tonio",
+    "year": ""
+  },
+  {
+    "id": 2565,
+    "album_name": "Paris 1987",
+    "artist_name": "Camarón de la Isla con Tomatito",
+    "year": ""
+  },
+  {
+    "id": 2566,
+    "album_name": "Soy gitano",
+    "artist_name": "Camarón de la Isla con Royal Philharmonic Orchestra",
+    "year": "1989"
+  },
+  {
+    "id": 2567,
+    "album_name": "Disco de oro",
+    "artist_name": "Camarón de la Isla con la colaboración especial Paco de Lucía",
+    "year": "1988"
+  },
+  {
+    "id": 2572,
+    "album_name": "A Collection of Cyndee Peters and Eric Bibb",
+    "artist_name": "Cyndee Peters / Eric Bibb",
+    "year": "1991"
+  },
+  {
+    "id": 2581,
+    "album_name": "Kill for Love",
+    "artist_name": "Chromatics",
+    "year": "2012-05-28"
+  },
+  {
+    "id": 2588,
+    "album_name": "Green Label Sound",
+    "artist_name": "Chromeo",
+    "year": "2009"
+  },
+  {
+    "id": 2589,
+    "album_name": "Fancy Footwork",
+    "artist_name": "Chromeo",
+    "year": "2007-06-22"
+  },
+  {
+    "id": 2596,
+    "album_name": "The Cannonball Adderley Sextet in New York",
+    "artist_name": "Cannonball Adderley Sextet",
+    "year": "1987"
+  },
+  {
+    "id": 2597,
+    "album_name": "Walk Tall: The David Axelrod Years",
+    "artist_name": "Cannonball Adderley Sextet",
+    "year": "2008-05-26"
+  },
+  {
+    "id": 2599,
+    "album_name": "Can U Feel?",
+    "artist_name": "Comixxx",
+    "year": "2014-11-24"
+  },
+  {
+    "id": 2604,
+    "album_name": "Addax",
+    "artist_name": "Cassegrain",
+    "year": "2019-02-22"
+  },
+  {
+    "id": 2605,
+    "album_name": "Coptic E.P.",
+    "artist_name": "Cassegrain",
+    "year": "2012-02-20"
+  },
+  {
+    "id": 2606,
+    "album_name": "Dropa E.P.",
+    "artist_name": "Cassegrain",
+    "year": "2011-06-19"
+  },
+  {
+    "id": 2613,
+    "album_name": "Radiation: BBC Recordings 84-86",
+    "artist_name": "Cabaret Voltaire",
+    "year": "1998"
+  },
+  {
+    "id": 2621,
+    "album_name": "Commissioned Music",
+    "artist_name": "Celer",
+    "year": "2014"
+  },
+  {
+    "id": 2627,
+    "album_name": "Moon Palace",
+    "artist_name": "Celer",
+    "year": "2016"
+  },
+  {
+    "id": 2628,
+    "album_name": "M1 2",
+    "artist_name": "Celer",
+    "year": "2016"
+  },
+  {
+    "id": 2629,
+    "album_name": "Brittle",
+    "artist_name": "Celer",
+    "year": "2009-08-24"
+  },
+  {
+    "id": 2632,
+    "album_name": "Jima",
+    "artist_name": "Celer",
+    "year": "2015-04-21"
+  },
+  {
+    "id": 2644,
+    "album_name": "Stone Woman",
+    "artist_name": "Charlotte Day Wilson",
+    "year": "2018-02-23"
+  },
+  {
+    "id": 2648,
+    "album_name": "Twin Fantasy (Face to Face)",
+    "artist_name": "Car Seat Headrest",
+    "year": "2018-02-16"
+  },
+  {
+    "id": 2652,
+    "album_name": "Carnal",
+    "artist_name": "Cassegrain",
+    "year": "2012-06-04"
+  },
+  {
+    "id": 2660,
+    "album_name": "Cluster 71",
+    "artist_name": "Cluster",
+    "year": "1971"
+  },
+  {
+    "id": 2668,
+    "album_name": "Andorra",
+    "artist_name": "Caribou",
+    "year": "2007-08-17"
+  },
+  {
+    "id": 2676,
+    "album_name": "Cry",
+    "artist_name": "Cigarettes After Sex",
+    "year": "2019-10-25"
+  },
+  {
+    "id": 2681,
+    "album_name": "The David Axelrod Years",
+    "artist_name": "Cannonball Adderley",
+    "year": "2008-05-26"
+  },
+  {
+    "id": 2682,
+    "album_name": "Ark of the Covenant",
+    "artist_name": "Congo Natty",
+    "year": "2001"
+  },
+  {
+    "id": 2683,
+    "album_name": "Light as a Feather",
+    "artist_name": "Chick Corea, Return to Forever",
+    "year": "1973"
+  },
+  {
+    "id": 2689,
+    "album_name": "Head Over Heels [2002 Remaster]",
+    "artist_name": "Cocteau Twins",
+    "year": "1983"
+  },
+  {
+    "id": 2691,
+    "album_name": "Four-Calendar Cafe",
+    "artist_name": "Cocteau Twins",
+    "year": "1993"
+  },
+  {
+    "id": 2699,
+    "album_name": "Strollin'",
+    "artist_name": "Chet Baker",
+    "year": "2008-09-19"
+  },
+  {
+    "id": 2707,
+    "album_name": "Abyss",
+    "artist_name": "Chelsea Wolfe",
+    "year": "2015-08-07"
+  },
+  {
+    "id": 2714,
+    "album_name": "Cookin' With the Miles Davis Quintet",
+    "artist_name": "Miles Davis Quintet",
+    "year": "1999-10-19"
+  },
+  {
+    "id": 2715,
+    "album_name": "Relaxin' With the Miles Davis Quintet",
+    "artist_name": "Miles Davis Quintet",
+    "year": "1992"
+  },
+  {
+    "id": 2717,
+    "album_name": "The New Four Seasons - Vivaldi Recomposed",
+    "artist_name": "Max Richter, Elena Urioste, Chineke! Orchestra",
+    "year": "2022-06-10"
+  },
+  {
+    "id": 2719,
+    "album_name": "AVL",
+    "artist_name": "Mary Lattimore, Mac McCaughan",
+    "year": "2020-05-22"
+  },
+  {
+    "id": 2720,
+    "album_name": "The Omnichord Real Book",
+    "artist_name": "Meshell Ndegeocello",
+    "year": "2023-06-16"
+  },
+  {
+    "id": 2722,
+    "album_name": "Négropolitaines, volume 2",
+    "artist_name": "Manu Dibango",
+    "year": "1992-08-01"
+  },
+  {
+    "id": 2723,
+    "album_name": "Soul Makossa",
+    "artist_name": "Manu Dibango",
+    "year": "1992"
+  },
+  {
+    "id": 2725,
+    "album_name": "Around the Sun, Pt.2",
+    "artist_name": "Mr. Fingers",
+    "year": "2023-06-23"
+  },
+  {
+    "id": 2726,
+    "album_name": "SulaMadiana",
+    "artist_name": "Mino Cinelu, Nils Petter Molvær",
+    "year": "2020-09-04"
+  },
+  {
+    "id": 2731,
+    "album_name": "Upheaval",
+    "artist_name": "Mythic Sunship",
+    "year": "2018-01-12"
+  },
+  {
+    "id": 2733,
+    "album_name": "E2-E4",
+    "artist_name": "Manuel Goettsching",
+    "year": "1984"
+  },
+  {
+    "id": 2734,
+    "album_name": "Her Chess Years",
+    "artist_name": "Minnie Riperton",
+    "year": "1997-11-04"
+  },
+  {
+    "id": 2740,
+    "album_name": "Locura de Brisa y Trino",
+    "artist_name": "Manolo Sanlúcar",
+    "year": "2000"
+  },
+  {
+    "id": 2741,
+    "album_name": "Al viento",
+    "artist_name": "Manolo Sanlúcar",
+    "year": "1982"
+  },
+  {
+    "id": 2742,
+    "album_name": "Tauromagia",
+    "artist_name": "Manolo Sanlúcar",
+    "year": "1988"
+  },
+  {
+    "id": 2743,
+    "album_name": "Sanlúcar",
+    "artist_name": "Manolo Sanlúcar",
+    "year": "1974"
+  },
+  {
+    "id": 2752,
+    "album_name": "Dream & Desire",
+    "artist_name": "Manuel Göttsching",
+    "year": "1991"
+  },
+  {
+    "id": 2760,
+    "album_name": "Agents of Time",
+    "artist_name": "Mathew Jonson",
+    "year": "2010-06-04"
+  },
+  {
+    "id": 2768,
+    "album_name": "Tubular Bells II",
+    "artist_name": "Mike Oldfield",
+    "year": "1992-08-31"
+  },
+  {
+    "id": 2771,
+    "album_name": "Extra Grush",
+    "artist_name": "Mu‐Ziq",
+    "year": "2024-12-06"
+  },
+  {
+    "id": 2772,
+    "album_name": "Hello",
+    "artist_name": "Mu‐Ziq",
+    "year": "2022-11-04"
+  },
+  {
+    "id": 2773,
+    "album_name": "Sentimiento",
+    "artist_name": "Manolo Sanlucar",
+    "year": "1976"
+  },
+  {
+    "id": 2774,
+    "album_name": "Medea",
+    "artist_name": "Manolo Sanlucar",
+    "year": "1987"
+  },
+  {
+    "id": 2776,
+    "album_name": "Ghost Forests",
+    "artist_name": "Meg Baird",
+    "year": "2018-11-09"
+  },
+  {
+    "id": 2784,
+    "album_name": "Like Swimming",
+    "artist_name": "Morphine",
+    "year": "1997-03-11"
+  },
+  {
+    "id": 2792,
+    "album_name": "Tutu",
+    "artist_name": "Miles Davis",
+    "year": "1986"
+  },
+  {
+    "id": 2800,
+    "album_name": "Filles de Kilimanjaro",
+    "artist_name": "Miles Davis",
+    "year": "2002-08-20"
+  },
+  {
+    "id": 2808,
+    "album_name": "Moodymann",
+    "artist_name": "Moodymann",
+    "year": "2014-01-11"
+  },
+  {
+    "id": 2814,
+    "album_name": "Rock 'N' Soul",
+    "artist_name": "Millie Jackson",
+    "year": "1994-10-25"
+  },
+  {
+    "id": 2815,
+    "album_name": "Feelin' Bitchy",
+    "artist_name": "Millie Jackson",
+    "year": "2007-02-05"
+  },
+  {
+    "id": 2816,
+    "album_name": "Caught Up / Still Caught Up",
+    "artist_name": "Millie Jackson",
+    "year": "2000-09-11"
+  },
+  {
+    "id": 2824,
+    "album_name": "Hardcore Will Never Die, but You Will",
+    "artist_name": "Mogwai",
+    "year": "2011"
+  },
+  {
+    "id": 2832,
+    "album_name": "Ride the Lightning",
+    "artist_name": "Metallica",
+    "year": "2000-02-22"
+  },
+  {
+    "id": 2833,
+    "album_name": "What Will You Grow Now?",
+    "artist_name": "Modern Cosmology, Lætitia Sadier",
+    "year": "2023-05-05"
+  },
+  {
+    "id": 2838,
+    "album_name": "Symbiotix",
+    "artist_name": "Mrs Jynx / Oxynucid",
+    "year": "2009-08-02"
+  },
+  {
+    "id": 2839,
+    "album_name": "aux445",
+    "artist_name": "Microlith",
+    "year": "2017-06-17"
+  },
+  {
+    "id": 2840,
+    "album_name": "Clube da Esquina",
+    "artist_name": "Milton Nascimento",
+    "year": "1994"
+  },
+  {
+    "id": 2843,
+    "album_name": "Valentina Tereshkova",
+    "artist_name": "Mats Erlandsson",
+    "year": "2016-02-26"
+  },
+  {
+    "id": 2844,
+    "album_name": "Selective Miracles",
+    "artist_name": "Mats Erlandsson",
+    "year": "2016-01-05"
+  },
+  {
+    "id": 2846,
+    "album_name": "Royal Rappin's",
+    "artist_name": "Millie Jackson",
+    "year": "1992"
+  },
+  {
+    "id": 2848,
+    "album_name": "Perfect Angel",
+    "artist_name": "Minnie Riperton",
+    "year": "1998-08-26"
+  },
+  {
+    "id": 2850,
+    "album_name": "[standalone recordings]",
+    "artist_name": "Mrs Jynx",
+    "year": "2010"
+  },
+  {
+    "id": 2853,
+    "album_name": "Expert Knob Twiddlers",
+    "artist_name": "Mike Paradinas",
+    "year": "1996-06-24"
+  },
+  {
+    "id": 2854,
+    "album_name": "Four Walls / Paradise Circus",
+    "artist_name": "Massive Attack vs. Burial",
+    "year": "2011-10-10"
+  },
+  {
+    "id": 2856,
+    "album_name": "Phase II",
+    "artist_name": "Mildlife",
+    "year": "2018"
+  },
+  {
+    "id": 2864,
+    "album_name": "Summertime",
+    "artist_name": "MFSB",
+    "year": "1976"
+  },
+  {
+    "id": 2866,
+    "album_name": "Heaven, Vol. 2",
+    "artist_name": "MONO",
+    "year": "2023-12-25"
+  },
+  {
+    "id": 2879,
+    "album_name": "On the Go",
+    "artist_name": "Matthew Halsall",
+    "year": "2011-04-18"
+  },
+  {
+    "id": 2883,
+    "album_name": "RARITIES",
+    "artist_name": "Massive Attack",
+    "year": "2006"
+  },
+  {
+    "id": 2887,
+    "album_name": "Collected",
+    "artist_name": "Massive Attack",
+    "year": "2006-03-27"
+  },
+  {
+    "id": 2895,
+    "album_name": "Beyond the Sea of Sand",
+    "artist_name": "Mirlaqi",
+    "year": "2020-05-01"
+  },
+  {
+    "id": 2898,
+    "album_name": "Däfos",
+    "artist_name": "Mickey Hart, Airto Moreira, Flora Purim",
+    "year": "1984"
+  },
+  {
+    "id": 2902,
+    "album_name": "Elementary",
+    "artist_name": "Melvin “Wah Wah” Watson",
+    "year": "2004"
+  },
+  {
+    "id": 2903,
+    "album_name": "Saturdays = Youth",
+    "artist_name": "M83",
+    "year": "2008-04-14"
+  },
+  {
+    "id": 2911,
+    "album_name": "It’s Only Us",
+    "artist_name": "Monophonics",
+    "year": "2020-03-13"
+  },
+  {
+    "id": 2919,
+    "album_name": "Bordando el manto terrestre",
+    "artist_name": "Maud the moth + Trajedesaliva",
+    "year": "2023-05-26"
+  },
+  {
+    "id": 2927,
+    "album_name": "Buena Onda - Balearic Beats 2021",
+    "artist_name": "Kayroy",
+    "year": "2021"
+  },
+  {
+    "id": 2932,
+    "album_name": "Early Tape Works 1986–1993, Vol. 1",
+    "artist_name": "Kuniyuki Takahashi",
+    "year": "2018-01-31"
+  },
+  {
+    "id": 2935,
+    "album_name": "Are You Sequenced?",
+    "artist_name": "Klaus Schulze",
+    "year": "1996-09-27"
+  },
+  {
+    "id": 2946,
+    "album_name": "10 Years Of Madhouse - Mixed By Kerri Chandler",
+    "artist_name": "various artists",
+    "year": "2001"
+  },
+  {
+    "id": 2950,
+    "album_name": "OR",
+    "artist_name": "Kangding Ray",
+    "year": "2011-05-23"
+  },
+  {
+    "id": 2958,
+    "album_name": "Predawn Qualia",
+    "artist_name": "Kangding Ray",
+    "year": "2019-05-17"
+  },
+  {
+    "id": 2959,
+    "album_name": "The Pentaki Slopes",
+    "artist_name": "Kangding Ray",
+    "year": "2012-12-10"
+  },
+  {
+    "id": 2966,
+    "album_name": "forge",
+    "artist_name": "KMRU",
+    "year": "2024-10-22"
+  },
+  {
+    "id": 2974,
+    "album_name": "The Epic",
+    "artist_name": "Kamasi Washington",
+    "year": "2015-05-05"
+  },
+  {
+    "id": 2982,
+    "album_name": "The Universe Smiles Upon You",
+    "artist_name": "Khruangbin",
+    "year": "2015-11-06"
+  },
+  {
+    "id": 2987,
+    "album_name": "Standards, Volume 1",
+    "artist_name": "Keith Jarrett, Gary Peacock, Jack DeJohnette",
+    "year": "2019"
+  },
+  {
+    "id": 2988,
+    "album_name": "Does Spring Hide Its Joy",
+    "artist_name": "Kali Malone featuring Stephen O’Malley",
+    "year": "2023-01-20"
+  },
+  {
+    "id": 2990,
+    "album_name": "The Secret Cosmic Music of the East German Olympic Program 1972-83: Volume Five",
+    "artist_name": "Kosmischer Läufer",
+    "year": "2023-02-03"
+  },
+  {
+    "id": 2991,
+    "album_name": "Kl(aüs)",
+    "artist_name": "Kl(aüs)",
+    "year": "2016-07"
+  },
+  {
+    "id": 2994,
+    "album_name": "Inde du Nord: Raga Marwa - Surbahar",
+    "artist_name": "Kushal Das",
+    "year": "2004-10-15"
+  },
+  {
+    "id": 2998,
+    "album_name": "KIDS SEE GHOSTS",
+    "artist_name": "KIDS SEE GHOSTS",
+    "year": "2018-09-28"
+  },
+  {
+    "id": 3006,
+    "album_name": "The Outskirts of Reality",
+    "artist_name": "Yuri Gagarin",
+    "year": "2020-01-31"
+  },
+  {
+    "id": 3008,
+    "album_name": "Heat EP",
+    "artist_name": "Yan Cook",
+    "year": "2015-04-27"
+  },
+  {
+    "id": 3011,
+    "album_name": "Berg EP",
+    "artist_name": "Yan Cook",
+    "year": "2014-07-14"
+  },
+  {
+    "id": 3012,
+    "album_name": "DD#1",
+    "artist_name": "Yan Cook",
+    "year": "2012-04-16"
+  },
+  {
+    "id": 3014,
+    "album_name": "Dead End EP",
+    "artist_name": "Yan Cook",
+    "year": "2015-01-12"
+  },
+  {
+    "id": 3015,
+    "album_name": "Drag Me",
+    "artist_name": "Yan Cook",
+    "year": "2013-09-11"
+  },
+  {
+    "id": 3017,
+    "album_name": "Intruder EP",
+    "artist_name": "Yan Cook",
+    "year": "2012-04-03"
+  },
+  {
+    "id": 3018,
+    "album_name": "Melter",
+    "artist_name": "Yan Cook",
+    "year": "2014-09-29"
+  },
+  {
+    "id": 3019,
+    "album_name": "F.1 EP",
+    "artist_name": "Yan Cook",
+    "year": "2012-08-22"
+  },
+  {
+    "id": 3020,
+    "album_name": "2x2 EP",
+    "artist_name": "Yan Cook",
+    "year": "2012-12-03"
+  },
+  {
+    "id": 3021,
+    "album_name": "Alptraum EP",
+    "artist_name": "Yan Cook",
+    "year": "2013-02-22"
+  },
+  {
+    "id": 3022,
+    "album_name": "Deformer EP",
+    "artist_name": "Yan Cook",
+    "year": "2014-07-13"
+  },
+  {
+    "id": 3023,
+    "album_name": "Gravity EP",
+    "artist_name": "Yan Cook",
+    "year": "2014-12"
+  },
+  {
+    "id": 3024,
+    "album_name": "Shift EP",
+    "artist_name": "Yan Cook",
+    "year": "2015-03-23"
+  },
+  {
+    "id": 3025,
+    "album_name": "Spiegeln EP",
+    "artist_name": "Yan Cook",
+    "year": "2013-07-15"
+  },
+  {
+    "id": 3027,
+    "album_name": "Brood Remixes02 - Yan Cook Remixed",
+    "artist_name": "Yan Cook",
+    "year": "2012-07-30"
+  },
+  {
+    "id": 3028,
+    "album_name": "Outbreak EP",
+    "artist_name": "Yan Cook",
+    "year": "2011-12-26"
+  },
+  {
+    "id": 3030,
+    "album_name": "Wandering",
+    "artist_name": "Yosi Horikawa",
+    "year": "2012-06-18"
+  },
+  {
+    "id": 3038,
+    "album_name": "Five Years",
+    "artist_name": "Yui Onodera 小野寺唯",
+    "year": "2015"
+  },
+  {
+    "id": 3039,
+    "album_name": "Yello - Touch Yello 24bit-48000hz",
+    "artist_name": "Yello",
+    "year": "2009"
+  },
+  {
+    "id": 3046,
+    "album_name": "Enter EP",
+    "artist_name": "Yan Cook",
+    "year": "2014-08"
+  },
+  {
+    "id": 3050,
+    "album_name": "Counting Triggers",
+    "artist_name": "Yves De Mey",
+    "year": "2011-10-10"
+  },
+  {
+    "id": 3053,
+    "album_name": "Transfer EP",
+    "artist_name": "Yves De Mey",
+    "year": "2013-09-02"
+  },
+  {
+    "id": 3054,
+    "album_name": "Bleak Comfort",
+    "artist_name": "Yves De Mey",
+    "year": "2018-02-01"
+  },
+  {
+    "id": 3055,
+    "album_name": "Late-Night Patching 1",
+    "artist_name": "Yves De Mey",
+    "year": "2016-08-29"
+  },
+  {
+    "id": 3061,
+    "album_name": "King of a Land",
+    "artist_name": "Yusuf Islam",
+    "year": "2023-06-16"
+  },
+  {
+    "id": 3062,
+    "album_name": "Jammed / Kosmos",
+    "artist_name": "Yan Cook / Urbano",
+    "year": "2013-05-28"
+  },
+  {
+    "id": 3063,
+    "album_name": "For the Ones...",
+    "artist_name": "Yelfris Carlos Valdés Espinosa",
+    "year": "2019-10-04"
+  },
+  {
+    "id": 3067,
+    "album_name": "Is Everything Okay in Your World?",
+    "artist_name": "Yellow Days",
+    "year": "2017-10-27"
+  },
+  {
+    "id": 3068,
+    "album_name": "El soñador elegido",
+    "artist_name": "Xhelazz",
+    "year": "2007-10-03"
+  },
+  {
+    "id": 3070,
+    "album_name": "Love Is a Dream",
+    "artist_name": "Xela",
+    "year": "2010-10"
+  },
+  {
+    "id": 3073,
+    "album_name": "Infinition / Hyperprism",
+    "artist_name": "Quadrant",
+    "year": "2004-01-19"
+  },
+  {
+    "id": 3074,
+    "album_name": "Hip Hop Jazz Best",
+    "artist_name": "Quincy Jones and His Orchestra",
+    "year": "1991"
+  },
+  {
+    "id": 3078,
+    "album_name": "Over the Years and Through the Woods (Live at Brixton Academy / 2005)",
+    "artist_name": "Queens of the Stone Age",
+    "year": "2005-11-22"
+  },
+  {
+    "id": 3083,
+    "album_name": "Dog With a Rope",
+    "artist_name": "Quantic presenta Flowering Inferno",
+    "year": "2010-07-19"
+  },
+  {
+    "id": 3084,
+    "album_name": "Everything Must Change",
+    "artist_name": "Quincy Jones",
+    "year": "2003"
+  },
+  {
+    "id": 3086,
+    "album_name": "Newport 1961",
+    "artist_name": "Quincy Jones",
+    "year": "2019"
+  },
+  {
+    "id": 3094,
+    "album_name": "Walking in Space",
+    "artist_name": "Quincy Jones",
+    "year": "1985"
+  },
+  {
+    "id": 3099,
+    "album_name": "Sounds… And Stuff Like That!!",
+    "artist_name": "Quincy Jones",
+    "year": "1978"
+  },
+  {
+    "id": 3100,
+    "album_name": "I Heard That!!",
+    "artist_name": "Quincy Jones",
+    "year": "1976"
+  },
+  {
+    "id": 3102,
+    "album_name": "Go West, Man!",
+    "artist_name": "Quincy Jones",
+    "year": "1957-10-17"
+  }
+]

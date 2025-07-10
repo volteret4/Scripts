@@ -1,0 +1,18 @@
+{
+    "db_path": "/home/huan/Scripts/utilities/tiddlywiki/wiki_obsidian.db",
+    "root_dirs": [
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs",
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
+        "/mnt/windows/FTP/wiki/Obsidian/Recortes"
+    ],
+    "excluded_paths": [
+        ".git",
+        ".gitignore",
+        ".stfolder",
+        ".obsidian"
+    ],
+    "log_file": "/home/huan/Scripts/utilities/tiddlywiki/wiki_sync.log",
+    "optimize_frequency": 7,
+    "backup_retention": 5
+}

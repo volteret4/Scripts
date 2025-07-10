@@ -1,8 +1,7 @@
 import os
 import shutil
-
-
-
+from datetime import datetime, timedelta
+import re
 
 # Mapeo de extensiones a lenguajes de bloque de código
 EXT_TO_LANG = {
@@ -29,10 +28,76 @@ EXT_TO_LANG = {
 }
 
 
+def extract_todos(content, filename):
+    """
+    Extract TODO comments from file content.
+    
+    Args:
+        content (str): File content
+        filename (str): Name of the file
+    
+    Returns:
+        list: List of extracted TODO lines
+    """
+    # Regular expressions to match TODO comments with or without #
+    todo_patterns = [
+        r'#\s*TODO:?\s*(.+)',  # Matches #TODO: or # TODO 
+        r'\s*TODO:?\s*(.+)'    # Matches TODO: without #
+    ]
+    
+    todos = []
+    for pattern in todo_patterns:
+        matches = re.findall(pattern, content, re.MULTILINE)
+        for todo in matches:
+            todos.append(todo.strip())
+    
+    return todos
+
+def add_todos_to_task_file(todos, filename):
+    """
+    Add extracted TODOs to the task file.
+    
+    Args:
+        todos (list): List of TODO lines
+        filename (str): Source filename
+    """
+    task_file_path = "/mnt/windows/FTP/Obsidian/Important/Tareas.md"
+    
+    # Get current and future dates
+    today = datetime.now().date()
+    three_months_later = today + timedelta(days=90)
+    
+    # Prepare task filename tag (remove .md extension)
+    filename_tag = os.path.splitext(filename)[0]
+    
+    # Prepare new TODO entries
+    new_todos = []
+    for todo in todos:
+        todo_entry = f"-  [ ] TODO: #{filename_tag} {todo} 🛫 {today} 📅 {three_months_later}"
+        new_todos.append(todo_entry)
+    
+    # Read existing content
+    existing_content = []
+    if os.path.exists(task_file_path):
+        with open(task_file_path, 'r', encoding='utf-8') as f:
+            existing_content = f.readlines()
+    
+    # Append new TODOs if they don't already exist
+    updated_content = existing_content.copy()
+    for todo_entry in new_todos:
+        if todo_entry + '\n' not in existing_content:
+            updated_content.append(todo_entry + '\n')
+    
+    # Write back to the task file
+    with open(task_file_path, 'w', encoding='utf-8') as f:
+        f.writelines(updated_content)
+
+
+
 def sync_files(source_dir, dest_dir, exclude_dirs, exclude_extensions=None):
     # Si exclude_extensions es None, inicializamos como lista vacía
     if exclude_extensions is None:
-        exclude_extensions = []
+        exclude_extensions = ['sqlite', 'db', 'bak', 'tmp', 'log', 'swp', 'mb']
     
     # Normalizar las rutas de exclusión para comparaciones consistentes
     exclude_dirs = [os.path.normpath(path) for path in exclude_dirs]
@@ -132,6 +197,25 @@ def sync_files(source_dir, dest_dir, exclude_dirs, exclude_extensions=None):
                 print(f"Error al actualizar {dest_path}: {e}")
         else:
             print(f"Sin cambios: {dest_path}")
+
+        # After creating the .md file, add a new step to extract and process TODOs
+        if need_update and ext in ['py', 'js', 'sh', 'txt', 'md']:
+            try:
+                # If not read before, read now
+                if 'content' not in locals():
+                    with open(src_path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                
+                # Extract TODOs
+                todos = extract_todos(content, os.path.basename(rel_path))
+                
+                # Add TODOs to task file if any exist
+                if todos:
+                    add_todos_to_task_file(todos, os.path.basename(rel_path))
+                    print(f"Extracted TODOs from {rel_path}")
+            
+            except Exception as e:
+                print(f"Error extracting TODOs from {rel_path}: {e}")
 
     # Paso 4: Eliminar archivos que ya no existen en el origen
     print("Eliminando archivos obsoletos...")
