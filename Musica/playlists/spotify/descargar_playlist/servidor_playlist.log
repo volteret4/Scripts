@@ -1,0 +1,21 @@
+2025-03-11 18:56:23,416 - WARNING - La carpeta de destino '/mnt/NFS/lidarr/torrents_backup/watch_torrents' no existe. Intentando crearla...
+2025-03-11 18:56:23,416 - ERROR - Error creando carpeta de destino: [Errno 13] Permission denied: '/mnt/NFS/lidarr/torrents_backup'
+2025-03-11 19:00:40,448 - INFO - Cargado archivo de canciones con 2 entradas
+2025-03-11 19:00:40,449 - INFO - Servidor iniciado en 0.0.0.0:8584
+2025-03-11 19:35:50,985 - INFO - Recibida señal de interrupción. Cerrando servidor...
+2025-03-11 19:35:50,985 - INFO - Servidor cerrado
+2025-03-12 01:37:51,296 - INFO - Detectado formato JSON agrupado por artista/álbum
+2025-03-12 01:37:51,297 - INFO - Cargado archivo de canciones con 2 entradas
+2025-03-12 01:37:51,297 - INFO - Configuración del servidor:
+2025-03-12 01:37:51,297 - INFO -   - Host: 0.0.0.0
+2025-03-12 01:37:51,297 - INFO -   - Puerto: 8584
+2025-03-12 01:37:51,297 - INFO -   - Archivo JSON: .content/playlist_songs.json
+2025-03-12 01:37:51,297 - INFO -   - Ruta de destino: /home/pepe/descargar_playlist_spotify/canciones/test
+2025-03-12 01:37:51,297 - INFO -   - Carpeta de descargas: /mnt/NFS/lidarr/torrents_backup
+2025-03-12 01:37:51,297 - INFO -   - Número de torrents a procesar: 1
+2025-03-12 01:37:51,299 - INFO - Servidor iniciado en 0.0.0.0:8584
+2025-03-12 01:37:51,299 - INFO - Servidor listo y esperando solicitudes...
+2025-03-12 01:37:51,299 - INFO - Para realizar una prueba manual, puedes ejecutar:
+2025-03-12 01:37:51,299 - INFO - curl -X POST http://localhost:8584/download-complete -H 'Content-Type: application/json' -d '{'album': 'Nombre del Album', 'ruta': 'ruta/relativa/a/descarga'}'
+2025-03-12 01:38:09,367 - INFO - Recibida señal de interrupción. Cerrando servidor...
+2025-03-12 01:38:09,822 - INFO - Servidor cerrado correctamente

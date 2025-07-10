@@ -1,10 +1,13 @@
 import sys
 import sqlite3
+import re
+import subprocess
+import platform
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLineEdit, QListWidget, QTextEdit, QPushButton, QLabel, QListWidgetItem,
                              QDialog, QCheckBox, QScrollArea, QSplitter, QFrame, QMessageBox,  QDialogButtonBox)
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QColor, QPalette, QFont, QIcon
+from PyQt6.QtGui import QColor, QPalette, QFont, QIcon, QShortcut, QKeySequence
 import markdown
 from markdown.extensions import codehilite, fenced_code
 import os
@@ -71,8 +74,16 @@ class CatppuccinDarkTheme:
         
         # Estilo adicional para widgets específicos
         app.setStyleSheet(f"""
-            QLineEdit, QTextEdit, QListWidget {{
+            QLineEdit {{
                 background-color: {cls.surface0};
+                color: {cls.text};
+                border: 1px solid {cls.surface2};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+
+            QTextEdit, QListWidget {{
+                background-color: {cls.base};
                 color: {cls.text};
                 border: 1px solid {cls.surface2};
                 border-radius: 4px;
@@ -99,10 +110,28 @@ class CatppuccinDarkTheme:
             QSplitter::handle {{
                 background-color: {cls.surface1};
             }}
+
+
+            QScrollBar:horizontal {{
+                background-color: {cls.surface0};
+                width: 10px;
+                margin: 0px;
+            }}
             
+            QScrollBar::handle:horizontal {{
+                background-color: {cls.surface2};
+                min-height: 20px;
+                border-radius: 4px;
+            }}
+            
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                height: 0px;
+            }}
+
+
             QScrollBar:vertical {{
                 background-color: {cls.surface0};
-                width: 12px;
+                width: 10px;
                 margin: 0px;
             }}
             
@@ -336,11 +365,11 @@ class MarkdownSearchViewer(QMainWindow):
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
         self.root_folders = root_folders or [
-            "/mnt/windows/FTP/Obsidian/Spaces/Wiki",
-            "/mnt/windows/FTP/Obsidian/Spaces/Blogs",
-            "/mnt/windows/FTP/Obsidian/Spaces/Proyectos Interesantes",
-            "/mnt/windows/FTP/Obsidian/Spaces/Scripts",
-            "/mnt/windows/FTP/Obsidian/Recortes"
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts",
+            "/mnt/windows/FTP/wiki/Obsidian/Recortes"
         ]
         self.selected_folders = []
         # Primero cargar las carpetas seleccionadas antes de iniciar búsquedas
@@ -388,25 +417,41 @@ class MarkdownSearchViewer(QMainWindow):
         
         # Splitter horizontal para los paneles de listado y contenido
         horizontal_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.horizontal_splitter = horizontal_splitter
+
+        # Panel izquierdo: Lista de resultados con scroll fijo
+        results_container = QWidget()
+        results_layout = QVBoxLayout(results_container)
+        results_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Panel izquierdo: Lista de resultados
         self.results_list = QListWidget()
         self.results_list.currentItemChanged.connect(self.show_snippet)
-        # Añadir espacio vertical entre los elementos
+        # Configurar scroll vertical fijo y estilos
+        self.results_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.results_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.results_list.setStyleSheet("""
             QListWidget::item { 
-                padding-top: 5px; 
-                padding-bottom: 5px; 
+                padding-top: 8px; 
+                padding-bottom: 8px;
+                border-bottom: 1px solid #45475a;
             }
-        """)      
-
+            QListWidget::item:selected {
+                background-color: #cba6f7;
+                color: #11111b;
+            }
+            QListWidget::item:hover {
+                background-color: #585b70;
+            }
+        """)
+        
+        results_layout.addWidget(self.results_list)
 
         # Panel derecho: Visualizador de markdown
         self.markdown_view = QTextEdit()
         self.markdown_view.setReadOnly(True)
         
         # Añade ambos widgets al splitter horizontal
-        horizontal_splitter.addWidget(self.results_list)
+        horizontal_splitter.addWidget(results_container)
         horizontal_splitter.addWidget(self.markdown_view)
         
         # Configurar tamaños iniciales para el splitter horizontal (50% cada uno)
@@ -428,17 +473,262 @@ class MarkdownSearchViewer(QMainWindow):
             border-radius: 4px;
             font-weight: bold;
         """)
-        
+        status_widget.setFixedHeight(0)
         status_layout.addWidget(self.status_label)
         main_splitter.addWidget(status_widget)
         
         # Configurar tamaños del splitter vertical (90% contenido, 10% status)
-        main_splitter.setSizes([int(self.height() * 0.9), int(self.height() * 0.1)])
+        main_splitter.setSizes([int(self.height() * 1), int(self.height() * 0)])
         
         main_layout.addWidget(main_splitter)
         
         # Cargar todos los snippets al inicio
         self.search_snippets()
+        
+        # Configurar atajos de teclado
+        self.setup_shortcuts()
+    
+    def setup_shortcuts(self):
+        """Configura los atajos de teclado"""
+        # CTRL+F: Focus en el cajón de búsqueda
+        self.shortcut_search = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.shortcut_search.activated.connect(self.focus_search)
+        
+        # Flecha arriba: Mover hacia arriba en la lista
+        self.shortcut_up = QShortcut(QKeySequence("Up"), self)
+        self.shortcut_up.activated.connect(self.move_selection_up)
+        
+        # Flecha abajo: Mover hacia abajo en la lista
+        self.shortcut_down = QShortcut(QKeySequence("Down"), self)
+        self.shortcut_down.activated.connect(self.move_selection_down)
+        
+        # CTRL+O: Abrir carpeta del archivo
+        self.shortcut_open_folder = QShortcut(QKeySequence("Ctrl+O"), self)
+        self.shortcut_open_folder.activated.connect(self.open_file_folder)
+        
+        # CTRL+E: Editar archivo
+        self.shortcut_edit = QShortcut(QKeySequence("Ctrl+E"), self)
+        self.shortcut_edit.activated.connect(self.edit_file)
+        
+        # NUEVOS HOTKEYS PARA EL SEPARADOR
+        # Flecha derecha: Expandir panel derecho (mover separador a la izquierda)
+        self.shortcut_right = QShortcut(QKeySequence("Right"), self)
+        self.shortcut_right.activated.connect(self.expand_right_panel)
+        
+        # Flecha izquierda: Expandir panel izquierdo (mover separador a la derecha)
+        self.shortcut_left = QShortcut(QKeySequence("Left"), self)
+        self.shortcut_left.activated.connect(self.expand_left_panel)
+    
+    def focus_search(self):
+        """Pone el foco en el cajón de búsqueda"""
+        self.search_input.setFocus()
+        self.search_input.selectAll()
+    
+    def move_selection_up(self):
+        """Mueve la selección hacia arriba en la lista"""
+        if self.results_list.count() == 0:
+            return
+            
+        current_row = self.results_list.currentRow()
+        if current_row <= 0:
+            return
+            
+        # Buscar el elemento anterior que sea seleccionable (no header)
+        for i in range(current_row - 1, -1, -1):
+            item = self.results_list.item(i)
+            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.results_list.setCurrentRow(i)
+                break
+    
+    def move_selection_down(self):
+        """Mueve la selección hacia abajo en la lista"""
+        if self.results_list.count() == 0:
+            return
+            
+        current_row = self.results_list.currentRow()
+        if current_row >= self.results_list.count() - 1:
+            return
+            
+        # Buscar el elemento siguiente que sea seleccionable (no header)
+        for i in range(current_row + 1, self.results_list.count()):
+            item = self.results_list.item(i)
+            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.results_list.setCurrentRow(i)
+                break
+    
+
+
+    def expand_right_panel(self):
+        """Expande el panel derecho moviendo el separador hacia la izquierda"""
+        if not hasattr(self, 'horizontal_splitter'):
+            return
+        
+        current_sizes = self.horizontal_splitter.sizes()
+        if len(current_sizes) != 2:
+            return
+        
+        total_width = sum(current_sizes)
+        step = total_width // 8  # Mover 12.5% del ancho total
+        
+        # Reducir panel izquierdo, expandir panel derecho
+        new_left = max(current_sizes[0] - step, total_width // 8)  # Mínimo 12.5%
+        new_right = total_width - new_left
+        
+        self.horizontal_splitter.setSizes([new_left, new_right])
+        print(f"Expandiendo panel derecho: {new_left}, {new_right}")
+
+    def expand_left_panel(self):
+        """Expande el panel izquierdo moviendo el separador hacia la derecha"""
+        if not hasattr(self, 'horizontal_splitter'):
+            return
+        
+        current_sizes = self.horizontal_splitter.sizes()
+        if len(current_sizes) != 2:
+            return
+        
+        total_width = sum(current_sizes)
+        step = total_width // 8  # Mover 12.5% del ancho total
+        
+        # Expandir panel izquierdo, reducir panel derecho
+        new_left = min(current_sizes[0] + step, total_width * 7 // 8)  # Máximo 87.5%
+        new_right = total_width - new_left
+        
+        self.horizontal_splitter.setSizes([new_left, new_right])
+        print(f"Expandiendo panel izquierdo: {new_left}, {new_right}")
+
+
+
+    def get_current_file_path(self):
+        """Obtiene la ruta del archivo actualmente seleccionado"""
+        current_item = self.results_list.currentItem()
+        if not current_item:
+            return None
+            
+        data = current_item.data(Qt.ItemDataRole.UserRole)
+        if not data:
+            return None
+            
+        _, _, path = data
+        return path
+    
+    def open_file_folder(self):
+        """Abre la carpeta que contiene el archivo actual"""
+        file_path = self.get_current_file_path()
+        if not file_path:
+            QMessageBox.information(self, "Información", "No hay archivo seleccionado")
+            return
+            
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "Advertencia", f"El archivo no existe:\n{file_path}")
+            return
+            
+        try:
+            folder_path = os.path.dirname(file_path)
+            
+            # Detectar el sistema operativo y abrir el explorador correspondiente
+            system = platform.system()
+            
+            if system == "Linux":
+                # Intentar varios exploradores de archivos de Linux
+                file_managers = ['xdg-open', 'nautilus', 'dolphin', 'thunar', 'nemo', 'pcmanfm']
+                
+                for fm in file_managers:
+                    try:
+                        subprocess.run([fm, folder_path], check=True)
+                        break
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        continue
+                else:
+                    # Si ningún explorador funciona, mostrar error
+                    QMessageBox.warning(self, "Error", 
+                                      f"No se pudo abrir el explorador de archivos.\n"
+                                      f"Carpeta: {folder_path}")
+                    
+            elif system == "Windows":
+                subprocess.run(['explorer', folder_path])
+                
+            elif system == "Darwin":  # macOS
+                subprocess.run(['open', folder_path])
+            else:
+                QMessageBox.information(self, "No soportado", 
+                                      f"Sistema operativo no soportado: {system}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al abrir la carpeta:\n{str(e)}")
+    
+    def edit_file(self):
+        """Abre el archivo actual en el editor por defecto"""
+        file_path = self.get_current_file_path()
+        if not file_path:
+            QMessageBox.information(self, "Información", "No hay archivo seleccionado")
+            return
+            
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "Advertencia", f"El archivo no existe:\n{file_path}")
+            return
+            
+        try:
+            system = platform.system()
+            
+            if system == "Linux":
+                # Intentar varios editores de texto de Linux
+                editors = ['code', 'gedit', 'kate', 'mousepad', 'nano', 'vim', 'xdg-open']
+                
+                for editor in editors:
+                    try:
+                        # Para editores GUI, usar Popen para no bloquear la aplicación
+                        if editor in ['code', 'gedit', 'kate', 'mousepad', 'xdg-open']:
+                            subprocess.Popen([editor, file_path])
+                        else:
+                            # Para editores de terminal, abrir en una nueva terminal
+                            subprocess.Popen(['x-terminal-emulator', '-e', editor, file_path])
+                        break
+                    except FileNotFoundError:
+                        continue
+                else:
+                    QMessageBox.warning(self, "Error", 
+                                      f"No se encontró un editor disponible.\n"
+                                      f"Archivo: {file_path}")
+                    
+            elif system == "Windows":
+                os.startfile(file_path)
+                
+            elif system == "Darwin":  # macOS
+                subprocess.Popen(['open', file_path])
+            else:
+                QMessageBox.information(self, "No soportado", 
+                                      f"Sistema operativo no soportado: {system}")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al abrir el archivo:\n{str(e)}")
+    
+    def keyPressEvent(self, event):
+        """Maneja eventos de teclado adicionales"""
+        # Si estamos en el campo de búsqueda, permitir navegación con flechas
+        if self.search_input.hasFocus():
+            if event.key() == Qt.Key.Key_Down:
+                # Ir al primer elemento seleccionable de la lista
+                if self.results_list.count() > 0:
+                    for i in range(self.results_list.count()):
+                        item = self.results_list.item(i)
+                        if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                            self.results_list.setCurrentRow(i)
+                            self.results_list.setFocus()
+                            break
+                return
+            elif event.key() == Qt.Key.Key_Up:
+                # Ir al último elemento seleccionable de la lista
+                if self.results_list.count() > 0:
+                    for i in range(self.results_list.count() - 1, -1, -1):
+                        item = self.results_list.item(i)
+                        if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                            self.results_list.setCurrentRow(i)
+                            self.results_list.setFocus()
+                            break
+                return
+        
+        # Llamar al manejador padre para otros eventos
+        super().keyPressEvent(event)
     
     def load_selected_folders(self):
         """Carga las carpetas seleccionadas desde un archivo JSON"""
@@ -481,7 +771,6 @@ class MarkdownSearchViewer(QMainWindow):
         except Exception as e:
             print(f"Error guardando filtros: {e}")
 
-    # Modificar el método open_folder_filter para guardar los filtros
     def open_folder_filter(self):
         dialog = PathFilterDialog(self, self.db_path, self.root_folders)
         if dialog.exec():
@@ -491,7 +780,6 @@ class MarkdownSearchViewer(QMainWindow):
             self.save_selected_folders()
             # Actualizar la búsqueda con los filtros seleccionados
             self.search_snippets()
-
 
     def delayed_search(self):
         # "Debounce" technique to avoid many consecutive searches
@@ -530,48 +818,194 @@ class MarkdownSearchViewer(QMainWindow):
         self.search_thread.start()
     
     def process_search_results(self, results):
-        # Procesar los resultados devueltos por el worker
-        for snippet_id, filename, path, content, tags in results:
-            # Mostrar solo el nombre del archivo y las etiquetas
-            display_text = filename
-            
-            if tags:
-                display_text += f" ({', '.join(tags)})"
-            
-            item = self.results_list.addItem(display_text)
-            # Guardar el ID, contenido y ruta completa como datos del item
-            self.results_list.item(self.results_list.count() - 1).setData(Qt.ItemDataRole.UserRole, 
-                                                                        (snippet_id, content, path))
+        # Limpiar resultados anteriores
+        self.results_list.clear()
+        
+        if not results:
+            self.status_label.setText("Resultados: 0")
+            return
+        
+        # Categorizar resultados
+        categorized_results = self.categorize_results(results)
+        
+        # Mostrar resultados por categorías
+        self.display_categorized_results(categorized_results)
         
         # Actualizar etiqueta de estado con el conteo de resultados
-        self.status_label.setText(f"Resultados: {self.results_list.count()}")
+        total_count = sum(len(cat_results) for cat_results in categorized_results.values())
+        self.status_label.setText(f"Resultados: {total_count}")
         
         # Seleccionar el primer resultado si existe
         if self.results_list.count() > 0:
-            self.results_list.setCurrentRow(0)
-
+            # Buscar el primer elemento seleccionable (no header)
+            for i in range(self.results_list.count()):
+                item = self.results_list.item(i)
+                if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                    self.results_list.setCurrentRow(i)
+                    break
+    
+    def categorize_results(self, results):
+        """Categoriza los resultados según el tipo de coincidencia"""
+        search_term = self.search_input.text().lower().strip()
+        
+        # Rutas prioritarias para contenido
+        priority_paths = [
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Comandos/",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Tutoriales/",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Apps/",
+            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Python/",
+            "/mnt/windows/FTP/wiki/Obsidian/Recortes/"
+        ]
+        
+        categorized = {
+            'titulo': [],
+            'tag': [],
+            'contenido_priority': [],
+            'contenido_other': []
+        }
+        
+        if not search_term:
+            # Si no hay término de búsqueda, poner todo en contenido_other
+            categorized['contenido_other'] = results
+            return categorized
+        
+        for snippet_id, filename, path, content, tags in results:
+            filename_lower = filename.lower()
+            content_lower = content.lower()
+            tags_lower = [tag.lower() for tag in tags] if tags else []
+            
+            # Verificar coincidencia por título
+            if search_term in filename_lower:
+                categorized['titulo'].append((snippet_id, filename, path, content, tags))
+            # Verificar coincidencia por tag
+            elif any(search_term in tag for tag in tags_lower):
+                categorized['tag'].append((snippet_id, filename, path, content, tags))
+            # Verificar coincidencia por contenido
+            elif search_term in content_lower:
+                # Verificar si está en ruta prioritaria
+                is_priority = any(path.startswith(priority_path) for priority_path in priority_paths)
+                if is_priority:
+                    categorized['contenido_priority'].append((snippet_id, filename, path, content, tags))
+                else:
+                    categorized['contenido_other'].append((snippet_id, filename, path, content, tags))
+            else:
+                # Fallback para resultados de FTS que no coinciden exactamente
+                categorized['contenido_other'].append((snippet_id, filename, path, content, tags))
+        
+        return categorized
+    
+    def display_categorized_results(self, categorized_results):
+        """Muestra los resultados categorizados con headers"""
+        
+        # Definir categorías y sus títulos
+        categories = [
+            ('titulo', 'TÍTULO', categorized_results['titulo']),
+            ('tag', 'TAG', categorized_results['tag']),
+            ('contenido_priority', 'CONTENIDO (Prioritario)', categorized_results['contenido_priority']),
+            ('contenido_other', 'CONTENIDO', categorized_results['contenido_other'])
+        ]
+        
+        for category_key, category_title, results in categories:
+            if not results:
+                continue
+                
+            # Añadir header de categoría
+            self.add_category_header(category_title, len(results))
+            
+            # Añadir resultados de la categoría
+            for snippet_id, filename, path, content, tags in results:
+                self.add_result_item(snippet_id, filename, path, content, tags, category_key)
+    
+    def add_category_header(self, title, count):
+        """Añade un header de categoría a la lista"""
+        header_item = QListWidgetItem(f"── {title} ({count}) ──")
+        header_item.setFlags(Qt.ItemFlag.NoItemFlags)  # No seleccionable
+        header_item.setBackground(QColor(CatppuccinDarkTheme.surface1))
+        header_item.setForeground(QColor(CatppuccinDarkTheme.mauve))
+        
+        # Configurar fuente en negrita
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        header_item.setFont(font)
+        
+        self.results_list.addItem(header_item)
+    
+    def add_result_item(self, snippet_id, filename, path, content, tags, category):
+        """Añade un elemento de resultado a la lista"""
+        # Mostrar nombre del archivo y tags
+        display_text = filename
+        
+        if tags:
+            display_text += f" ({', '.join(tags)})"
+        
+        item = QListWidgetItem(display_text)
+        
+        # Guardar datos del snippet
+        item.setData(Qt.ItemDataRole.UserRole, (snippet_id, content, path))
+        
+        # Hacer el elemento seleccionable
+        item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+        
+        # Configurar colores según categoría
+        if category == 'titulo':
+            item.setForeground(QColor(CatppuccinDarkTheme.green))
+        elif category == 'tag':
+            item.setForeground(QColor(CatppuccinDarkTheme.blue))
+        elif category == 'contenido_priority':
+            item.setForeground(QColor(CatppuccinDarkTheme.yellow))
+        else:
+            item.setForeground(QColor(CatppuccinDarkTheme.text))
+        
+        # Añadir indentación visual
+        item.setText("    " + display_text)
+        
+        self.results_list.addItem(item)
     
     def show_snippet(self, current, previous):
         if current is None:
             return
         
-        snippet_id, content, path = current.data(Qt.ItemDataRole.UserRole)
+        # Verificar si es un header (no tiene datos de usuario)
+        data = current.data(Qt.ItemDataRole.UserRole)
+        if data is None:
+            return
         
-        # Añadir la ruta en la parte superior del contenido
-        content_with_path = f"**Ruta:** {path}\n\n{content}"
+        snippet_id, content, path = data
+        
+        # Extraer el nombre del archivo sin extensión
+        filename = os.path.basename(path)
+        filename_without_ext = os.path.splitext(filename)[0]
+        
+        # Limpiar el frontmatter del contenido
+        cleaned_content = self.remove_frontmatter(content)
+        
+        # Añadir el nombre del archivo como título principal
+        content_with_header = f"# {filename_without_ext}\n\n**Ruta:** {path}\n\n{cleaned_content}"
         
         # Renderizar el markdown a HTML
-        html_content = MarkdownRenderer.render_markdown(content_with_path)
+        html_content = MarkdownRenderer.render_markdown(content_with_header)
         
         # Mostrar el contenido HTML
         self.markdown_view.setHtml(html_content)
+    
+    def remove_frontmatter(self, content):
+        """Elimina el frontmatter YAML del contenido"""
+        # Buscar frontmatter que empiece y termine con ---
+        frontmatter_pattern = re.compile(r'^---\s*\n.*?\n---\s*\n', re.DOTALL | re.MULTILINE)
+        
+        # Eliminar el frontmatter si existe
+        cleaned_content = frontmatter_pattern.sub('', content)
+        
+        # Eliminar líneas vacías iniciales que pudieran quedar
+        cleaned_content = cleaned_content.lstrip('\n')
+        
+        return cleaned_content
     
     def handle_search_error(self, error_message):
         # Manejar errores de búsqueda
         QMessageBox.critical(self, "Error de búsqueda", error_message)
         self.status_label.setText("Error en la búsqueda")
-    
-
     
     def closeEvent(self, event):
         # Asegurarse de que el hilo de búsqueda termine antes de cerrar
@@ -593,15 +1027,15 @@ def main():
     CatppuccinDarkTheme.apply_to_app(app)
     
     # Ruta de la base de datos
-    db_path = 'wiki_obsidian.db'  # Cambiar por la ruta real de tu base de datos
+    db_path = '/home/huan/Scripts/utilities/tiddlywiki/wiki_obsidian.db'  # Cambiar por la ruta real de tu base de datos
     
     # Lista de carpetas raíz para el filtro
     root_folders = [
-        "/mnt/windows/FTP/Obsidian/Spaces/Wiki",
-        "/mnt/windows/FTP/Obsidian/Spaces/Blogs",
-        "/mnt/windows/FTP/Obsidian/Spaces/Proyectos Interesantes",
-        "/mnt/windows/FTP/Obsidian/Spaces/Scripts",
-        "/mnt/windows/FTP/Obsidian/Recortes"
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs",
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
+        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts",
+        "/mnt/windows/FTP/wiki/Obsidian/Recortes"
     ]
     
     viewer = MarkdownSearchViewer(db_path, root_folders)

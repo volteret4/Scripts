@@ -1,0 +1,23 @@
+Watching for changes in /mnt/NFS/blogs/vvmm/{archetypes,content,static,themes}
+Watching for config changes in /mnt/NFS/blogs/vvmm/config.toml, /mnt/NFS/blogs/vvmm/themes/hugo-theme-m10c/config.toml
+Start building sites … 
+hugo v0.147.9+extended+withdeploy linux/amd64 BuildDate=unknown
+
+WARN  "/mnt/NFS/blogs/vvmm/content/coleccion/coleccion.md:1:1": duplicate menu entry with identifier "coleccion" in menu "main"
+
+                  │ EN  
+──────────────────┼─────
+ Pages            │ 298 
+ Paginator pages  │  22 
+ Non-page files   │ 506 
+ Static files     │ 175 
+ Processed images │   0 
+ Aliases          │  72 
+ Cleaned          │   0 
+
+Built in 9809 ms
+Environment: "development"
+Serving pages from disk
+Running in Fast Render Mode. For full rebuilds on change: hugo server --disableFastRender
+Web Server is available at http://localhost:1313/ (bind address 0.0.0.0) 
+Press Ctrl+C to stop

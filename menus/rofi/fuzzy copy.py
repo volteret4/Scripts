@@ -4,7 +4,6 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
-# TODO: 
 # - No muestra coincidencias por contenido
 # - No coinciden indices de archivo y contenido en grupos >2
 # 

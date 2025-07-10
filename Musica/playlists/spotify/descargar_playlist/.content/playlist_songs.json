@@ -1,0 +1,27 @@
+[
+    {
+        "cancion": "Back To Black",
+        "album": "Back To Black (Deluxe Edition)",
+        "artista": "Amy Winehouse"
+    },
+    {
+        "cancion": "It's Not Unusual",
+        "album": "Along Came Jones",
+        "artista": "Tom Jones"
+    },
+    {
+        "cancion": "Apricots",
+        "album": "Isles (Deluxe)",
+        "artista": "BICEP"
+    },
+    {
+        "cancion": "Deltoya",
+        "album": "Deltoya",
+        "artista": "Extremoduro"
+    },
+    {
+        "cancion": "Bohemian Rhapsody - Remastered 2011",
+        "album": "A Night At The Opera (2011 Remaster)",
+        "artista": "Queen"
+    }
+]

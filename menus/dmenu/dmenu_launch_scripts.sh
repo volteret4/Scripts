@@ -5,7 +5,7 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License: 
-# TODO: 
+
 #   - Change "fd" for a faster option.
 #   - Change termite
 # Notes:

@@ -233,12 +233,12 @@ def main():
         
         print(f"Se encontraron {len(uuids_a_eliminar)} tareas para eliminar.")
         
-        respuesta = input("¿Desea eliminar estas tareas duplicadas? (s/n): ")
-        if respuesta.lower() in ['s', 'si', 'sí', 'y', 'yes']:
-            eliminadas = eliminar_tareas(uuids_a_eliminar)
-            print(f"Proceso completado. Se eliminaron {eliminadas} tareas duplicadas.")
-        else:
-            print("Operación cancelada.")
+        # respuesta = input("¿Desea eliminar estas tareas duplicadas? (s/n): ")
+        # if respuesta.lower() in ['s', 'si', 'sí', 'y', 'yes']:
+        eliminadas = eliminar_tareas(uuids_a_eliminar)
+        print(f"Proceso completado. Se eliminaron {eliminadas} tareas duplicadas.")
+        # else:
+        #     print("Operación cancelada.")
     except Exception as e:
         print(f"Error inesperado: {e}")
         sys.exit(1)

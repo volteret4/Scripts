@@ -1,0 +1,42 @@
+services:
+  music-web-explorer:
+    build: .
+    container_name: music-web-explorer
+    ports:
+      - "8447:80"        # Nginx web server
+      - "5157:5157"    # Flask API directa (opcional)
+    volumes:
+      # Base de datos (ajusta la ruta según tu ubicación)
+      - /home/dietpi/contenedores/mfuzz/musica.sqlite:/app/data/musica.sqlite:ro
+
+      
+      # Directorio de descargas (persistente)
+      - /mnt/dietpi_userdata/suarez_mula/musica:/downloads
+      
+      # Logs (persistente)
+      - /home/dietpi/contenedores/mfuzz/logs:/app/logs
+      
+      # Configuración SSH (opcional, para descargas SSH)
+      - /home/dietpi/.ssh:/root/.ssh:ro
+      
+      # Configuración personalizada (opcional)
+      - /home/dietpi/contenedores/mfuzz/config.ini:/app/config.ini:ro
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Madrid
+      - USER=dietpi
+
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Configuración adicional
+networks:
+  default:
+    name: music-web-network

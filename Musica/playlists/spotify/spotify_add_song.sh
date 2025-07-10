@@ -5,21 +5,20 @@
 # Author: volteret4
 # Repository: https://github.com/volteret4/
 # License:
-# TODO: 
 # Notes:
 #   Dependencies: 
 #
 
 # Directorios y variables:
 scr_dir="$HOME/Scripts/Musica/playlists/spotify"
-hugo_dir="/home/pi/hugo/hugo_scripts/playlists/spotify"
+hugo_dir="/home/pepe/Scripts/hugo_scripts/playlists/spotify"
 
-#python_env="$(source /home/pi/scripts/python_venv/bin/activate)"
+#python_env="$(source /home/pepe/scripts/python_venv/bin/activate)"
 # Actualiza listas de reproducción de spotify.
-ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_playlist.py"
+ssh pepecono "source /home/pepe/Scripts/moode_scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_playlist.py"
 
 # Descarga el listado.
-rsync -avzh moode:"${hugo_dir}"/playlists.txt $HOME/Scripts/Musica/playlists/spotify/playlists.txt
+rsync -avzh pepecono:"${hugo_dir}"/playlists.txt $HOME/Scripts/Musica/playlists/spotify/playlists.txt
 
 # Obtener artista y titulo de la canción actual
 variables="$(bash $HOME/Scripts/utilities/aliases/en_reproduccion.sh)"
@@ -41,10 +40,10 @@ album="$(bash $HOME/Scripts/utilities/aliases/limpia_var.sh ${album})"
 echo "$artista $titulo $album"
 
 # Busca cancion en spotify.
-song_id="$(ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artista} ${titulo}")"
+song_id="$(ssh pepecono "source /home/pepe/Scripts/moode_scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artista} ${titulo}")"
 
 if [[ -z $song_id ]]; then
-    notify-send -u critical -t 5000 " error en el script "
+    notify-send -u critical -t 5000 " error en el script para obtener la id de la cancion "
     exit 0
     elif [[ $song_id =~ 'notoken' ]] ; then
         notify-send -u critical -t 5000 " fallo con el token "
@@ -52,7 +51,7 @@ if [[ -z $song_id ]]; then
     elif [[ $song_id =~ 'nocancion' ]] ; then
         notify-send -u critical -t 5000 "fallo con la id de la canción... reintentando"
         artist_song="$(yad --entry --entry-text="$artista - $titulo" --entry-label="artista - cancion")"
-        song_id="$(ssh moode "source /home/pi/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artist_song}")"
+        song_id="$(ssh pepecono "source /home/pepe/scripts/python_venv/bin/activate ; python3 ${hugo_dir}/sp_busca_cancion.py ${artist_song}")"
         if [[ $song_id =~ 'nocancion' ]] ; then
             notify-send -u critical -t 5000 " fallo DEFINITIVO con la id de la canción"
         fi
@@ -66,14 +65,14 @@ playlist="$(python3 $scr_dir/sp_menu_playlists.py)"
 
 if [[ $playlist =~ "nuevalista" ]]; then
     pl_name="$(yad --entry --entry-label="Nombre de la playlist")"
-    playlist="$(ssh moode "python3 ${hugo_dir}/sp_crear_playlist.py ${pl_name}")"
+    playlist="$(ssh pepecono "python3 ${hugo_dir}/sp_crear_playlist.py ${pl_name}")"
 fi
 
 # dup="$(ssh hugo "python3 ${hugo_dir}/sp_duplicate.py")"
 # echo "$dup"
 
 # if [[ $dup =~ "nota" ]]; then
-ssh moode "python3 ${hugo_dir}/sp_add_song_to_playlist.py ${id} ${playlist}"
+ssh pepecono "python3 ${hugo_dir}/sp_add_song_to_playlist.py ${id} ${playlist}"
 # else
 #     yad --text="${titulo} ya se ha añadido a la playlist: ${pl_name}" --timeout=2
 #     exit 0
@@ -82,9 +81,9 @@ ssh moode "python3 ${hugo_dir}/sp_add_song_to_playlist.py ${id} ${playlist}"
 # Descargar caratula
 sp_portada="${hugo_dir}/blog/vvmm/post/portadas/caratula-spotify.py"
 
-ssh moode "python3 $sp_portada $artista $album"
-rsync moode:hugo/image.jpeg .
-ssh moode "rm hugo/image.jpeg"
+ssh pepecono "python3 $sp_portada $artista $album"
+rsync pepecono:hugo/image.jpeg .
+ssh pepecono "rm hugo/image.jpeg"
 url_def="https://open.spotify.com/playlist/${playlist}"  
 
 if [[ -f image.jpeg ]]; then

@@ -45,6 +45,10 @@ MARKDOWN_FILES = [
         "title": "create_db"
     },
     {
+        "path": "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/snipets y scripts/music-fuzzy/web_docker/Web.md",
+        "title": "web_mfuzzy"
+    },
+    {
         "path": "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/Tumtumpa/Blog Tumtumpá.md",
         "title": "tumtumpa"
     }
@@ -576,6 +580,11 @@ def main():
             import_cmd = f'cat "{TODO_DIR}/tw_from_t_todo.json" | task import'
             run_command(import_cmd, shell=True)
             
+            # Delete duplicates TODO corregir importacion para no duplicar
+            del_dup = f'python {HOME}/Scripts/tareas/sync_tareas/delete_duplicate_taskwarrior.py'
+            run_command(del_dup, shell=True)
+            
+
             # Crear comando para todo
             todo_cmd = f'todo --config "{HOME}/.config/todoman/config_tareas.py" new -l "{TAREAS}" -s "{fecha_inicio}" -d "{fecha_fin}" -r "{titulo_todo}"'
             
@@ -599,7 +608,7 @@ def main():
     
     # Mostrar barra de progreso (podríamos implementar esto con QProgressDialog pero
     # mantengamos el script bash por ahora para mantener la compatibilidad)
-    run_command(f'bash "{HOME}/Scripts/utilities/aliases/barra_progreso.sh" 10', shell=True)
+    #run_command(f'bash "{HOME}/Scripts/utilities/aliases/barra_progreso.sh" 10', shell=True)
     
     # Sincronizar con vdirsyncer de nuevo
     run_command("vdirsyncer sync", shell=True)

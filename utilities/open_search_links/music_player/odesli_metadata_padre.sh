@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# -*- coding: utf-8 -*-
 #
 # Script Name: .sh
 # Description: 
@@ -17,14 +18,14 @@ setup_error_trap
 # Variables
 artist="$(deadbeef --nowplaying "%a" )"
 album="$(deadbeef --nowplaying "%b"  )"
-artista="$(echo $artist | sed 's/ /-/g' | sed 's/á/a/g' | sed 's/é/e/g' | sed 's/í/i/g' | sed 's/ó/o/g' | sed 's/ú/u/g' | sed "s/'/-/g" | sed 's/"/-/g'| sed 's/`/-/g' | sed 's/,/-/g' | sed 's/;/-/g' | sed 's/:/-/g')"
+artista="$(echo $artist | sed 's/ /-/g' | sed 's/á/a/g' | sed 's/é/e/g' | sed 's/í/i/g' | sed 's/ó/o/g' | sed 's/ú/u/g' | sed "s/'/-/g" | sed 's/"/-/g'| sed 's/`/-/g' | sed 's/,/-/g' | sed 's/;/-/g' | sed 's/:/-/g' | sed 's/&/and/g')"
 albuma="$(echo $album | sed 's/ /-/g' | sed 's/á/a/g' | sed 's/é/e/g' | sed 's/í/i/g' | sed 's/ó/o/g' | sed 's/ú/u/g' | sed "s/'/-/g" | sed 's/"/-/g' | sed 's/,/-/g' | sed 's/;/-/g' | sed 's/:/-/g')"
 path_album="$(dirname "$(deadbeef --nowplaying-tf "%path%")")"
 echo "$path_album"
 
-path_script="python3 /home/pi/hugo/hugo_scripts/blog/vvmm/post/enlaces/spotify/spotify.py $artista $albuma"
+path_script="python3 /home/pepe/Scripts/hugo_scripts/blog/vvmm/post/enlaces/spotify/spotify.py $artista $albuma"
 
-source_env="source /home/pi/scripts/python_venv/bin/activate"
+source_env="source /home/pepe/Scripts/python-env/bin/activate"
 
 # debug
 # Verifica que las variables no estén vacías
@@ -46,7 +47,7 @@ echo Album_formateado: $albuma
 
 
 # Obtener url de spotify
-url_spotify="$(ssh moode "$source_env && $path_script")"
+url_spotify="$(ssh pepecono "$source_env && $path_script")"
 if [[ -z "$url_spotify" ]]; then
     echo "Error: No se obtuvo la URL de Spotify."
     exit 1
