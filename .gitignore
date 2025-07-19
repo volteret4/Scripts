@@ -57,3 +57,4 @@ utilities/server/docker_web/config.ini
 utilities/server/crear index musica web/config.ini
 Musica/discos-nuevos/telegram_bot/muspy_bot.service
 Musica/orpheus-api/buscar_ausentes_en_orpheus.py
+Musica/blog/vvmm/.content/logs/hugo_server.log

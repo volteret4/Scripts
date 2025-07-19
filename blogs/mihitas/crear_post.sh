@@ -11,7 +11,7 @@ BLOG_STATIC_DIR="/mnt/NFS/blogs/notas/static/"
 
 # Variables de configuración - Blog mihitas
 BLOG_DIR_2="/mnt/NFS/blogs/mihitas"
-BLOG_CONTENT_DIR_2="/mnt/NFS/blogs/mihitas/content/post/"
+BLOG_CONTENT_DIR_2="/mnt/NFS/blogs/mihitas/content/posts/"  # Corregido: posts en lugar de post
 BLOG_STATIC_DIR_2="/mnt/NFS/blogs/mihitas/static/"
 
 # Variables comunes
@@ -65,59 +65,6 @@ select_blog() {
         echo "$blog_choice" | cut -d'|' -f1
     else
         echo ""
-    fi
-}
-
-# Función para incrementar el contador diario
-increment_daily_counter() {
-    local blog_name="$1"
-    local counter_file="daily_counter_${blog_name}.txt"
-    local today=$(date +"%d-%m-%Y")
-
-    # Si el archivo no existe, crearlo
-    if [[ ! -f "$counter_file" ]]; then
-        echo "${today}=1" > "$counter_file"
-        return
-    fi
-
-    # Leer la línea actual del archivo
-    local current_line=$(cat "$counter_file")
-    local current_date=$(echo "$current_line" | cut -d'=' -f1)
-    local current_count=$(echo "$current_line" | cut -d'=' -f2)
-
-    # Si es la misma fecha, incrementar contador
-    if [[ "$current_date" == "$today" ]]; then
-        local new_count=$((current_count + 1))
-        echo "${today}=${new_count}" > "$counter_file"
-    else
-        # Si es una fecha diferente, reiniciar contador
-        echo "${today}=1" > "$counter_file"
-    fi
-}
-
-# Función para obtener el contador actual y asignarlo a la variable weight
-get_daily_weight() {
-    local blog_name="$1"
-    local counter_file="daily_counter_${blog_name}.txt"
-    local today=$(date +"%d-%m-%Y")
-
-    # Si el archivo no existe, weight=1
-    if [[ ! -f "$counter_file" ]]; then
-        weight=1
-        return
-    fi
-
-    # Leer la línea actual del archivo
-    local current_line=$(cat "$counter_file")
-    local current_date=$(echo "$current_line" | cut -d'=' -f1)
-    local current_count=$(echo "$current_line" | cut -d'=' -f2)
-
-    # Si es la misma fecha, usar el contador actual
-    if [[ "$current_date" == "$today" ]]; then
-        weight=$current_count
-    else
-        # Si es una fecha diferente, weight=1
-        weight=1
     fi
 }
 
@@ -237,7 +184,7 @@ get_category() {
     fi
 }
 
-# Función para generar el frontmatter de Hugo (blog notas)
+# Función para generar el frontmatter de Hugo (blog notas) - SIN WEIGHT
 generate_frontmatter_notas() {
     local title="$1"
     local tags="$2"
@@ -254,13 +201,12 @@ image : ""
 tags : [$tags]
 categories : [$categoria]
 description : "$description"
-weight : $weight
 ---
 
 EOF
 }
 
-# Función para generar el frontmatter de Hugo (blog mihitas)
+# Función para generar el frontmatter de Hugo (blog mihitas) - SIN WEIGHT
 generate_frontmatter_mihitas() {
     local title="$1"
     local tags="$2"
@@ -367,7 +313,6 @@ update_frontmatter_with_image() {
     fi
 }
 
-
 # Función para hacer commit a git
 commit_git() {
     local blog_dir="$1"
@@ -403,12 +348,6 @@ process_blog() {
         current_static_dir="$BLOG_STATIC_DIR_2"
     fi
 
-    # Incrementar contador de posts para el blog
-    increment_daily_counter "$blog_name"
-
-    # Obtener el peso actual
-    get_daily_weight "$blog_name"
-
     # Crear directorios si no existen
     mkdir -p "$current_content_dir"
     mkdir -p "$current_static_dir"
@@ -428,7 +367,7 @@ process_blog() {
 
     success "Procesando blog: $blog_name"
 
-    # Generar frontmatter según el blog
+    # Generar frontmatter según el blog (SIN WEIGHT)
     if [[ "$blog_name" == "notas" ]]; then
         generate_frontmatter_notas "$title" "$tags" "$description" "$category" > "$output_file"
     else

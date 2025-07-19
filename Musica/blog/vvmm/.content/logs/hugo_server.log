@@ -1,6 +1,0 @@
-nohup: no se tendrá en cuenta la entrada
-Watching for changes in /mnt/NFS/blogs/vvmm/{archetypes,content,static,themes}
-Watching for config changes in /mnt/NFS/blogs/vvmm/config.toml, /mnt/NFS/blogs/vvmm/themes/hugo-theme-m10c/config.toml
-Start building sites … 
-hugo v0.148.0+extended+withdeploy linux/amd64 BuildDate=unknown
-
