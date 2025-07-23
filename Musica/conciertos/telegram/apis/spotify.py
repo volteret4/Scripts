@@ -1,77 +1,24 @@
-# modules/submodules/shared/spotify_service.py
 import os
 import json
 import time
 import base64
 import requests
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
-from threading import Timer
-import http.server
-import socketserver
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
-import re
+import urllib.parse
 
-
-class SpotifyAuthHandler(http.server.SimpleHTTPRequestHandler):
-    """Manejador de autorización para Spotify callback"""
-
-    def __init__(self, *args, auth_code_callback=None, **kwargs):
-        self.auth_code_callback = auth_code_callback
-        super().__init__(*args, **kwargs)
-
-    def do_GET(self):
-        """Procesar solicitud GET con código de autorización"""
-        query = urllib.parse.urlparse(self.path).query
-        query_components = dict(qc.split("=") for qc in query.split("&") if "=" in qc)
-
-        if "code" in query_components:
-            auth_code = query_components["code"]
-            self.auth_code_callback(auth_code)
-
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-
-            success_html = """
-            <html>
-            <head><title>Autorización Spotify Completada</title></head>
-            <body>
-                <h1>Autorización Completada</h1>
-                <p>Puedes cerrar esta ventana y volver a la aplicación.</p>
-            </body>
-            </html>
-            """
-            self.wfile.write(success_html.encode())
-        else:
-            self.send_response(400)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-
-            error_html = """
-            <html>
-            <head><title>Error de Autorización</title></head>
-            <body>
-                <h1>Error de Autorización</h1>
-                <p>No se recibió código de autorización. Por favor, intenta nuevamente.</p>
-            </body>
-            </html>
-            """
-            self.wfile.write(error_html.encode())
-
-        self.server.server_close()
-        return
+try:
+    import spotipy
+    from spotipy.oauth2 import SpotifyOAuth
+    SPOTIPY_AVAILABLE = True
+except ImportError:
+    SPOTIPY_AVAILABLE = False
+    print("Warning: spotipy not available. Some features will be limited.")
 
 class SpotifyService:
-    """Servicio unificado para interactuar con la API de Spotify"""
+    """Servicio para interactuar con la API de Spotify con detección de país mejorada"""
 
     def __init__(self, client_id, client_secret, redirect_uri, cache_dir, cache_duration=24, spotify_client=None):
         self.client_id = client_id
@@ -79,7 +26,6 @@ class SpotifyService:
         self.redirect_uri = redirect_uri
         self.base_url = "https://api.spotify.com/v1"
         self.auth_url = "https://accounts.spotify.com/api/token"
-        self.authorize_url = "https://accounts.spotify.com/authorize"
 
         self.cache_dir = Path(cache_dir)
         self.cache_duration = cache_duration
@@ -88,15 +34,131 @@ class SpotifyService:
 
         # Variable para capturar errores
         self.last_error = None
+        self.authenticated = False
 
         # Variables Spotipy
         self.sp = spotify_client
         self.sp_oauth = None
-        self.authenticated = False
+        self.spotify_user_id = None
+
+        # Cache para geolocalización
+        self.location_cache = {}
+
+        # Mapeo de ciudades a países (principales ciudades)
+        self.city_country_map = {
+            # España
+            'madrid': 'ES', 'barcelona': 'ES', 'valencia': 'ES', 'sevilla': 'ES', 'seville': 'ES',
+            'bilbao': 'ES', 'malaga': 'ES', 'valencia': 'ES', 'zaragoza': 'ES', 'valladolid': 'ES',
+            'vigo': 'ES', 'gijon': 'ES', 'cadiz': 'ES', 'cordoba': 'ES', 'alicante': 'ES',
+            'santander': 'ES', 'salamanca': 'ES', 'burgos': 'ES', 'leon': 'ES', 'tarragona': 'ES',
+
+            # Reino Unido
+            'london': 'GB', 'manchester': 'GB', 'birmingham': 'GB', 'glasgow': 'GB', 'liverpool': 'GB',
+            'leeds': 'GB', 'sheffield': 'GB', 'edinburgh': 'GB', 'bristol': 'GB', 'cardiff': 'GB',
+            'nottingham': 'GB', 'newcastle': 'GB', 'belfast': 'GB', 'brighton': 'GB', 'plymouth': 'GB',
+
+            # Francia
+            'paris': 'FR', 'marseille': 'FR', 'lyon': 'FR', 'toulouse': 'FR', 'nice': 'FR',
+            'nantes': 'FR', 'strasbourg': 'FR', 'montpellier': 'FR', 'bordeaux': 'FR', 'lille': 'FR',
+            'rennes': 'FR', 'reims': 'FR', 'le havre': 'FR', 'saint-etienne': 'FR', 'toulon': 'FR',
+
+            # Estados Unidos
+            'new york': 'US', 'los angeles': 'US', 'chicago': 'US', 'houston': 'US', 'phoenix': 'US',
+            'philadelphia': 'US', 'san antonio': 'US', 'san diego': 'US', 'dallas': 'US', 'san jose': 'US',
+            'austin': 'US', 'jacksonville': 'US', 'fort worth': 'US', 'columbus': 'US', 'charlotte': 'US',
+            'san francisco': 'US', 'indianapolis': 'US', 'seattle': 'US', 'denver': 'US', 'washington': 'US',
+            'boston': 'US', 'el paso': 'US', 'detroit': 'US', 'nashville': 'US', 'portland': 'US',
+            'memphis': 'US', 'oklahoma city': 'US', 'las vegas': 'US', 'louisville': 'US', 'baltimore': 'US',
+            'milwaukee': 'US', 'albuquerque': 'US', 'tucson': 'US', 'fresno': 'US', 'sacramento': 'US',
+            'kansas city': 'US', 'mesa': 'US', 'atlanta': 'US', 'omaha': 'US', 'colorado springs': 'US',
+            'raleigh': 'US', 'miami': 'US', 'oakland': 'US', 'minneapolis': 'US', 'tulsa': 'US',
+            'cleveland': 'US', 'wichita': 'US', 'arlington': 'US', 'new orleans': 'US', 'bakersfield': 'US',
+            'tampa': 'US', 'honolulu': 'US', 'aurora': 'US', 'anaheim': 'US', 'santa ana': 'US',
+            'st. louis': 'US', 'riverside': 'US', 'corpus christi': 'US', 'lexington': 'US', 'pittsburgh': 'US',
+            'anchorage': 'US', 'stockton': 'US', 'cincinnati': 'US', 'st. paul': 'US', 'toledo': 'US',
+            'greensboro': 'US', 'newark': 'US', 'plano': 'US', 'henderson': 'US', 'lincoln': 'US',
+            'buffalo': 'US', 'jersey city': 'US', 'chula vista': 'US', 'fort wayne': 'US', 'orlando': 'US',
+            'st. petersburg': 'US', 'chandler': 'US', 'laredo': 'US', 'norfolk': 'US', 'durham': 'US',
+            'madison': 'US', 'lubbock': 'US', 'irvine': 'US', 'winston-salem': 'US', 'glendale': 'US',
+            'garland': 'US', 'hialeah': 'US', 'reno': 'US', 'chesapeake': 'US', 'gilbert': 'US',
+            'baton rouge': 'US', 'irving': 'US', 'scottsdale': 'US', 'north las vegas': 'US', 'fremont': 'US',
+            'boise': 'US', 'richmond': 'US', 'san bernardino': 'US', 'birmingham': 'US', 'spokane': 'US',
+            'rochester': 'US', 'des moines': 'US', 'modesto': 'US', 'fayetteville': 'US', 'tacoma': 'US',
+            'oxnard': 'US', 'fontana': 'US', 'columbus': 'US', 'montgomery': 'US', 'moreno valley': 'US',
+            'shreveport': 'US', 'aurora': 'US', 'yonkers': 'US', 'akron': 'US', 'huntington beach': 'US',
+            'little rock': 'US', 'augusta': 'US', 'amarillo': 'US', 'glendale': 'US', 'mobile': 'US',
+            'grand rapids': 'US', 'salt lake city': 'US', 'tallahassee': 'US', 'huntsville': 'US', 'grand prairie': 'US',
+            'knoxville': 'US', 'worcester': 'US', 'newport news': 'US', 'brownsville': 'US', 'overland park': 'US',
+            'santa clarita': 'US', 'providence': 'US', 'garden grove': 'US', 'chattanooga': 'US', 'oceanside': 'US',
+            'jackson': 'US', 'fort lauderdale': 'US', 'santa rosa': 'US', 'rancho cucamonga': 'US', 'port st. lucie': 'US',
+            'tempe': 'US', 'ontario': 'US', 'vancouver': 'US', 'cape coral': 'US', 'sioux falls': 'US',
+            'springfield': 'US', 'peoria': 'US', 'pembroke pines': 'US', 'elk grove': 'US', 'corona': 'US',
+            'lansing': 'US', 'eugene': 'US', 'palmdale': 'US', 'salinas': 'US', 'springfield': 'US',
+            'pasadena': 'US', 'fort collins': 'US', 'hayward': 'US', 'pomona': 'US', 'cary': 'US',
+            'rockford': 'US', 'alexandria': 'US', 'escondido': 'US', 'mckinney': 'US', 'kansas city': 'US',
+            'joliet': 'US', 'sunnyvale': 'US', 'torrance': 'US', 'bridgeport': 'US', 'lakewood': 'US',
+            'hollywood': 'US', 'paterson': 'US', 'naperville': 'US', 'syracuse': 'US', 'mesquite': 'US',
+            'dayton': 'US', 'savannah': 'US', 'clarksville': 'US', 'orange': 'US', 'pasadena': 'US',
+            'fullerton': 'US', 'killeen': 'US', 'frisco': 'US', 'hampton': 'US', 'mcallen': 'US',
+            'warren': 'US', 'west valley city': 'US', 'columbia': 'US', 'olathe': 'US', 'sterling heights': 'US',
+            'new haven': 'US', 'miramar': 'US', 'waco': 'US', 'thousand oaks': 'US', 'cedar rapids': 'US',
+
+            # Alemania
+            'berlin': 'DE', 'hamburg': 'DE', 'munich': 'DE', 'cologne': 'DE', 'frankfurt': 'DE',
+            'stuttgart': 'DE', 'dusseldorf': 'DE', 'dortmund': 'DE', 'essen': 'DE', 'leipzig': 'DE',
+            'bremen': 'DE', 'dresden': 'DE', 'hannover': 'DE', 'nuremberg': 'DE', 'duisburg': 'DE',
+
+            # Italia
+            'rome': 'IT', 'milan': 'IT', 'naples': 'IT', 'turin': 'IT', 'palermo': 'IT',
+            'genoa': 'IT', 'bologna': 'IT', 'florence': 'IT', 'bari': 'IT', 'catania': 'IT',
+            'venice': 'IT', 'verona': 'IT', 'messina': 'IT', 'padua': 'IT', 'trieste': 'IT',
+
+            # Países Bajos
+            'amsterdam': 'NL', 'rotterdam': 'NL', 'the hague': 'NL', 'utrecht': 'NL', 'eindhoven': 'NL',
+            'tilburg': 'NL', 'groningen': 'NL', 'almere': 'NL', 'breda': 'NL', 'nijmegen': 'NL',
+
+            # Bélgica
+            'brussels': 'BE', 'antwerp': 'BE', 'ghent': 'BE', 'charleroi': 'BE', 'liege': 'BE',
+            'bruges': 'BE', 'namur': 'BE', 'leuven': 'BE', 'mons': 'BE', 'aalst': 'BE',
+
+            # Portugal
+            'lisbon': 'PT', 'porto': 'PT', 'braga': 'PT', 'coimbra': 'PT', 'funchal': 'PT',
+            'aveiro': 'PT', 'setubal': 'PT', 'faro': 'PT', 'viseu': 'PT', 'leiria': 'PT',
+
+            # Canada
+            'toronto': 'CA', 'montreal': 'CA', 'vancouver': 'CA', 'calgary': 'CA', 'ottawa': 'CA',
+            'edmonton': 'CA', 'winnipeg': 'CA', 'quebec city': 'CA', 'hamilton': 'CA', 'halifax': 'CA',
+
+            # Australia
+            'sydney': 'AU', 'melbourne': 'AU', 'brisbane': 'AU', 'perth': 'AU', 'adelaide': 'AU',
+            'gold coast': 'AU', 'newcastle': 'AU', 'canberra': 'AU', 'sunshine coast': 'AU', 'wollongong': 'AU',
+
+            # México
+            'mexico city': 'MX', 'guadalajara': 'MX', 'monterrey': 'MX', 'puebla': 'MX', 'tijuana': 'MX',
+            'leon': 'MX', 'juarez': 'MX', 'torreon': 'MX', 'queretaro': 'MX', 'san luis potosi': 'MX',
+
+            # Brasil
+            'sao paulo': 'BR', 'rio de janeiro': 'BR', 'brasilia': 'BR', 'salvador': 'BR', 'fortaleza': 'BR',
+            'belo horizonte': 'BR', 'manaus': 'BR', 'curitiba': 'BR', 'recife': 'BR', 'porto alegre': 'BR',
+
+            # Argentina
+            'buenos aires': 'AR', 'cordoba': 'AR', 'rosario': 'AR', 'mendoza': 'AR', 'tucuman': 'AR',
+            'la plata': 'AR', 'mar del plata': 'AR', 'salta': 'AR', 'santa fe': 'AR', 'san juan': 'AR',
+
+            # Japón
+            'tokyo': 'JP', 'yokohama': 'JP', 'osaka': 'JP', 'nagoya': 'JP', 'sapporo': 'JP',
+            'kobe': 'JP', 'kyoto': 'JP', 'fukuoka': 'JP', 'kawasaki': 'JP', 'saitama': 'JP',
+
+            # Otros países importantes
+            'stockholm': 'SE', 'copenhagen': 'DK', 'oslo': 'NO', 'helsinki': 'FI',
+            'vienna': 'AT', 'zurich': 'CH', 'warsaw': 'PL', 'prague': 'CZ',
+            'budapest': 'HU', 'dublin': 'IE', 'athens': 'GR', 'moscow': 'RU',
+        }
 
         # Validar credenciales
         if not self.client_id or not self.client_secret:
             self.last_error = "Credenciales Spotify incompletas"
+            print(f"❌ {self.last_error}")
             return
 
         # Crear directorio de caché si no existe
@@ -104,6 +166,7 @@ class SpotifyService:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             self.last_error = f"Error creando directorio de caché: {str(e)}"
+            print(f"❌ {self.last_error}")
             return
 
         # Intentar cargar token guardado
@@ -114,11 +177,23 @@ class SpotifyService:
         try:
             # Verificar si ya tenemos un error de inicialización
             if self.last_error:
-                print(f"Error previo en inicialización: {self.last_error}")
+                print(f"❌ Error previo en inicialización: {self.last_error}")
                 return False
 
+            # Si spotipy no está disponible, usar solo Client Credentials
+            if not SPOTIPY_AVAILABLE:
+                print("⚠️ Spotipy no disponible, usando Client Credentials Flow")
+                token = self.get_client_credentials()
+                if token:
+                    self.authenticated = True
+                    print("✅ Spotify configurado con Client Credentials")
+                    return True
+                else:
+                    self.last_error = "No se pudo obtener token con Client Credentials"
+                    return False
+
             # Definir scope para permisos de Spotify
-            scope = "playlist-modify-public playlist-modify-private playlist-read-private playlist-read-collaborative user-follow-read user-read-email"
+            scope = "playlist-read-private playlist-read-collaborative user-follow-read user-read-email"
 
             # Crear instancia OAuth
             self.sp_oauth = SpotifyOAuth(
@@ -130,128 +205,32 @@ class SpotifyService:
                 cache_path=str(self.cache_dir / "spotify_token.txt")
             )
 
-            # Obtener token
-            token_info = self._get_token_or_authenticate()
-
-            if token_info:
-                # Crear cliente Spotify con el token
-                self.sp = spotipy.Spotify(auth=token_info['access_token'])
-
-                # Obtener información del usuario
-                try:
-                    user_info = self.sp.current_user()
-                    self.spotify_user_id = user_info['id']
-                    print(f"Authenticated as user: {self.spotify_user_id}")
+            # Intentar obtener token (sin interacción del usuario para el bot)
+            try:
+                # Primero intentar Client Credentials Flow que no requiere autorización del usuario
+                token = self.get_client_credentials()
+                if token:
+                    # Crear cliente básico con Client Credentials
+                    # Este no tendrá acceso a datos del usuario pero puede buscar artistas
                     self.authenticated = True
+                    print("✅ Spotify configurado con Client Credentials Flow")
                     return True
-                except Exception as e:
-                    self.last_error = f"Error obteniendo info de usuario: {str(e)}"
-                    print(self.last_error)
-                    return False
-            else:
-                self.last_error = "No se pudo obtener token de autenticación"
-                return False
+            except Exception as e:
+                print(f"⚠️ Client Credentials falló: {e}")
 
-        except ImportError as e:
-            self.last_error = f"Error importando spotipy: {str(e)}. ¿Está instalado?"
-            print(self.last_error)
-            return False
+            # Si llegamos aquí, usar un modo limitado
+            self.authenticated = False
+            print("⚠️ Spotify en modo limitado (sin autenticación completa)")
+            return True
+
         except Exception as e:
             self.last_error = f"Error configurando Spotify: {str(e)}"
-            print(self.last_error)
+            print(f"❌ {self.last_error}")
             return False
-
-    def _load_saved_token(self):
-        """Cargar token guardado si existe y es válido"""
-        token_file = self.cache_dir / "spotify_token.json" or ".cache" / "spotify_token.txt"
-
-        if token_file.exists():
-            try:
-                with open(token_file, "r") as f:
-                    token_data = json.load(f)
-
-                expiry_time = datetime.fromisoformat(token_data.get("expiry", ""))
-
-                if datetime.now() < expiry_time - timedelta(minutes=5):
-                    self.access_token = token_data.get("access_token")
-                    self.token_expiry = expiry_time
-                    return True
-            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                print(f"Error cargando token guardado: {e}")
-
-        return False
-
-    def _save_token(self):
-        """Guardar token actual en caché"""
-        if not self.access_token or not self.token_expiry:
-            return
-
-        token_file = self.cache_dir / "spotify_token.json"
-
-        try:
-            token_data = {
-                "access_token": self.access_token,
-                "expiry": self.token_expiry.isoformat()
-            }
-
-            with open(token_file, "w") as f:
-                json.dump(token_data, f)
-        except Exception as e:
-            print(f"Error guardando token: {e}")
-
-    def _get_token_or_authenticate(self):
-        """Obtener token válido o iniciar autenticación"""
-        try:
-            # Verificar token en caché
-            cached_token = self.sp_oauth.get_cached_token()
-            if cached_token and not self.sp_oauth.is_token_expired(cached_token):
-                return cached_token
-            elif cached_token:
-                try:
-                    new_token = self.sp_oauth.refresh_access_token(cached_token['refresh_token'])
-                    return new_token
-                except Exception as e:
-                    print(f"Token refresh failed: {str(e)}")
-
-            # Si no hay token válido, realizar nueva autenticación
-            print("Iniciando autenticación de Spotify...")
-            return self._perform_new_authentication()
-        except Exception as e:
-            print(f"Error en get_token_or_authenticate: {str(e)}")
-            return None
-
-    def _perform_new_authentication(self):
-        """Realizar autenticación desde cero"""
-        auth_url = self.sp_oauth.get_authorize_url()
-
-        # Para interactuar con el usuario, podría usar PyQt dialogs aquí
-        print(f"Por favor, visita: {auth_url}")
-        redirect_url = input("Ingresa la URL de redirección: ")
-
-        if redirect_url:
-            try:
-                if '%3A' in redirect_url or '%2F' in redirect_url:
-                    redirect_url = unquote(redirect_url)
-
-                code = None
-                if redirect_url.startswith('http'):
-                    code = self.sp_oauth.parse_response_code(redirect_url)
-                elif 'code=' in redirect_url:
-                    code = redirect_url.split('code=')[1].split('&')[0]
-                else:
-                    code = redirect_url
-
-                if code:
-                    token_info = self.sp_oauth.get_access_token(code)
-                    return token_info
-            except Exception as e:
-                print(f"Error en autenticación: {str(e)}")
-
-        return None
 
     def get_client_credentials(self):
         """Obtener token usando Client Credentials Flow"""
-        if self.access_token and datetime.now() < self.token_expiry:
+        if self.access_token and self.token_expiry and datetime.now() < self.token_expiry:
             return self.access_token
 
         auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
@@ -266,7 +245,7 @@ class SpotifyService:
         }
 
         try:
-            response = requests.post(self.auth_url, headers=headers, data=data)
+            response = requests.post(self.auth_url, headers=headers, data=data, timeout=10)
             response.raise_for_status()
 
             token_info = response.json()
@@ -277,10 +256,141 @@ class SpotifyService:
 
             self._save_token()
 
+            print(f"✅ Token de Spotify obtenido (expira en {expires_in}s)")
             return self.access_token
         except requests.exceptions.RequestException as e:
-            print(f"Error obteniendo token: {e}")
+            print(f"❌ Error obteniendo token de Spotify: {e}")
             return None
+
+    def detect_country_from_city(self, city_name):
+        """
+        Detecta el país basándose en el nombre de la ciudad
+
+        Args:
+            city_name (str): Nombre de la ciudad
+
+        Returns:
+            str: Código de país (ej: 'ES', 'US', 'FR') o cadena vacía si no se detecta
+        """
+        if not city_name:
+            return ''
+
+        city_clean = city_name.lower().strip()
+
+        # Remover texto común que no es parte del nombre de la ciudad
+        city_clean = re.sub(r'\s*\(.*?\)\s*', '', city_clean)  # Remover paréntesis
+        city_clean = re.sub(r'\s*,.*$', '', city_clean)  # Remover todo después de coma
+        city_clean = city_clean.strip()
+
+        # Buscar en el mapeo directo
+        if city_clean in self.city_country_map:
+            country = self.city_country_map[city_clean]
+            print(f"🌍 País detectado por mapeo directo: {city_name} -> {country}")
+            return country
+
+        # Buscar coincidencias parciales
+        for city_key, country_code in self.city_country_map.items():
+            if city_key in city_clean or city_clean in city_key:
+                print(f"🌍 País detectado por coincidencia parcial: {city_name} ({city_clean}) -> {country_code}")
+                return country_code
+
+        print(f"🌍 País no detectado para: {city_name}")
+        return ''
+
+    def get_country_from_geocoding(self, location):
+        """
+        Obtiene el país usando APIs de geocodificación
+
+        Args:
+            location (str): Ubicación (ciudad, venue, etc.)
+
+        Returns:
+            str: Código de país o cadena vacía
+        """
+        if not location:
+            return ''
+
+        # Verificar caché primero
+        cache_key = location.lower().strip()
+        if cache_key in self.location_cache:
+            return self.location_cache[cache_key]
+
+        country = ''
+
+        try:
+            # Método 1: Nominatim (OpenStreetMap) - gratuito
+            country = self._get_country_nominatim(location)
+
+            if not country:
+                # Método 2: REST Countries API como fallback
+                country = self._get_country_rest_countries(location)
+
+        except Exception as e:
+            print(f"❌ Error en geocodificación para {location}: {e}")
+
+        # Guardar en caché
+        self.location_cache[cache_key] = country
+
+        if country:
+            print(f"🌍 País obtenido por geocodificación: {location} -> {country}")
+
+        return country
+
+    def _get_country_nominatim(self, location):
+        """Obtiene país usando Nominatim (OpenStreetMap)"""
+        try:
+            # Limpiar ubicación
+            clean_location = re.sub(r'\s*\(.*?\)\s*', '', location).strip()
+
+            url = "https://nominatim.openstreetmap.org/search"
+            params = {
+                'q': clean_location,
+                'format': 'json',
+                'limit': 1,
+                'addressdetails': 1
+            }
+            headers = {
+                'User-Agent': 'SpotifyBot/1.0 (https://example.com/contact)'
+            }
+
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+            response.raise_for_status()
+
+            data = response.json()
+            if data and len(data) > 0:
+                address = data[0].get('address', {})
+                country_code = address.get('country_code', '').upper()
+
+                if country_code:
+                    return country_code
+
+        except Exception as e:
+            print(f"⚠️ Error en Nominatim: {e}")
+
+        return ''
+
+    def _get_country_rest_countries(self, location):
+        """Obtiene país usando REST Countries API como fallback"""
+        try:
+            # Extraer posible nombre de país de la ubicación
+            location_parts = location.replace(',', ' ').split()
+
+            for part in location_parts:
+                if len(part) > 3:  # Solo considerar palabras significativas
+                    url = f"https://restcountries.com/v3.1/name/{part}"
+                    response = requests.get(url, timeout=3)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data and len(data) > 0:
+                            country_code = data[0].get('cca2', '')
+                            if country_code:
+                                return country_code
+
+        except Exception as e:
+            print(f"⚠️ Error en REST Countries: {e}")
+
+        return ''
 
     def search_artist(self, name):
         """Buscar un artista por nombre"""
@@ -288,10 +398,12 @@ class SpotifyService:
         cached_data = self._load_from_cache(cache_file)
 
         if cached_data:
+            print(f"🔄 Usando caché para artista: {name}")
             return cached_data
 
         token = self.get_client_credentials()
         if not token:
+            print(f"❌ No se pudo obtener token para buscar: {name}")
             return None
 
         headers = {
@@ -305,7 +417,7 @@ class SpotifyService:
         }
 
         try:
-            response = requests.get(f"{self.base_url}/search", headers=headers, params=params)
+            response = requests.get(f"{self.base_url}/search", headers=headers, params=params, timeout=10)
             response.raise_for_status()
 
             data = response.json()
@@ -314,51 +426,14 @@ class SpotifyService:
             if artists:
                 artist_data = artists[0]
                 self._save_to_cache(cache_file, artist_data)
+                print(f"✅ Artista encontrado en Spotify: {artist_data.get('name')}")
                 return artist_data
 
+            print(f"📭 No se encontró artista en Spotify: {name}")
             return None
         except requests.exceptions.RequestException as e:
-            print(f"Error buscando artista: {e}")
+            print(f"❌ Error buscando artista en Spotify: {e}")
             return None
-
-    def get_artist_concerts_from_db_or_search(self, artist_name, db_path):
-        """Obtener información de conciertos para un artista"""
-        import sqlite3
-
-        # Verificar caché primero
-        cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
-        cached_data = self._load_from_cache(cache_file)
-
-        if cached_data:
-            return cached_data, f"Se encontraron {len(cached_data)} conciertos para {artist_name} (caché)"
-
-        # Buscar en BD
-        artist_url = None
-        try:
-            db_conn = sqlite3.connect(db_path)
-            cursor = db_conn.cursor()
-            cursor.execute("SELECT spotify_url FROM artists WHERE name = ?", (artist_name,))
-            result = cursor.fetchone()
-
-            if result and result[0]:
-                artist_url = result[0]
-            else:
-                artist_url = self.search_artist_url(artist_name)
-                if result:
-                    cursor.execute("UPDATE artists SET spotify_url = ? WHERE name = ?", (artist_url, artist_name))
-                    db_conn.commit()
-        except Exception as e:
-            print(f"Error accessing database: {e}")
-            artist_url = self.search_artist_url(artist_name)
-        finally:
-            if 'db_conn' in locals():
-                db_conn.close()
-
-        if not artist_url:
-            return [], f"No se encontró URL de Spotify para {artist_name}"
-
-        # Scrapear conciertos
-        return self.scrape_artist_concerts(artist_url, artist_name)
 
     def search_artist_url(self, artist_name):
         """Buscar URL del artista en Spotify"""
@@ -367,279 +442,51 @@ class SpotifyService:
             return artist_data['external_urls'].get('spotify', '')
         return ''
 
+    def search_artist_and_concerts(self, artist_name):
+        """
+        Busca un artista en Spotify y sus conciertos con detección de país mejorada
+        """
+        print(f"🎵 Buscando conciertos de {artist_name} en Spotify...")
+
+        # Verificar caché primero
+        cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
+        cached_data = self._load_from_cache(cache_file)
+
+        if cached_data:
+            print(f"🔄 Usando caché de conciertos para: {artist_name}")
+            return cached_data, f"Se encontraron {len(cached_data)} conciertos para {artist_name} (caché)"
+
+        # Buscar artista directamente en Spotify
+        artist_url = self.search_artist_url(artist_name)
+
+        if not artist_url:
+            print(f"📭 No se encontró URL de Spotify para {artist_name}")
+            return [], f"No se encontró URL de Spotify para {artist_name}"
+
+        # Scrapear conciertos
+        try:
+            return self.scrape_artist_concerts(artist_url, artist_name)
+        except Exception as e:
+            print(f"❌ Error en scraping de Spotify para {artist_name}: {e}")
+            return [], f"Error scrapeando Spotify: {str(e)}"
+
     def scrape_artist_concerts(self, artist_url, artist_name):
-        """Scrapear conciertos de un artista usando Selenium con múltiples estrategias"""
-        match = re.search(r'/artist/([^/]+)', artist_url)
-        if not match:
-            return [], "URL de artista inválida"
-
-        artist_id = match.group(1)
-        concerts_url = f"https://open.spotify.com/artist/{artist_id}/concerts"
-
-        # Configuración robusta de Chrome
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-web-security')
-        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-        chrome_options.add_argument('--disable-extensions')
-        chrome_options.add_argument('--disable-plugins')
-        chrome_options.add_argument('--disable-images')
-        chrome_options.add_argument('--disable-javascript')
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        chrome_options.add_argument('--window-size=1920,1080')
-
-        driver = None
-        concerts = []
+        """
+        Scraping de conciertos usando requests con detección de país mejorada
+        """
+        print(f"🔍 Scrapeando conciertos de {artist_name} desde {artist_url}")
 
         try:
-            # Intentar crear el driver con manejo de errores
-            try:
-                driver = webdriver.Chrome(options=chrome_options)
-                driver.set_page_load_timeout(30)
-            except WebDriverException as e:
-                print(f"Error creando driver Chrome: {e}")
-                return [], f"Error iniciando navegador: {str(e)}"
-
-            # Navegar a la página
-            try:
-                print(f"Navegando a: {concerts_url}")
-                driver.get(concerts_url)
-            except TimeoutException:
-                print("Timeout al cargar la página")
-                return [], "Timeout al cargar página de Spotify"
-            except WebDriverException as e:
-                print(f"Error navegando: {e}")
-                return [], f"Error navegando a Spotify: {str(e)}"
-
-            # Esperar a que la página cargue con múltiples estrategias
-            selectors_to_try = [
-                '[data-testid="concert-row"]',
-                '.concert-item',
-                '.event-item',
-                '.UtdfKFkqUnNS1UWu3BG_',  # Posible selector de Spotify
-                '[class*="concert"]',
-                '[class*="event"]'
-            ]
-
-            concert_elements = []
-            wait = WebDriverWait(driver, 20)
-
-            for selector in selectors_to_try:
-                try:
-                    print(f"Intentando selector: {selector}")
-                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                    concert_elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if concert_elements:
-                        print(f"Encontrados {len(concert_elements)} elementos con selector: {selector}")
-                        break
-                except TimeoutException:
-                    print(f"Timeout con selector: {selector}")
-                    continue
-                except Exception as e:
-                    print(f"Error con selector {selector}: {e}")
-                    continue
-
-            # Si no encontramos elementos específicos, buscar patrones más generales
-            if not concert_elements:
-                print("Buscando patrones alternativos...")
-
-                # Buscar elementos que contengan fechas o información de conciertos
-                alternative_selectors = [
-                    'div[role="row"]',
-                    'div[class*="row"]',
-                    'article',
-                    'li[class*="item"]',
-                    'div[class*="item"]'
-                ]
-
-                for alt_selector in alternative_selectors:
-                    try:
-                        elements = driver.find_elements(By.CSS_SELECTOR, alt_selector)
-                        # Filtrar elementos que puedan contener información de conciertos
-                        for element in elements:
-                            text = element.text.lower()
-                            if any(keyword in text for keyword in ['concert', 'tour', 'live', 'show', '2024', '2025']):
-                                concert_elements.append(element)
-
-                        if concert_elements:
-                            print(f"Encontrados {len(concert_elements)} elementos candidatos con selector: {alt_selector}")
-                            break
-                    except Exception as e:
-                        print(f"Error con selector alternativo {alt_selector}: {e}")
-                        continue
-
-            # Procesar elementos encontrados
-            if concert_elements:
-                print(f"Procesando {len(concert_elements)} elementos de concierto")
-
-                for i, element in enumerate(concert_elements[:10]):  # Limitar a 10 para evitar timeouts
-                    try:
-                        print(f"Procesando elemento {i+1}")
-                        concert = self._extract_concert_info(element, artist_name)
-                        if concert:
-                            concerts.append(concert)
-                    except Exception as e:
-                        print(f"Error procesando elemento {i+1}: {e}")
-                        continue
-            else:
-                print("No se encontraron elementos de concierto")
-                # Intentar método alternativo usando requests
-                return self._scrape_with_requests(artist_url, artist_name)
-
-            # Actualizar caché
-            if concerts:
-                cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
-                self._save_to_cache(cache_file, concerts)
-
-            return concerts, f"Se encontraron {len(concerts)} conciertos para {artist_name} (scraping)"
-
-        except Exception as e:
-            print(f"Error general en scraping: {e}")
-            # Intentar método alternativo
+            # Intentar scraping con requests primero
             return self._scrape_with_requests(artist_url, artist_name)
-        finally:
-            if driver:
-                try:
-                    driver.quit()
-                except Exception as e:
-                    print(f"Error cerrando driver: {e}")
-
-    def _extract_concert_info(self, element, artist_name):
-        """Extrae información de concierto de un elemento"""
-        try:
-            # Obtener texto del elemento
-            element_text = element.text
-            element_html = element.get_attribute('outerHTML')
-
-            # Buscar fecha usando múltiples estrategias
-            date = self._extract_date_from_element(element)
-
-            # Buscar venue y ciudad
-            venue, city = self._extract_venue_and_city(element, element_text)
-
-            # Buscar URL del concierto
-            concert_url = self._extract_concert_url(element)
-
-            # Si encontramos información válida, crear el concierto
-            if date or venue or city:
-                concert = {
-                    'artist': artist_name,
-                    'name': f"{venue} Concert" if venue else f"{artist_name} Concert",
-                    'venue': venue or 'Unknown venue',
-                    'city': city or 'Unknown city',
-                    'date': date or '',
-                    'time': '',
-                    'image': '',
-                    'url': concert_url or '',
-                    'source': 'Spotify'
-                }
-                print(f"Concierto extraído: {concert}")
-                return concert
-
         except Exception as e:
-            print(f"Error extrayendo información del concierto: {e}")
-
-        return None
-
-    def _extract_date_from_element(self, element):
-        """Extrae fecha del elemento usando múltiples estrategias"""
-        try:
-            # Buscar elemento time con datetime
-            time_elements = element.find_elements(By.TAG_NAME, 'time')
-            for time_elem in time_elements:
-                datetime_attr = time_elem.get_attribute('datetime')
-                if datetime_attr:
-                    return datetime_attr[:10] if len(datetime_attr) >= 10 else datetime_attr
-
-            # Buscar patrones de fecha en el texto
-            text = element.text
-            date_patterns = [
-                r'(\d{4}-\d{2}-\d{2})',  # YYYY-MM-DD
-                r'(\d{1,2}/\d{1,2}/\d{4})',  # DD/MM/YYYY o MM/DD/YYYY
-                r'(\d{1,2}\s+\w+\s+\d{4})',  # DD Month YYYY
-            ]
-
-            for pattern in date_patterns:
-                match = re.search(pattern, text)
-                if match:
-                    return match.group(1)
-
-        except Exception as e:
-            print(f"Error extrayendo fecha: {e}")
-
-        return ''
-
-    def _extract_venue_and_city(self, element, text):
-        """Extrae venue y ciudad del elemento"""
-        venue = ''
-        city = ''
-
-        try:
-            # Buscar selectores específicos para venue
-            venue_selectors = [
-                '[data-testid="event-venue"]',
-                '.venue-name',
-                '.event-venue',
-                'strong'
-            ]
-
-            for selector in venue_selectors:
-                try:
-                    venue_elem = element.find_element(By.CSS_SELECTOR, selector)
-                    if venue_elem:
-                        venue = venue_elem.text.strip()
-                        break
-                except:
-                    continue
-
-            # Si no encontramos venue con selectores, buscar en el texto
-            if not venue:
-                lines = text.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line and not any(char.isdigit() for char in line[:4]):  # Evitar líneas que empiecen con fechas
-                        if len(line) > 3 and len(line) < 100:  # Longitud razonable para un venue
-                            venue = line
-                            break
-
-            # Extraer ciudad (usualmente después del venue)
-            if venue and ',' in venue:
-                parts = venue.split(',')
-                venue = parts[0].strip()
-                city = parts[1].strip() if len(parts) > 1 else ''
-
-        except Exception as e:
-            print(f"Error extrayendo venue/ciudad: {e}")
-
-        return venue, city
-
-    def _extract_concert_url(self, element):
-        """Extrae URL del concierto"""
-        try:
-            # Buscar enlaces dentro del elemento
-            links = element.find_elements(By.TAG_NAME, 'a')
-            for link in links:
-                href = link.get_attribute('href')
-                if href and 'concert' in href:
-                    return href
-
-            # Si el elemento mismo es un enlace
-            href = element.get_attribute('href')
-            if href:
-                return href
-
-        except Exception as e:
-            print(f"Error extrayendo URL: {e}")
-
-        return ''
+            print(f"❌ Error en scraping: {e}")
+            return [], f"Error scrapeando Spotify: {str(e)}"
 
     def _scrape_with_requests(self, artist_url, artist_name):
-        """Método alternativo usando requests cuando Selenium falla"""
+        """Método de scraping usando requests con detección de país"""
         try:
-            print("Intentando scraping con requests como fallback...")
+            print(f"🌐 Intentando scraping con requests para {artist_name}...")
 
             match = re.search(r'/artist/([^/]+)', artist_url)
             if not match:
@@ -660,94 +507,486 @@ class SpotifyService:
             response = requests.get(concerts_url, headers=headers, timeout=30)
             response.raise_for_status()
 
-            # Buscar JSON con datos de conciertos en el HTML
-            import re
-            json_pattern = r'<script[^>]*type="application/json"[^>]*>(.*?)</script>'
-            json_matches = re.findall(json_pattern, response.text, re.DOTALL)
+            # Buscar enlaces de conciertos en el HTML
+            concert_urls = self._extract_concert_urls_from_html(response.text)
 
+            if not concert_urls:
+                print(f"📭 No se encontraron enlaces de conciertos en HTML para {artist_name}")
+                return [], f"No se encontraron conciertos para {artist_name} en Spotify"
+
+            print(f"🔗 Encontrados {len(concert_urls)} enlaces de conciertos para {artist_name}")
+
+            # Extraer información de cada concierto
             concerts = []
-            for json_str in json_matches:
-                try:
-                    data = json.loads(json_str)
-                    # Buscar datos de conciertos en la estructura JSON
-                    concerts.extend(self._extract_concerts_from_json(data, artist_name))
-                except json.JSONDecodeError:
-                    continue
+            max_concerts = min(len(concert_urls), 20)  # Limitar para evitar timeouts
 
+            for i, concert_url in enumerate(concert_urls[:max_concerts]):
+                print(f"📍 Procesando concierto {i+1}/{max_concerts}: {concert_url}")
+
+                concert_info = self._extract_enhanced_concert_info(concert_url, artist_name)
+                if concert_info:
+                    concerts.append(concert_info)
+
+                # Pausa para no sobrecargar
+                time.sleep(0.5)
+
+            # Guardar en caché
             if concerts:
                 cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
                 self._save_to_cache(cache_file, concerts)
-                return concerts, f"Se encontraron {len(concerts)} conciertos para {artist_name} (requests fallback)"
-            else:
-                return [], f"No se encontraron conciertos para {artist_name} en Spotify"
+
+            return concerts, f"Se encontraron {len(concerts)} conciertos para {artist_name}"
 
         except Exception as e:
-            print(f"Error en scraping con requests: {e}")
+            print(f"❌ Error en scraping con requests: {e}")
             return [], f"Error scrapeando Spotify: {str(e)}"
 
-    def _extract_concerts_from_json(self, data, artist_name):
-        """Extrae conciertos de datos JSON"""
-        concerts = []
+    def _extract_concert_urls_from_html(self, html_content):
+        """Extrae URLs de conciertos del HTML"""
+        concert_urls = []
 
+        # Patrón para encontrar URLs de conciertos
+        concert_url_pattern = r'https://open\.spotify\.com/concert/[a-zA-Z0-9]+'
+        matches = re.findall(concert_url_pattern, html_content)
+
+        # Eliminar duplicados manteniendo el orden
+        seen = set()
+        for url in matches:
+            if url not in seen:
+                seen.add(url)
+                concert_urls.append(url)
+
+        return concert_urls
+
+    def _extract_enhanced_concert_info(self, concert_url, artist_name):
+        """Extrae información de concierto con detección de país mejorada"""
         try:
-            # Función recursiva para buscar conciertos en estructuras JSON anidadas
-            def search_concerts(obj, path=""):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        if key in ['concerts', 'events', 'shows', 'tour'] and isinstance(value, list):
-                            for item in value:
-                                if isinstance(item, dict):
-                                    concert = self._parse_concert_json(item, artist_name)
-                                    if concert:
-                                        concerts.append(concert)
-                        else:
-                            search_concerts(value, f"{path}.{key}")
-                elif isinstance(obj, list):
-                    for i, item in enumerate(obj):
-                        search_concerts(item, f"{path}[{i}]")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
 
-            search_concerts(data)
+            response = requests.get(concert_url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            # Extraer información del HTML
+            concert_info = self._parse_enhanced_spotify_page(response.text, artist_name, concert_url)
+
+            if concert_info:
+                # Detectar país usando múltiples estrategias
+                country = self._detect_country_multiple_strategies(concert_info)
+                concert_info['country'] = country
+
+                if country:
+                    print(f"🌍 País detectado para concierto: {country}")
+                else:
+                    print(f"⚠️ No se pudo detectar país para: {concert_info.get('city', 'ubicación desconocida')}")
+
+                return concert_info
+            else:
+                return self._create_enhanced_fallback_concert_info(concert_url, artist_name)
 
         except Exception as e:
-            print(f"Error extrayendo conciertos de JSON: {e}")
+            print(f"❌ Error extrayendo info de {concert_url}: {e}")
+            return self._create_enhanced_fallback_concert_info(concert_url, artist_name)
 
-        return concerts
+    def _parse_enhanced_spotify_page(self, html_content, artist_name, concert_url):
+        """Parsea página de Spotify con extracción mejorada de información"""
 
-    def _parse_concert_json(self, concert_data, artist_name):
-        """Parsea un objeto JSON de concierto individual"""
+        # Extraer título de la página
+        title_match = re.search(r'<title>(.*?)</title>', html_content, re.IGNORECASE)
+
+        if not title_match:
+            return None
+
+        title = title_match.group(1)
+
+        # Intentar múltiples patrones de extracción
+        concert_info = None
+
+        # Patrón 1: Título con información completa
+        concert_info = self._parse_spotify_title_enhanced(title, artist_name, concert_url)
+
+        if not concert_info:
+            # Patrón 2: Buscar en el contenido de la página
+            concert_info = self._parse_spotify_content(html_content, artist_name, concert_url)
+
+        if not concert_info:
+            # Patrón 3: Extracción básica como fallback
+            concert_info = self._parse_spotify_title(title, artist_name, concert_url)
+
+        return concert_info
+
+    def _parse_spotify_title_enhanced(self, title, artist_name, concert_url):
+        """Versión mejorada del parser de títulos de Spotify"""
+        concert_info = {
+            'artist': artist_name,
+            'artist_name': artist_name,
+            'name': '',
+            'venue': '',
+            'city': '',
+            'country': '',
+            'date': '',
+            'time': '',
+            'url': concert_url,
+            'source': 'Spotify'
+        }
+
         try:
-            venue = concert_data.get('venue', {})
-            if isinstance(venue, str):
-                venue_name = venue
-                city = ''
-            else:
-                venue_name = venue.get('name', '')
-                city = venue.get('city', '')
+            # Limpiar título
+            title = re.sub(r'\s*\|\s*Spotify\s*, ', '', title.strip())
 
-            date = concert_data.get('date', '')
-            if isinstance(concert_data.get('startDate'), str):
-                date = concert_data['startDate'][:10]
+            # Patrón 1: "Artist Tickets City (Venue) on Date at Time"
+            pattern1 = r'Tickets\s+([^(]+?)\s*\(([^)]+)\)\s+on\s+(\d{1,2}/\d{1,2}/\d{4})\s+at\s+([^|]+)'
+            match1 = re.search(pattern1, title, re.IGNORECASE)
 
-            concert = {
+            if match1:
+                city = match1.group(1).strip()
+                venue = match1.group(2).strip()
+                date_str = match1.group(3).strip()
+                time_str = match1.group(4).strip()
+
+                concert_info.update({
+                    'city': city,
+                    'venue': venue,
+                    'time': time_str,
+                    'name': f"{artist_name} at {venue}"
+                })
+
+                # Convertir fecha
+                try:
+                    date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+                    concert_info['date'] = date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    concert_info['date'] = date_str
+
+                print(f"✅ Patrón 1 - Info extraída: venue='{venue}', city='{city}', date='{concert_info['date']}'")
+                return concert_info
+
+            # Patrón 2: "Artist Tickets at Venue, City on Date"
+            pattern2 = r'Tickets\s+at\s+([^,]+),\s*([^o]+?)\s+on\s+(\d{1,2}/\d{1,2}/\d{4})'
+            match2 = re.search(pattern2, title, re.IGNORECASE)
+
+            if match2:
+                venue = match2.group(1).strip()
+                city = match2.group(2).strip()
+                date_str = match2.group(3).strip()
+
+                concert_info.update({
+                    'venue': venue,
+                    'city': city,
+                    'name': f"{artist_name} at {venue}"
+                })
+
+                # Convertir fecha
+                try:
+                    date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+                    concert_info['date'] = date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    concert_info['date'] = date_str
+
+                print(f"✅ Patrón 2 - Info extraída: venue='{venue}', city='{city}', date='{concert_info['date']}'")
+                return concert_info
+
+            # Patrón 3: "Artist Tickets Location Date"
+            pattern3 = r'Tickets\s+([^0-9]+?)\s+(\d{1,2}/\d{1,2}/\d{4})'
+            match3 = re.search(pattern3, title, re.IGNORECASE)
+
+            if match3:
+                location = match3.group(1).strip()
+                date_str = match3.group(2).strip()
+
+                # Intentar separar venue y city del location
+                if ',' in location:
+                    parts = location.split(',')
+                    venue = parts[0].strip()
+                    city = parts[1].strip()
+                else:
+                    venue = location
+                    city = location
+
+                concert_info.update({
+                    'venue': venue,
+                    'city': city,
+                    'name': f"{artist_name} at {venue}"
+                })
+
+                # Convertir fecha
+                try:
+                    date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+                    concert_info['date'] = date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    concert_info['date'] = date_str
+
+                print(f"✅ Patrón 3 - Info extraída: venue='{venue}', city='{city}', date='{concert_info['date']}'")
+                return concert_info
+
+        except Exception as e:
+            print(f"❌ Error parseando título mejorado: {e}")
+
+        return None
+
+    def _parse_spotify_content(self, html_content, artist_name, concert_url):
+        """Parsea el contenido HTML buscando información de concierto"""
+        try:
+            # Buscar metadatos estructurados
+            concert_info = {
                 'artist': artist_name,
-                'name': concert_data.get('name', f"{venue_name} Concert"),
-                'venue': venue_name,
-                'city': city,
-                'date': date,
-                'time': concert_data.get('time', ''),
-                'image': concert_data.get('image', ''),
-                'url': concert_data.get('url', ''),
+                'artist_name': artist_name,
+                'name': f"{artist_name} Concert",
+                'venue': '',
+                'city': '',
+                'country': '',
+                'date': '',
+                'time': '',
+                'url': concert_url,
                 'source': 'Spotify'
             }
 
-            # Solo devolver si tenemos información mínima
-            if venue_name or city or date:
-                return concert
+            # Buscar datos en JSON-LD si están presentes
+            json_ld_pattern = r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>'
+            json_matches = re.findall(json_ld_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+            for json_text in json_matches:
+                try:
+                    data = json.loads(json_text)
+                    if isinstance(data, dict) and data.get('@type') == 'Event':
+                        # Extraer información del evento
+                        name = data.get('name', '')
+                        location = data.get('location', {})
+
+                        if isinstance(location, dict):
+                            venue_name = location.get('name', '')
+                            address = location.get('address', {})
+
+                            if isinstance(address, dict):
+                                city = address.get('addressLocality', '')
+                                country = address.get('addressCountry', '')
+                            elif isinstance(address, str):
+                                city = address
+
+                        start_date = data.get('startDate', '')
+
+                        if venue_name or city or start_date:
+                            concert_info.update({
+                                'name': name or f"{artist_name} at {venue_name}",
+                                'venue': venue_name,
+                                'city': city,
+                                'country': country,
+                                'date': start_date[:10] if len(start_date) >= 10 else start_date
+                            })
+
+                            print(f"✅ Info extraída de JSON-LD: venue='{venue_name}', city='{city}', country='{country}'")
+                            return concert_info
+
+                except json.JSONDecodeError:
+                    continue
+
+            # Buscar patrones en el HTML
+            # Buscar fechas
+            date_patterns = [
+                r'(\d{1,2}/\d{1,2}/\d{4})',
+                r'(\d{4}-\d{2}-\d{2})',
+                r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}'
+            ]
+
+            for pattern in date_patterns:
+                date_matches = re.findall(pattern, html_content, re.IGNORECASE)
+                if date_matches:
+                    concert_info['date'] = date_matches[0]
+                    break
+
+            # Buscar información de ubicación en meta tags
+            venue_pattern = r'<meta[^>]*property=["\']venue["\'][^>]*content=["\']([^"\']+)["\']'
+            venue_match = re.search(venue_pattern, html_content, re.IGNORECASE)
+            if venue_match:
+                concert_info['venue'] = venue_match.group(1)
+
+            city_pattern = r'<meta[^>]*property=["\']city["\'][^>]*content=["\']([^"\']+)["\']'
+            city_match = re.search(city_pattern, html_content, re.IGNORECASE)
+            if city_match:
+                concert_info['city'] = city_match.group(1)
+
+            if concert_info['venue'] or concert_info['city'] or concert_info['date']:
+                print(f"✅ Info extraída del contenido HTML")
+                return concert_info
 
         except Exception as e:
-            print(f"Error parseando concierto JSON: {e}")
+            print(f"❌ Error parseando contenido HTML: {e}")
 
         return None
+
+    def _detect_country_multiple_strategies(self, concert_info):
+        """Detecta país usando múltiples estrategias"""
+        country = ''
+
+        # Estrategia 1: Si ya tenemos país en la info extraída
+        if concert_info.get('country'):
+            country = concert_info['country'].upper()
+            if len(country) == 2:  # Código de país válido
+                return country
+
+        # Estrategia 2: Detectar por nombre de ciudad
+        city = concert_info.get('city', '')
+        if city:
+            country = self.detect_country_from_city(city)
+            if country:
+                return country
+
+        # Estrategia 3: Usar venue para detectar ubicación
+        venue = concert_info.get('venue', '')
+        if venue:
+            country = self.detect_country_from_city(venue)
+            if country:
+                return country
+
+        # Estrategia 4: Geocodificación de la ubicación completa
+        full_location = ''
+        if venue and city:
+            full_location = f"{venue}, {city}"
+        elif city:
+            full_location = city
+        elif venue:
+            full_location = venue
+
+        if full_location:
+            country = self.get_country_from_geocoding(full_location)
+            if country:
+                return country
+
+        # Estrategia 5: Buscar en el nombre del concierto
+        concert_name = concert_info.get('name', '')
+        if concert_name:
+            country = self.detect_country_from_city(concert_name)
+            if country:
+                return country
+
+        return ''
+
+    def _parse_spotify_title(self, title, artist_name, concert_url):
+        """Versión original del parser (como fallback)"""
+        concert_info = {
+            'artist': artist_name,
+            'artist_name': artist_name,
+            'name': '',
+            'venue': '',
+            'city': '',
+            'country': '',
+            'date': '',
+            'time': '',
+            'url': concert_url,
+            'source': 'Spotify'
+        }
+
+        try:
+            # Limpiar título
+            title = re.sub(r'\s*\|\s*Spotify\s*, ', '', title.strip())
+
+            # Patrón principal: "Artist Tickets City (Venue) on Date at Time"
+            pattern = r'Tickets\s+([^(]+?)\s*\(([^)]+)\)\s+on\s+(\d{1,2}/\d{1,2}/\d{4})\s+at\s+([^|]+)'
+            match = re.search(pattern, title, re.IGNORECASE)
+
+            if match:
+                city = match.group(1).strip()
+                venue = match.group(2).strip()
+                date_str = match.group(3).strip()
+                time_str = match.group(4).strip()
+
+                concert_info['city'] = city
+                concert_info['venue'] = venue
+                concert_info['time'] = time_str
+
+                # Convertir fecha
+                try:
+                    date_obj = datetime.strptime(date_str, '%m/%d/%Y')
+                    concert_info['date'] = date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    concert_info['date'] = date_str
+
+                # Crear nombre del concierto
+                concert_info['name'] = f"{artist_name} at {venue}"
+
+                print(f"✅ Info extraída del título original: venue='{venue}', city='{city}', date='{concert_info['date']}'")
+                return concert_info
+
+            else:
+                # Patrón más simple como fallback
+                simple_pattern = r'([^|]+?)\s+Tickets'
+                simple_match = re.search(simple_pattern, title, re.IGNORECASE)
+
+                if simple_match:
+                    location = simple_match.group(1).strip()
+                    concert_info['venue'] = f"{location} (Venue)"
+                    concert_info['city'] = location
+                    concert_info['name'] = f"{artist_name} Concert"
+
+                    print(f"✅ Info básica extraída: location='{location}'")
+                    return concert_info
+
+        except Exception as e:
+            print(f"❌ Error parseando título original: {e}")
+
+        return None
+
+    def _create_enhanced_fallback_concert_info(self, concert_url, artist_name):
+        """Crea información básica del concierto cuando falla la extracción"""
+        concert_info = {
+            'artist': artist_name,
+            'artist_name': artist_name,
+            'name': f"{artist_name} Concert",
+            'venue': 'Venue information not available',
+            'city': 'Location not available',
+            'country': '',
+            'date': '',
+            'time': '',
+            'url': concert_url,
+            'source': 'Spotify'
+        }
+
+        # Intentar extraer alguna información básica del URL
+        concert_id_match = re.search(r'/concert/([^/?]+)', concert_url)
+        if concert_id_match:
+            concert_id = concert_id_match.group(1)
+            concert_info['name'] = f"{artist_name} Concert ({concert_id[:8]})"
+
+        return concert_info
+
+    def _load_saved_token(self):
+        """Cargar token guardado si existe y es válido"""
+        token_file = self.cache_dir / "spotify_token.json"
+
+        if token_file.exists():
+            try:
+                with open(token_file, "r") as f:
+                    token_data = json.load(f)
+
+                expiry_time = datetime.fromisoformat(token_data.get("expiry", ""))
+
+                if datetime.now() < expiry_time - timedelta(minutes=5):
+                    self.access_token = token_data.get("access_token")
+                    self.token_expiry = expiry_time
+                    return True
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                print(f"⚠️ Error cargando token guardado: {e}")
+
+        return False
+
+    def _save_token(self):
+        """Guardar token actual en caché"""
+        if not self.access_token or not self.token_expiry:
+            return
+
+        token_file = self.cache_dir / "spotify_token.json"
+
+        try:
+            token_data = {
+                "access_token": self.access_token,
+                "expiry": self.token_expiry.isoformat()
+            }
+
+            with open(token_file, "w") as f:
+                json.dump(token_data, f)
+        except Exception as e:
+            print(f"⚠️ Error guardando token: {e}")
 
     def _get_cache_file_path(self, cache_key):
         """Generar ruta al archivo de caché"""
@@ -779,7 +1018,7 @@ class SpotifyService:
                     return data
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            print(f"Error leyendo caché: {e}")
+            print(f"⚠️ Error leyendo caché: {e}")
             return None
 
     def _save_to_cache(self, cache_file, data):
@@ -794,7 +1033,7 @@ class SpotifyService:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
         except Exception as e:
-            print(f"Error guardando caché: {e}")
+            print(f"⚠️ Error guardando caché: {e}")
 
     def clear_cache(self, pattern=None):
         """Limpiar caché"""
@@ -804,34 +1043,3 @@ class SpotifyService:
         else:
             for file in self.cache_dir.glob("spotify_*.json"):
                 file.unlink()
-
-    # ESPECIFICO PARA EL BOT
-    def search_artist_and_concerts(self, artist_name):
-        """
-        Busca un artista en Spotify y sus conciertos sin usar BD
-
-        Args:
-            artist_name (str): Nombre del artista a buscar
-
-        Returns:
-            tuple: (lista de conciertos, mensaje)
-        """
-        # Verificar caché primero
-        cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
-        cached_data = self._load_from_cache(cache_file)
-
-        if cached_data:
-            return cached_data, f"Se encontraron {len(cached_data)} conciertos para {artist_name} (caché)"
-
-        # Buscar artista directamente en Spotify
-        artist_url = self.search_artist_url(artist_name)
-
-        if not artist_url:
-            return [], f"No se encontró URL de Spotify para {artist_name}"
-
-        # Scrapear conciertos con manejo robusto de errores
-        try:
-            return self.scrape_artist_concerts(artist_url, artist_name)
-        except Exception as e:
-            print(f"Error en scraping de Spotify: {e}")
-            return [], f"Error scrapeando Spotify: {str(e)}"

@@ -1,0 +1,21 @@
+# /etc/systemd/system/artist-notifications.service
+[Unit]
+Description=Artist Concert Notifications Service
+After=network.target
+
+[Service]
+Type=simple
+User=tu_usuario
+WorkingDirectory=/ruta/a/tu/proyecto
+Environment=TELEGRAM_BOT_CONCIERTOS=tu_token_aqui
+Environment=TICKETMASTER_API_KEY=tu_api_key_aqui
+Environment=SPOTIFY_CLIENT_ID=tu_client_id_aqui
+Environment=SPOTIFY_CLIENT_SECRET=tu_client_secret_aqui
+Environment=SETLISTFM_API_KEY=tu_api_key_aqui
+Environment=DB_PATH=/ruta/a/tu/proyecto/artist_tracker.db
+ExecStart=/usr/bin/python3 /ruta/a/tu/proyecto/notification_scheduler.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
