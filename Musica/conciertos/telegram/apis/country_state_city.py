@@ -644,13 +644,7 @@ class ArtistTrackerDatabaseExtended:
     def filter_concerts_by_countries(self, concerts: List[Dict], user_countries: Set[str]) -> List[Dict]:
         """
         Filtra conciertos según países del usuario
-
-        Args:
-            concerts: Lista de conciertos
-            user_countries: Set de países del usuario
-
-        Returns:
-            Lista de conciertos filtrados
+        VERSIÓN MEJORADA: Mejor manejo de países en conciertos de Ticketmaster
         """
         if not user_countries or not self.country_city_service:
             return concerts
@@ -658,23 +652,28 @@ class ArtistTrackerDatabaseExtended:
         filtered_concerts = []
 
         for concert in concerts:
-            # Si ya tiene país asignado
-            if concert.get('country') in user_countries:
+            concert_country = concert.get('country', '').upper()
+
+            # Si ya tiene país asignado y está en los países del usuario
+            if concert_country and concert_country in {c.upper() for c in user_countries}:
                 filtered_concerts.append(concert)
                 continue
 
-            # Intentar detectar país por ciudad
+            # Intentar detectar país por ciudad si no tiene país o no coincide
             city = concert.get('city', '')
             if city:
-                detected_country = self.country_city_service.find_city_country(city, user_countries)
+                detected_country = self.country_city_service.find_city_country(city, {c.upper() for c in user_countries})
                 if detected_country:
                     concert['country'] = detected_country
-                    if detected_country in user_countries:
+                    if detected_country.upper() in {c.upper() for c in user_countries}:
                         filtered_concerts.append(concert)
                         continue
 
-            # Si no se puede determinar el país, incluir si no hay filtro estricto
-            if not concert.get('country'):
+            # Si el concierto viene de Ticketmaster pero no tiene país, incluirlo
+            # (Ticketmaster debería tener país, pero por seguridad)
+            if concert.get('source') == 'Ticketmaster' and not concert_country:
+                logger.warning(f"Concierto de Ticketmaster sin país: {concert.get('name')} en {concert.get('city')}")
                 filtered_concerts.append(concert)
 
+        logger.info(f"Filtrado de conciertos: {len(concerts)} -> {len(filtered_concerts)} para países {user_countries}")
         return filtered_concerts

@@ -14,10 +14,10 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple
 from telegram import Update, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
-country_city_service = None
-
+country_state_city = None
+lastfm_service = None
 
 # Importar funciones del archivo mb_artist_info.py existente
 try:
@@ -39,6 +39,13 @@ try:
     from apis.setlistfm import SetlistfmService
 except ImportError:
     print("Advertencia: No se pudieron importar los servicios de conciertos")
+
+# Importar servicio de Last.fm
+try:
+    from apis.lastfm import LastFmService
+except ImportError:
+    print("Advertencia: No se pudo importar lastfm.py")
+    LastFmService = None
 
 # Configuración de logging
 logging.basicConfig(
@@ -194,6 +201,35 @@ class ArtistTrackerDatabase:
                 )
             """)
 
+                        # Nueva tabla para usuarios de Last.fm
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_lastfm (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    lastfm_username TEXT NOT NULL,
+                    lastfm_playcount INTEGER DEFAULT 0,
+                    lastfm_registered TEXT DEFAULT '',
+                    sync_limit INTEGER DEFAULT 20,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id)
+                )
+            """)
+
+            # Tabla para almacenar selecciones pendientes de Last.fm
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pending_lastfm_sync (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    period TEXT NOT NULL,
+                    artists_data TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id, period)
+                )
+            """)
+
             # Índices para optimizar consultas
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_chat_id ON users(chat_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
@@ -208,6 +244,11 @@ class ArtistTrackerDatabase:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_concert ON notifications_sent(concert_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_cache_user ON user_search_cache(user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_search_cache_created ON user_search_cache(created_at)")
+
+            # Índices para Last.fm
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_lastfm_user_id ON user_lastfm(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pending_lastfm_user_id ON pending_lastfm_sync(user_id)")
+
 
             conn.commit()
             logger.info("Base de datos inicializada correctamente")
@@ -303,20 +344,292 @@ class ArtistTrackerDatabase:
         finally:
             conn.close()
 
+# lastfm
 
+    def set_user_lastfm(self, user_id: int, lastfm_username: str, user_info: dict = None) -> bool:
+        """
+        Establece el usuario de Last.fm para un usuario
+
+        Args:
+            user_id: ID del usuario
+            lastfm_username: Nombre de usuario de Last.fm
+            user_info: Información adicional del usuario (opcional)
+
+        Returns:
+            True si se estableció correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            playcount = 0
+            registered = ''
+
+            if user_info:
+                playcount = user_info.get('playcount', 0)
+                registered = user_info.get('registered', '')
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_lastfm
+                (user_id, lastfm_username, lastfm_playcount, lastfm_registered, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, lastfm_username, playcount, registered))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error estableciendo usuario Last.fm: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_user_lastfm(self, user_id: int) -> Optional[Dict]:
+        """
+        Obtiene el usuario de Last.fm asociado
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Diccionario con datos de Last.fm o None si no existe
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("SELECT * FROM user_lastfm WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return dict(row)
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo usuario Last.fm: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def set_lastfm_sync_limit(self, user_id: int, limit: int) -> bool:
+        """
+        Establece el límite de sincronización para Last.fm
+
+        Args:
+            user_id: ID del usuario
+            limit: Número de artistas a sincronizar
+
+        Returns:
+            True si se estableció correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE user_lastfm SET sync_limit = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            """, (limit, user_id))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error estableciendo límite de sincronización: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def save_pending_lastfm_sync(self, user_id: int, period: str, artists_data: List[Dict]) -> bool:
+        """
+        Guarda una sincronización pendiente de Last.fm
+
+        Args:
+            user_id: ID del usuario
+            period: Período de Last.fm
+            artists_data: Lista de artistas a sincronizar
+
+        Returns:
+            True si se guardó correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                INSERT OR REPLACE INTO pending_lastfm_sync
+                (user_id, period, artists_data, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, period, json.dumps(artists_data)))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error guardando sincronización pendiente: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_pending_lastfm_sync(self, user_id: int, period: str) -> Optional[List[Dict]]:
+        """
+        Obtiene una sincronización pendiente de Last.fm
+
+        Args:
+            user_id: ID del usuario
+            period: Período de Last.fm
+
+        Returns:
+            Lista de artistas o None si no existe
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT artists_data FROM pending_lastfm_sync
+                WHERE user_id = ? AND period = ?
+            """, (user_id, period))
+
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row[0])
+            return None
+
+        except (sqlite3.Error, json.JSONDecodeError) as e:
+            logger.error(f"Error obteniendo sincronización pendiente: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def clear_pending_lastfm_sync(self, user_id: int, period: str = None):
+        """
+        Limpia sincronizaciones pendientes de Last.fm
+
+        Args:
+            user_id: ID del usuario
+            period: Período específico (opcional, si no se especifica limpia todos)
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            if period:
+                cursor.execute("DELETE FROM pending_lastfm_sync WHERE user_id = ? AND period = ?", (user_id, period))
+            else:
+                cursor.execute("DELETE FROM pending_lastfm_sync WHERE user_id = ?", (user_id,))
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            logger.error(f"Error limpiando sincronización pendiente: {e}")
+        finally:
+            conn.close()
+
+
+    def get_artist_by_mbid(self, mbid: str) -> Optional[int]:
+        """
+        Busca un artista por su MBID
+
+        Args:
+            mbid: MusicBrainz ID del artista
+
+        Returns:
+            ID del artista o None si no existe
+        """
+        if not mbid:
+            return None
+
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("SELECT id FROM artists WHERE mbid = ?", (mbid,))
+            row = cursor.fetchone()
+
+            if row:
+                return row[0]
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error buscando artista por MBID {mbid}: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def format_artists_preview(self, artists: List[Dict], limit: int = 10) -> str:
+        """
+        Formatea una vista previa de artistas con información de MBID
+
+        Args:
+            artists: Lista de artistas
+            limit: Número máximo de artistas a mostrar
+
+        Returns:
+            String formateado con los artistas
+        """
+        if not artists:
+            return "No se encontraron artistas"
+
+        lines = []
+        display_artists = artists[:limit]
+        mbid_count = sum(1 for artist in display_artists if artist.get("mbid"))
+
+        for i, artist in enumerate(display_artists, 1):
+            playcount = artist.get("playcount", 0)
+            name = artist.get("name", "Nombre desconocido")
+            mbid = artist.get("mbid", "")
+
+            # Escapar caracteres especiales para Markdown
+            safe_name = name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+
+            line = f"{i}. *{safe_name}*"
+
+            # Añadir información de reproducción
+            if playcount > 0:
+                line += f" ({playcount:,} reproducciones)"
+
+            # Indicar si tiene MBID
+            if mbid:
+                line += " 🎵"  # Emoji para indicar que tiene MBID
+
+            # Añadir géneros si están disponibles
+            genres = artist.get("genres", [])
+            if genres:
+                genre_text = ", ".join(genres[:2])  # Mostrar hasta 2 géneros
+                line += f" _{genre_text}_"
+
+            lines.append(line)
+
+        if len(artists) > limit:
+            lines.append(f"_...y {len(artists) - limit} más_")
+
+        # Añadir estadísticas de MBID
+        lines.append("")
+        lines.append(f"🎵 {mbid_count}/{len(display_artists)} artistas con MBID para sincronización precisa")
+
+        return "\n".join(lines)
+
+
+
+
+# countries
     def set_country_filter(self, user_id: int, country_code: str) -> bool:
         """
         VERSIÓN LEGACY - Mantener compatibilidad
         Ahora redirige al sistema de países múltiples
         """
-        if country_city_service:
+        if country_state_city:
             # Limpiar países existentes y añadir el nuevo
-            user_countries = country_city_service.get_user_countries(user_id)
+            user_countries = country_state_city.get_user_countries(user_id)
             for country in user_countries:
-                country_city_service.remove_user_country(user_id, country['code'])
+                country_state_city.remove_user_country(user_id, country['code'])
 
             # Añadir el nuevo país
-            return country_city_service.add_user_country(user_id, country_code)
+            return country_state_city.add_user_country(user_id, country_code)
         else:
             # Fallback al sistema original
             conn = self.get_connection()
@@ -1144,8 +1457,8 @@ class ArtistTrackerDatabase:
             }
 
             # Añadir información de países múltiples
-            if country_city_service:
-                user_countries = country_city_service.get_user_country_codes(user_id)
+            if country_state_city:
+                user_countries = country_state_city.get_user_country_codes(user_id)
                 services['countries'] = user_countries
 
                 # Mantener compatibilidad con country_filter
@@ -1412,7 +1725,7 @@ def initialize_concert_services():
 
 def initialize_country_service():
     """Inicializa el servicio de países y ciudades"""
-    global country_city_service
+    global country_state_city
 
     COUNTRY_API_KEY = os.environ.get("COUNTRY_CITY_API_KEY")
 
@@ -1422,9 +1735,9 @@ def initialize_country_service():
         return False
 
     try:
-        from country_city_service import CountryCityService
+        from apis.country_state_city import CountryCityService
 
-        country_city_service = CountryCityService(
+        country_state_city = CountryCityService(
             api_key=COUNTRY_API_KEY,
             db_path=db.db_path
         )
@@ -1436,6 +1749,45 @@ def initialize_country_service():
         logger.error(f"❌ Error inicializando servicio de países: {e}")
         return False
 
+
+def initialize_lastfm_service():
+    """Inicializa el servicio de Last.fm"""
+    global lastfm_service
+
+    LASTFM_API_KEY = os.environ.get("LASTFM_API_KEY")
+
+    if not LASTFM_API_KEY:
+        logger.warning("⚠️ LASTFM_API_KEY no configurada")
+        logger.warning("⚠️ Funcionalidad de Last.fm deshabilitada")
+        return False
+
+    if not LastFmService:
+        logger.warning("⚠️ LastFmService no disponible")
+        return False
+
+    try:
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        CACHE_DIR = os.path.join(BASE_DIR, "cache")
+
+        lastfm_service = LastFmService(
+            api_key=LASTFM_API_KEY,
+            cache_dir=os.path.join(CACHE_DIR, "lastfm")
+        )
+
+        if lastfm_service.setup():
+            logger.info("✅ Servicio de Last.fm inicializado")
+            return True
+        else:
+            logger.error("❌ Error configurando Last.fm")
+            lastfm_service = None
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Error inicializando servicio de Last.fm: {e}")
+        lastfm_service = None
+        return False
+
+
 async def addcountry_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /addcountry - añade un país a la configuración del usuario"""
     if not context.args:
@@ -1446,7 +1798,7 @@ async def addcountry_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
-    if not country_city_service:
+    if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible.\n"
             "Contacta al administrador para configurar la API key."
@@ -1476,11 +1828,11 @@ async def addcountry_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             country_code = query.upper()
 
             # Verificar que existe
-            country_info = country_city_service.get_country_info(country_code)
+            country_info = country_state_city.get_country_info(country_code)
             if not country_info:
                 # Intentar obtener países actualizados
-                countries = country_city_service.get_available_countries(force_refresh=True)
-                country_info = country_city_service.get_country_info(country_code)
+                countries = country_state_city.get_available_countries(force_refresh=True)
+                country_info = country_state_city.get_country_info(country_code)
 
             if country_info:
                 selected_country = country_info
@@ -1492,7 +1844,7 @@ async def addcountry_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 return
         else:
             # Buscar por nombre
-            matching_countries = country_city_service.search_countries(query)
+            matching_countries = country_state_city.search_countries(query)
 
             if not matching_countries:
                 await status_message.edit_text(
@@ -1513,12 +1865,12 @@ async def addcountry_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Esto puede tardar un momento mientras obtenemos las ciudades..."
         )
 
-        success = country_city_service.add_user_country(user['id'], selected_country['code'])
+        success = country_state_city.add_user_country(user['id'], selected_country['code'])
 
         if success:
             # Obtener estadísticas
-            cities = country_city_service.get_country_cities(selected_country['code'])
-            user_countries = country_city_service.get_user_countries(user['id'])
+            cities = country_state_city.get_country_cities(selected_country['code'])
+            user_countries = country_state_city.get_user_countries(user['id'])
 
             await status_message.edit_text(
                 f"✅ País añadido: {selected_country['name']} ({selected_country['code']})\n"
@@ -1638,15 +1990,15 @@ async def country_selection_callback(update: Update, context: ContextTypes.DEFAU
     )
 
     try:
-        success = country_city_service.add_user_country(user['id'], selected_country['code'])
+        success = country_state_city.add_user_country(user['id'], selected_country['code'])
 
         # Limpiar selección pendiente
         db.clear_pending_selection(chat_id)
 
         if success:
             # Obtener estadísticas
-            cities = country_city_service.get_country_cities(selected_country['code'])
-            user_countries = country_city_service.get_user_countries(user['id'])
+            cities = country_state_city.get_country_cities(selected_country['code'])
+            user_countries = country_state_city.get_user_countries(user['id'])
 
             await query.edit_message_text(
                 f"✅ País añadido: {selected_country['name']} ({selected_country['code']})\n"
@@ -1677,7 +2029,7 @@ async def removecountry_command(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    if not country_city_service:
+    if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible."
         )
@@ -1695,7 +2047,7 @@ async def removecountry_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     # Verificar que el usuario tenga más de un país (no puede quedarse sin países)
-    user_countries = country_city_service.get_user_countries(user['id'])
+    user_countries = country_state_city.get_user_countries(user['id'])
     if len(user_countries) <= 1:
         await update.message.reply_text(
             "❌ No puedes eliminar tu último país configurado.\n"
@@ -1704,13 +2056,13 @@ async def removecountry_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     # Eliminar país
-    success = country_city_service.remove_user_country(user['id'], country_code)
+    success = country_state_city.remove_user_country(user['id'], country_code)
 
     if success:
-        country_info = country_city_service.get_country_info(country_code)
+        country_info = country_state_city.get_country_info(country_code)
         country_name = country_info['name'] if country_info else country_code
 
-        remaining_countries = country_city_service.get_user_countries(user['id'])
+        remaining_countries = country_state_city.get_user_countries(user['id'])
 
         await update.message.reply_text(
             f"✅ País eliminado: {country_name} ({country_code})\n"
@@ -1724,7 +2076,7 @@ async def removecountry_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def mycountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /mycountries - muestra países configurados del usuario"""
-    if not country_city_service:
+    if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible."
         )
@@ -1741,7 +2093,7 @@ async def mycountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     # Obtener países del usuario
-    user_countries = country_city_service.get_user_countries(user['id'])
+    user_countries = country_state_city.get_user_countries(user['id'])
 
     if not user_countries:
         await update.message.reply_text(
@@ -1789,7 +2141,7 @@ async def mycountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /listcountries - muestra países disponibles"""
-    if not country_city_service:
+    if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible."
         )
@@ -1802,7 +2154,7 @@ async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     try:
         # Obtener países (usar caché si está disponible)
-        countries = country_city_service.get_available_countries()
+        countries = country_state_city.get_available_countries()
 
         if not countries:
             await status_message.edit_text(
@@ -1880,7 +2232,7 @@ async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def refreshcountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /refreshcountries - actualiza la base de datos de países (solo admins)"""
-    if not country_city_service:
+    if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible."
         )
@@ -1904,7 +2256,7 @@ async def refreshcountries_command(update: Update, context: ContextTypes.DEFAULT
 
     try:
         # Forzar actualización desde API
-        countries = country_city_service.get_available_countries(force_refresh=True)
+        countries = country_state_city.get_available_countries(force_refresh=True)
 
         if countries:
             await status_message.edit_text(
@@ -1935,8 +2287,8 @@ def get_user_services_extended(user_id: int) -> Dict[str, any]:
     original_services = db.get_user_services(user_id)
 
     # Añadir información de países
-    if country_city_service:
-        user_countries = country_city_service.get_user_country_codes(user_id)
+    if country_state_city:
+        user_countries = country_state_city.get_user_country_codes(user_id)
         original_services['countries'] = user_countries
         original_services['country_filter'] = list(user_countries)[0] if user_countries else 'ES'  # Compatibilidad
     else:
@@ -1944,33 +2296,74 @@ def get_user_services_extended(user_id: int) -> Dict[str, any]:
 
     return original_services
 
-async def search_concerts_for_artist_filtered(artist_name: str, user_id: int) -> List[Dict]:
+async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, any] = None, user_id: int = None) -> List[Dict]:
     """
-    Versión que filtra conciertos por países del usuario
-
-    Args:
-        artist_name: Nombre del artista
-        user_id: ID del usuario
-
-    Returns:
-        Lista de conciertos filtrados por países del usuario
+    Busca conciertos para un artista usando los servicios habilitados
+    VERSIÓN MODIFICADA: Ticketmaster busca globalmente y luego filtra
     """
-    # Obtener configuración del usuario
-    user_services = get_user_services_extended(user_id)
+    if user_services is None:
+        user_services = {
+            'ticketmaster': True,
+            'spotify': True,
+            'setlistfm': True,
+            'country_filter': 'ES',
+            'countries': {'ES'}
+        }
+
+    all_concerts = []
     user_countries = user_services.get('countries', {'ES'})
 
-    # Buscar conciertos usando función original
-    all_concerts = await search_concerts_for_artist(artist_name, user_services)
+    # Buscar en Ticketmaster si está habilitado - BÚSQUEDA GLOBAL
+    if user_services.get('ticketmaster', True) and ticketmaster_service:
+        try:
+            # Usar búsqueda global en lugar de por país
+            concerts, _ = ticketmaster_service.search_concerts_global(artist_name)
+            all_concerts.extend(concerts)
 
-    # Filtrar por países si el servicio está disponible
-    if country_city_service:
-        # Usar el filtro extendido
-        from country_city_service import ArtistTrackerDatabaseExtended
-        extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_city_service)
-        filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+            logger.info(f"Ticketmaster global: {len([c for c in concerts if c.get('source') == 'Ticketmaster'])} conciertos encontrados para {artist_name}")
+        except Exception as e:
+            logger.error(f"Error buscando en Ticketmaster: {e}")
 
-        logger.info(f"Conciertos filtrados: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
-        return filtered_concerts
+    # Buscar en Spotify si está habilitado (sin cambios)
+    if user_services.get('spotify', True) and spotify_service:
+        try:
+            concerts, _ = spotify_service.search_artist_and_concerts(artist_name)
+            all_concerts.extend(concerts)
+            logger.info(f"Spotify: {len([c for c in all_concerts if c.get('source') == 'Spotify'])} conciertos encontrados para {artist_name}")
+        except Exception as e:
+            logger.error(f"Error buscando en Spotify: {e}")
+
+    # Buscar en Setlist.fm si está habilitado - MANTENER POR PAÍS
+    if user_services.get('setlistfm', True) and setlistfm_service:
+        try:
+            # Setlist.fm mantiene búsqueda por país ya que es más específico
+            for country_code in user_countries:
+                concerts, _ = setlistfm_service.search_concerts(artist_name, country_code)
+                all_concerts.extend(concerts)
+
+            logger.info(f"Setlist.fm: {len([c for c in all_concerts if c.get('source') == 'Setlist.fm'])} conciertos encontrados para {artist_name}")
+        except Exception as e:
+            logger.error(f"Error buscando en Setlist.fm: {e}")
+
+    # Filtrar conciertos por países del usuario si el servicio está disponible
+    if country_city_service and user_id:
+        try:
+            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_city_service)
+            filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+
+            logger.info(f"Conciertos filtrados para {artist_name}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
+            return filtered_concerts
+        except Exception as e:
+            logger.error(f"Error filtrando conciertos: {e}")
+            # Si falla el filtrado, hacer filtrado básico por país
+            filtered_concerts = []
+            for concert in all_concerts:
+                concert_country = concert.get('country', '').upper()
+                if not concert_country or concert_country in user_countries:
+                    filtered_concerts.append(concert)
+
+            logger.info(f"Filtrado básico aplicado: {len(all_concerts)} -> {len(filtered_concerts)}")
+            return filtered_concerts
 
     return all_concerts
 
@@ -2038,9 +2431,9 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
             logger.error(f"Error buscando en Setlist.fm: {e}")
 
     # Filtrar conciertos por países del usuario si el servicio está disponible
-    if country_city_service and user_id:
+    if country_state_city and user_id:
         try:
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_city_service)
+            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
             filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
 
             logger.info(f"Conciertos filtrados para {artist_name}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
@@ -2053,7 +2446,10 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
 
 
 async def update_concerts_database():
-    """Actualiza la base de datos con nuevos conciertos"""
+    """
+    Actualiza la base de datos con nuevos conciertos
+    VERSIÓN MODIFICADA: Guarda todos los conciertos globalmente
+    """
     logger.info("Actualizando base de datos de conciertos...")
 
     # Obtener todos los artistas únicos de la base de datos
@@ -2065,11 +2461,23 @@ async def update_concerts_database():
         artists = [row[0] for row in cursor.fetchall()]
 
         total_new_concerts = 0
+        total_all_concerts = 0
 
         for artist_name in artists:
-            logger.info(f"Buscando conciertos para {artist_name}")
-            concerts = await search_concerts_for_artist(artist_name)
+            logger.info(f"Buscando conciertos globalmente para {artist_name}")
 
+            # Buscar con configuración global (todos los servicios activos)
+            global_services = {
+                'ticketmaster': True,
+                'spotify': True,
+                'setlistfm': True,
+                'countries': {'ES', 'US', 'FR', 'DE', 'IT', 'GB'}  # Países principales para Setlist.fm
+            }
+
+            concerts = await search_concerts_for_artist(artist_name, global_services)
+            total_all_concerts += len(concerts)
+
+            # Guardar TODOS los conciertos encontrados
             for concert in concerts:
                 concert_id = db.save_concert(concert)
                 if concert_id:
@@ -2078,12 +2486,14 @@ async def update_concerts_database():
             # Pausa para no sobrecargar las APIs
             await asyncio.sleep(1)
 
-        logger.info(f"Actualización completada: {total_new_concerts} nuevos conciertos añadidos")
+        logger.info(f"Actualización completada: {total_new_concerts} nuevos conciertos de {total_all_concerts} encontrados")
 
     except Exception as e:
         logger.error(f"Error actualizando base de datos de conciertos: {e}")
     finally:
         conn.close()
+
+
 
 
 def format_concerts_message(concerts: List[Dict], title: str = "🎵 Conciertos encontrados", show_notified: bool = False, show_expand_buttons: bool = False, user_id: int = None) -> Tuple[str, Optional[InlineKeyboardMarkup]]:
@@ -2603,9 +3013,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/search - Ver conciertos de tus artistas\n"
         "/searchartist <artista> - Buscar conciertos específicos\n"
         "/showartist <artista> - Ver todos los conciertos de un artista\n\n"
+        "/lastfm - Sincronizar artistas desde Last.fm\n\n"
     )
 
-    if country_city_service:
+    if country_state_city:
         help_text += (
             "🌍 *Gestión de países:*\n"
             "/addcountry <país> - Añadir país a tu configuración\n"
@@ -3306,7 +3717,7 @@ async def country_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Ejemplo: `/country ES`\n\n"
         )
 
-        if country_city_service:
+        if country_state_city:
             message += (
                 "💡 *Nuevo sistema disponible:*\n"
                 "Ahora puedes tener múltiples países configurados:\n"
@@ -3339,7 +3750,7 @@ async def country_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if country_city_service:
+    if country_state_city:
         # Usar nuevo sistema
         await update.message.reply_text(
             f"🔄 Configurando país usando el nuevo sistema...\n"
@@ -3347,15 +3758,15 @@ async def country_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Limpiar países existentes
-        user_countries = country_city_service.get_user_countries(user['id'])
+        user_countries = country_state_city.get_user_countries(user['id'])
         for country in user_countries:
-            country_city_service.remove_user_country(user['id'], country['code'])
+            country_state_city.remove_user_country(user['id'], country['code'])
 
         # Añadir nuevo país
-        success = country_city_service.add_user_country(user['id'], country_code)
+        success = country_state_city.add_user_country(user['id'], country_code)
 
         if success:
-            country_info = country_city_service.get_country_info(country_code)
+            country_info = country_state_city.get_country_info(country_code)
             country_name = country_info['name'] if country_info else country_code
 
             await update.message.reply_text(
@@ -3783,7 +4194,7 @@ def split_long_message(message: str, max_length: int = 4000) -> List[str]:
         chunks.append('\n'.join(current_chunk))
 
 async def config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /config - VERSIÓN EXTENDIDA con países múltiples"""
+    """Comando /config - VERSIÓN INTERACTIVA con botones"""
     chat_id = update.effective_chat.id
 
     # Verificar que el usuario esté registrado
@@ -3794,69 +4205,1539 @@ async def config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Obtener configuración de servicios (versión extendida)
+    # Mostrar configuración con botones
+    await show_config_menu(update, user)
+
+
+
+async def show_config_menu(update: Update, user: Dict, edit_message: bool = False):
+    """Muestra el menú principal de configuración"""
+    # Obtener configuración de servicios
     user_services = db.get_user_services(user['id'])
 
     # Formatear mensaje de configuración
-    config_lines = [f"⚙️ *Configuración de {user['username']}:*\n"]
+    config_lines = [f"⚙️ *Configuración de {user['username']}*\n"]
 
     # Notificaciones
-    notification_status = "activadas" if user['notification_enabled'] else "desactivadas"
+    notification_status = "✅ Activadas" if user['notification_enabled'] else "❌ Desactivadas"
     config_lines.append(f"🔔 *Notificaciones:* {notification_status}")
-    config_lines.append(f"⏰ *Hora de notificación:* {user['notification_time']}")
+    config_lines.append(f"⏰ *Hora:* {user['notification_time']}")
     config_lines.append("")
 
     # Países configurados
-    if country_city_service:
-        user_countries = country_city_service.get_user_countries(user['id'])
+    if country_state_city:
+        user_countries = country_state_city.get_user_countries(user['id'])
         if user_countries:
             config_lines.append("🌍 *Países configurados:*")
-            for country in user_countries:
-                config_lines.append(f"   • {country['name']} ({country['code']})")
+            countries_text = ", ".join([f"{c['name']} ({c['code']})" for c in user_countries[:3]])
+            if len(user_countries) > 3:
+                countries_text += f" y {len(user_countries) - 3} más"
+            config_lines.append(f"   {countries_text}")
         else:
             config_lines.append("🌍 *Países:* Ninguno configurado")
     else:
         # Fallback al sistema legacy
         country_filter = user_services.get('country_filter', 'ES')
-        config_lines.append(f"🌍 *Filtro de país:* {country_filter}")
+        config_lines.append(f"🌍 *País:* {country_filter}")
 
     config_lines.append("")
 
     # Estado de servicios
     config_lines.append("🔧 *Servicios de búsqueda:*")
+    active_services = []
+    inactive_services = []
 
     for service in ['ticketmaster', 'spotify', 'setlistfm']:
-        status = "✅ Activo" if user_services.get(service, True) else "❌ Inactivo"
-        service_name = service.capitalize()
-        config_lines.append(f"   • *{service_name}:* {status}")
+        if user_services.get(service, True):
+            active_services.append(service.capitalize())
+        else:
+            inactive_services.append(service.capitalize())
 
+    if active_services:
+        config_lines.append(f"   ✅ {', '.join(active_services)}")
+    if inactive_services:
+        config_lines.append(f"   ❌ {', '.join(inactive_services)}")
+
+    # Artistas seguidos
+    followed_artists = db.get_user_followed_artists(user['id'])
     config_lines.append("")
-    config_lines.append("💡 *Comandos de configuración:*")
-    config_lines.append("`/notify HH:MM` - Cambiar hora")
-    config_lines.append("`/notify toggle` - Activar/desactivar")
+    config_lines.append(f"🎵 *Artistas seguidos:* {len(followed_artists)}")
 
-    if country_city_service:
-        config_lines.append("`/addcountry <país>` - Añadir país")
-        config_lines.append("`/removecountry <código>` - Eliminar país")
-        config_lines.append("`/mycountries` - Ver países configurados")
-    else:
-        config_lines.append("`/country XX` - Cambiar país")
-
-    config_lines.append("`/serviceon <servicio>` - Activar servicio")
-    config_lines.append("`/serviceoff <servicio>` - Desactivar servicio")
+    # Crear botones del menú principal
+    keyboard = [
+        [
+            InlineKeyboardButton("🔔 Notificaciones", callback_data=f"config_notifications_{user['id']}"),
+            InlineKeyboardButton("🌍 Países", callback_data=f"config_countries_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔧 Servicios", callback_data=f"config_services_{user['id']}"),
+            InlineKeyboardButton("🎵 Artistas", callback_data=f"config_artists_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔄 Actualizar", callback_data=f"config_refresh_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     response = "\n".join(config_lines)
 
     try:
-        await update.message.reply_text(
-            response,
-            parse_mode='Markdown'
-        )
+        if edit_message and hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                response,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                response,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
     except Exception as e:
         # Si hay error con Markdown, enviar sin formato
         logger.warning(f"Error con Markdown en config, enviando texto plano: {e}")
         plain_response = response.replace('*', '').replace('`', '')
-        await update.message.reply_text(plain_response)
+        if edit_message and hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                plain_response,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                plain_response,
+                reply_markup=reply_markup
+            )
+
+
+async def config_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks del sistema de configuración"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Config callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) < 3:
+        await query.edit_message_text("❌ Error en el callback.")
+        return
+
+    prefix = parts[0]  # 'config', 'notif', 'country', 'service', etc.
+    action = parts[1]
+
+    # Obtener user_id del final
+    try:
+        user_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Error de usuario.")
+        return
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        # Manejar según el prefijo
+        if prefix == "config":
+            if action == "notifications":
+                await show_notifications_menu(query, user)
+            elif action == "countries":
+                await show_countries_menu(query, user)
+            elif action == "services":
+                await show_services_menu(query, user)
+            elif action == "artists":
+                await show_artists_menu(query, user)
+            elif action == "refresh" or action == "back":
+                # Actualizar la configuración
+                updated_user = db.get_user_by_chat_id(query.message.chat_id)
+                fake_update = type('obj', (object,), {'callback_query': query})()
+                await show_config_menu(fake_update, updated_user, edit_message=True)
+
+        elif prefix == "notif":
+            await handle_notification_callback(query, action, user_id, context)
+
+        elif prefix == "country":
+            await handle_country_callback(query, action, user_id, parts, context)
+
+        elif prefix == "service":
+            await handle_service_callback(query, action, user_id, parts)
+
+        else:
+            await query.edit_message_text("❌ Acción no reconocida.")
+
+    except Exception as e:
+        logger.error(f"Error en config_callback_handler: {e}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
+async def handle_notification_callback(query, action: str, user_id: int, context):
+    """Maneja callbacks específicos de notificaciones"""
+    if action == "on":
+        # Activar notificaciones
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error activando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "✅ Notificaciones activadas correctamente." if success else "❌ Error al activar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "off":
+        # Desactivar notificaciones
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 0 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error desactivando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "❌ Notificaciones desactivadas." if success else "❌ Error al desactivar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "time":
+        # Solicitar nueva hora
+        message = (
+            "⏰ *Cambiar hora de notificación*\n\n"
+            "Envía la nueva hora en formato HH:MM\n"
+            "Ejemplo: 09:00, 14:30, 20:15\n\n"
+            "Responde a este mensaje con la hora deseada."
+        )
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_back_{user_id}")]]
+
+        # Guardar estado para esperar respuesta
+        context.user_data['waiting_for_time'] = user_id
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def handle_country_callback(query, action: str, user_id: int, parts: list, context):
+    """Maneja callbacks específicos de países"""
+    if action == "add":
+        message = (
+            "➕ *Añadir país*\n\n"
+            "Envía el código o nombre del país que quieres añadir.\n"
+            "Ejemplos: ES, Spain, FR, France\n\n"
+            "Responde a este mensaje con el país deseado."
+        )
+        context.user_data['waiting_for_country_add'] = user_id
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "remove":
+        if country_state_city:
+            user_countries = country_state_city.get_user_countries(user_id)
+            if not user_countries:
+                message = "❌ No tienes países configurados para eliminar."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            elif len(user_countries) == 1:
+                message = "❌ No puedes eliminar tu último país configurado."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            else:
+                message = "➖ *Eliminar país*\n\nSelecciona el país a eliminar:"
+                keyboard = []
+                for country in user_countries:
+                    keyboard.append([InlineKeyboardButton(
+                        f"❌ {country['name']} ({country['code']})",
+                        callback_data=f"country_delete_{country['code']}_{user_id}"
+                    )])
+                keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_countries_{user_id}")])
+        else:
+            message = "❌ Sistema de países múltiples no disponible."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "list":
+        message = (
+            "📋 *Países disponibles*\n\n"
+            "Usa `/listcountries` para ver la lista completa de países disponibles."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "delete":
+        # Manejar eliminación de país específico
+        if len(parts) >= 4:
+            country_code = parts[2]
+            if country_state_city:
+                success = country_state_city.remove_user_country(user_id, country_code)
+                if success:
+                    country_info = country_state_city.get_country_info(country_code)
+                    country_name = country_info['name'] if country_info else country_code
+                    message = f"✅ País {country_name} ({country_code}) eliminado correctamente."
+                else:
+                    message = f"❌ Error al eliminar el país {country_code}."
+            else:
+                message = "❌ Sistema de países múltiples no disponible."
+        else:
+            message = "❌ Error en la eliminación del país."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_countries_{user_id}")]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def handle_service_callback(query, action: str, user_id: int, parts: list):
+    """Maneja callbacks específicos de servicios"""
+    user_services = db.get_user_services(user_id)
+    services = ['ticketmaster', 'spotify', 'setlistfm']
+
+    if action == "activate":
+        # Mostrar servicios inactivos para activar
+        inactive_services = [s for s in services if not user_services.get(s, True)]
+
+        if not inactive_services:
+            message = "✅ Todos los servicios ya están activos."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "✅ *Activar servicio*\n\nSelecciona el servicio a activar:"
+            keyboard = []
+            for i, service in enumerate(inactive_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_enable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    elif action == "deactivate":
+        # Mostrar servicios activos para desactivar
+        active_services = [s for s in services if user_services.get(s, True)]
+
+        if len(active_services) <= 1:
+            message = "❌ Debes mantener al menos un servicio activo."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "❌ *Desactivar servicio*\n\nSelecciona el servicio a desactivar:"
+            keyboard = []
+            for i, service in enumerate(active_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_disable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    elif action == "enable" or action == "disable":
+        # Procesar activar/desactivar servicio específico
+        if len(parts) >= 4:
+            service = parts[2]
+            success = db.set_service_status(user_id, service, action == "enable")
+            action_text = "activado" if action == "enable" else "desactivado"
+
+            if success:
+                message = f"✅ Servicio {service.capitalize()} {action_text} correctamente."
+            else:
+                message = f"❌ Error al modificar el servicio {service.capitalize()}."
+        else:
+            message = "❌ Error en la operación del servicio."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_services_{user_id}")]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+
+
+
+# Función principal del comando config (ya corregida)
+async def config_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /config - VERSIÓN INTERACTIVA con botones"""
+    chat_id = update.effective_chat.id
+
+    # Verificar que el usuario esté registrado
+    user = db.get_user_by_chat_id(chat_id)
+    if not user:
+        await update.message.reply_text(
+            "❌ Primero debes registrarte con `/adduser <tu_nombre>`"
+        )
+        return
+
+    # Mostrar configuración con botones
+    await show_config_menu(update, user)
+
+async def show_config_menu(update: Update, user: Dict, edit_message: bool = False):
+    """Muestra el menú principal de configuración"""
+    # Obtener configuración de servicios
+    user_services = db.get_user_services(user['id'])
+
+    # Formatear mensaje de configuración
+    config_lines = [f"⚙️ *Configuración de {user['username']}*\n"]
+
+    # Notificaciones
+    notification_status = "✅ Activadas" if user['notification_enabled'] else "❌ Desactivadas"
+    config_lines.append(f"🔔 *Notificaciones:* {notification_status}")
+    config_lines.append(f"⏰ *Hora:* {user['notification_time']}")
+    config_lines.append("")
+
+    # Países configurados
+    if country_state_city:
+        user_countries = country_state_city.get_user_countries(user['id'])
+        if user_countries:
+            config_lines.append("🌍 *Países configurados:*")
+            countries_text = ", ".join([f"{c['name']} ({c['code']})" for c in user_countries[:3]])
+            if len(user_countries) > 3:
+                countries_text += f" y {len(user_countries) - 3} más"
+            config_lines.append(f"   {countries_text}")
+        else:
+            config_lines.append("🌍 *Países:* Ninguno configurado")
+    else:
+        # Fallback al sistema legacy
+        country_filter = user_services.get('country_filter', 'ES')
+        config_lines.append(f"🌍 *País:* {country_filter}")
+
+    config_lines.append("")
+
+    # Estado de servicios
+    config_lines.append("🔧 *Servicios de búsqueda:*")
+    active_services = []
+    inactive_services = []
+
+    for service in ['ticketmaster', 'spotify', 'setlistfm']:
+        if user_services.get(service, True):
+            active_services.append(service.capitalize())
+        else:
+            inactive_services.append(service.capitalize())
+
+    if active_services:
+        config_lines.append(f"   ✅ {', '.join(active_services)}")
+    if inactive_services:
+        config_lines.append(f"   ❌ {', '.join(inactive_services)}")
+
+    # Artistas seguidos
+    followed_artists = db.get_user_followed_artists(user['id'])
+    config_lines.append("")
+    config_lines.append(f"🎵 *Artistas seguidos:* {len(followed_artists)}")
+
+    # Crear botones del menú principal
+    keyboard = [
+        [
+            InlineKeyboardButton("🔔 Notificaciones", callback_data=f"config_notifications_{user['id']}"),
+            InlineKeyboardButton("🌍 Países", callback_data=f"config_countries_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔧 Servicios", callback_data=f"config_services_{user['id']}"),
+            InlineKeyboardButton("🎵 Artistas", callback_data=f"config_artists_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔄 Actualizar", callback_data=f"config_refresh_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    response = "\n".join(config_lines)
+
+    try:
+        if edit_message and hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                response,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                response,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+    except Exception as e:
+        # Si hay error con Markdown, enviar sin formato
+        logger.warning(f"Error con Markdown en config, enviando texto plano: {e}")
+        plain_response = response.replace('*', '').replace('`', '')
+        if edit_message and hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                plain_response,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                plain_response,
+                reply_markup=reply_markup
+            )
+
+# HANDLER PRINCIPAL - Este maneja TODOS los callbacks de configuración
+async def config_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks del sistema de configuración"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Config callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) < 3:
+        await query.edit_message_text("❌ Error en el callback.")
+        return
+
+    prefix = parts[0]  # 'config', 'notif', 'country', 'service', etc.
+    action = parts[1]
+
+    # Obtener user_id del final
+    try:
+        user_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Error de usuario.")
+        return
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        # Manejar según el prefijo
+        if prefix == "config":
+            if action == "notifications":
+                await show_notifications_menu(query, user)
+            elif action == "countries":
+                await show_countries_menu(query, user)
+            elif action == "services":
+                await show_services_menu(query, user)
+            elif action == "artists":
+                await show_artists_menu(query, user)
+            elif action == "refresh" or action == "back":
+                # Actualizar la configuración
+                updated_user = db.get_user_by_chat_id(query.message.chat_id)
+                fake_update = type('obj', (object,), {'callback_query': query})()
+                await show_config_menu(fake_update, updated_user, edit_message=True)
+
+        elif prefix == "notif":
+            await handle_notification_callback(query, action, user_id, context)
+
+        elif prefix == "country":
+            await handle_country_callback(query, action, user_id, parts, context)
+
+        elif prefix == "service":
+            await handle_service_callback(query, action, user_id, parts)
+
+        else:
+            await query.edit_message_text("❌ Acción no reconocida.")
+
+    except Exception as e:
+        logger.error(f"Error en config_callback_handler: {e}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
+async def handle_notification_callback(query, action: str, user_id: int, context):
+    """Maneja callbacks específicos de notificaciones"""
+    if action == "on":
+        # Activar notificaciones
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error activando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "✅ Notificaciones activadas correctamente." if success else "❌ Error al activar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "off":
+        # Desactivar notificaciones
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 0 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error desactivando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "❌ Notificaciones desactivadas." if success else "❌ Error al desactivar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "time":
+        # Solicitar nueva hora
+        message = (
+            "⏰ *Cambiar hora de notificación*\n\n"
+            "Envía la nueva hora en formato HH:MM\n"
+            "Ejemplo: 09:00, 14:30, 20:15\n\n"
+            "Responde a este mensaje con la hora deseada."
+        )
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_back_{user_id}")]]
+
+        # Guardar estado para esperar respuesta
+        context.user_data['waiting_for_time'] = user_id
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def handle_country_callback(query, action: str, user_id: int, parts: list, context):
+    """Maneja callbacks específicos de países"""
+    if action == "add":
+        message = (
+            "➕ *Añadir país*\n\n"
+            "Envía el código o nombre del país que quieres añadir.\n"
+            "Ejemplos: ES, Spain, FR, France\n\n"
+            "Responde a este mensaje con el país deseado."
+        )
+        context.user_data['waiting_for_country_add'] = user_id
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "remove":
+        if country_state_city:
+            user_countries = country_state_city.get_user_countries(user_id)
+            if not user_countries:
+                message = "❌ No tienes países configurados para eliminar."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            elif len(user_countries) == 1:
+                message = "❌ No puedes eliminar tu último país configurado."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            else:
+                message = "➖ *Eliminar país*\n\nSelecciona el país a eliminar:"
+                keyboard = []
+                for country in user_countries:
+                    keyboard.append([InlineKeyboardButton(
+                        f"❌ {country['name']} ({country['code']})",
+                        callback_data=f"country_delete_{country['code']}_{user_id}"
+                    )])
+                keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_countries_{user_id}")])
+        else:
+            message = "❌ Sistema de países múltiples no disponible."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "list":
+        message = (
+            "📋 *Países disponibles*\n\n"
+            "Usa `/listcountries` para ver la lista completa de países disponibles."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "delete":
+        # Manejar eliminación de país específico
+        if len(parts) >= 4:
+            country_code = parts[2]
+            if country_state_city:
+                success = country_state_city.remove_user_country(user_id, country_code)
+                if success:
+                    country_info = country_state_city.get_country_info(country_code)
+                    country_name = country_info['name'] if country_info else country_code
+                    message = f"✅ País {country_name} ({country_code}) eliminado correctamente."
+                else:
+                    message = f"❌ Error al eliminar el país {country_code}."
+            else:
+                message = "❌ Sistema de países múltiples no disponible."
+        else:
+            message = "❌ Error en la eliminación del país."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_countries_{user_id}")]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def handle_service_callback(query, action: str, user_id: int, parts: list):
+    """Maneja callbacks específicos de servicios"""
+    user_services = db.get_user_services(user_id)
+    services = ['ticketmaster', 'spotify', 'setlistfm']
+
+    if action == "activate":
+        # Mostrar servicios inactivos para activar
+        inactive_services = [s for s in services if not user_services.get(s, True)]
+
+        if not inactive_services:
+            message = "✅ Todos los servicios ya están activos."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "✅ *Activar servicio*\n\nSelecciona el servicio a activar:"
+            keyboard = []
+            for i, service in enumerate(inactive_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_enable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    elif action == "deactivate":
+        # Mostrar servicios activos para desactivar
+        active_services = [s for s in services if user_services.get(s, True)]
+
+        if len(active_services) <= 1:
+            message = "❌ Debes mantener al menos un servicio activo."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "❌ *Desactivar servicio*\n\nSelecciona el servicio a desactivar:"
+            keyboard = []
+            for i, service in enumerate(active_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_disable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    elif action == "enable" or action == "disable":
+        # Procesar activar/desactivar servicio específico
+        if len(parts) >= 4:
+            service = parts[2]
+            success = db.set_service_status(user_id, service, action == "enable")
+            action_text = "activado" if action == "enable" else "desactivado"
+
+            if success:
+                message = f"✅ Servicio {service.capitalize()} {action_text} correctamente."
+            else:
+                message = f"❌ Error al modificar el servicio {service.capitalize()}."
+        else:
+            message = "❌ Error en la operación del servicio."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_services_{user_id}")]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_notifications_menu(query, user: Dict):
+    """Muestra el submenú de notificaciones"""
+    status = "✅ Activadas" if user['notification_enabled'] else "❌ Desactivadas"
+
+    message = (
+        f"🔔 *Gestión de Notificaciones*\n\n"
+        f"Estado actual: {status}\n"
+        f"Hora actual: {user['notification_time']}\n\n"
+        f"Selecciona una opción:"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Activar", callback_data=f"notif_on_{user['id']}"),
+            InlineKeyboardButton("❌ Desactivar", callback_data=f"notif_off_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("⏰ Cambiar hora", callback_data=f"notif_time_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔙 Volver", callback_data=f"config_back_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def show_countries_menu(query, user: Dict):
+    """Muestra el submenú de países"""
+    if country_state_city:
+        user_countries = country_state_city.get_user_countries(user['id'])
+        if user_countries:
+            countries_text = "\n".join([f"• {c['name']} ({c['code']})" for c in user_countries])
+        else:
+            countries_text = "Ningún país configurado"
+    else:
+        user_services = db.get_user_services(user['id'])
+        countries_text = f"• {user_services.get('country_filter', 'ES')} (sistema legacy)"
+
+    message = (
+        f"🌍 *Gestión de Países*\n\n"
+        f"Países actuales:\n{countries_text}\n\n"
+        f"Selecciona una opción:"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ Añadir país", callback_data=f"country_add_{user['id']}"),
+            InlineKeyboardButton("➖ Eliminar país", callback_data=f"country_remove_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("📋 Ver disponibles", callback_data=f"country_list_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔙 Volver", callback_data=f"config_back_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def show_services_menu(query, user: Dict):
+    """Muestra el submenú de servicios"""
+    user_services = db.get_user_services(user['id'])
+
+    services_status = []
+    for service in ['ticketmaster', 'spotify', 'setlistfm']:
+        status = "✅" if user_services.get(service, True) else "❌"
+        services_status.append(f"{status} {service.capitalize()}")
+
+    message = (
+        f"🔧 *Gestión de Servicios*\n\n"
+        f"Estado actual:\n" + "\n".join(services_status) + "\n\n"
+        f"Selecciona una opción:"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Activar servicio", callback_data=f"service_activate_{user['id']}"),
+            InlineKeyboardButton("❌ Desactivar servicio", callback_data=f"service_deactivate_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔙 Volver", callback_data=f"config_back_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def show_artists_menu(query, user: Dict):
+    """Muestra el submenú de artistas (equivalente a /list)"""
+    followed_artists = db.get_user_followed_artists(user['id'])
+
+    if not followed_artists:
+        message = (
+            f"🎵 *Artistas seguidos*\n\n"
+            f"No tienes artistas seguidos aún.\n"
+            f"Usa el botón de abajo para añadir artistas."
+        )
+    else:
+        message_lines = [f"🎵 *Artistas seguidos* ({len(followed_artists)})\n"]
+
+        # Mostrar solo los primeros 10 para no sobrecargar
+        for i, artist in enumerate(followed_artists[:10], 1):
+            line = f"{i}. *{artist['name']}*"
+
+            details = []
+            if artist['country']:
+                details.append(f"🌍 {artist['country']}")
+            if artist['formed_year']:
+                details.append(f"📅 {artist['formed_year']}")
+
+            if details:
+                line += f" ({', '.join(details)})"
+
+            message_lines.append(line)
+
+        if len(followed_artists) > 10:
+            message_lines.append(f"_...y {len(followed_artists) - 10} más_")
+
+        message_lines.append(f"\nUsa `/list` para ver la lista completa con enlaces.")
+        message = "\n".join(message_lines)
+
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ Añadir artista", callback_data=f"artist_add_{user['id']}"),
+            InlineKeyboardButton("🔍 Buscar conciertos", callback_data=f"artist_search_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔙 Volver", callback_data=f"config_back_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def notification_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja los callbacks específicos de notificaciones"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    action = parts[1]
+    user_id = int(parts[2])
+
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    if action == "on":
+        # Activar notificaciones
+        # Actualizar directamente en la base de datos
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 1 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error activando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "✅ Notificaciones activadas correctamente." if success else "❌ Error al activar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "off":
+        # Desactivar notificaciones
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET notification_enabled = 0 WHERE id = ?", (user_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error desactivando notificaciones: {e}")
+            success = False
+        finally:
+            conn.close()
+
+        message = "❌ Notificaciones desactivadas." if success else "❌ Error al desactivar notificaciones."
+        keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_back_{user_id}")]]
+
+    elif action == "time":
+        # Solicitar nueva hora
+        message = (
+            "⏰ *Cambiar hora de notificación*\n\n"
+            "Envía la nueva hora en formato HH:MM\n"
+            "Ejemplo: 09:00, 14:30, 20:15\n\n"
+            "Responde a este mensaje con la hora deseada."
+        )
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_back_{user_id}")]]
+
+        # Guardar estado para esperar respuesta
+        context.user_data['waiting_for_time'] = user_id
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def country_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja los callbacks específicos de países"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    action = parts[1]
+    user_id = int(parts[2])
+
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    if action == "add":
+        message = (
+            "➕ *Añadir país*\n\n"
+            "Envía el código o nombre del país que quieres añadir.\n"
+            "Ejemplos: ES, Spain, FR, France\n\n"
+            "Responde a este mensaje con el país deseado."
+        )
+        context.user_data['waiting_for_country_add'] = user_id
+
+    elif action == "remove":
+        if country_state_city:
+            user_countries = country_state_city.get_user_countries(user_id)
+            if not user_countries:
+                message = "❌ No tienes países configurados para eliminar."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            elif len(user_countries) == 1:
+                message = "❌ No puedes eliminar tu último país configurado."
+                keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+            else:
+                message = "➖ *Eliminar país*\n\nSelecciona el país a eliminar:"
+                keyboard = []
+                for country in user_countries:
+                    keyboard.append([InlineKeyboardButton(
+                        f"❌ {country['name']} ({country['code']})",
+                        callback_data=f"country_delete_{country['code']}_{user_id}"
+                    )])
+                keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_countries_{user_id}")])
+        else:
+            message = "❌ Sistema de países múltiples no disponible."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+
+    elif action == "list":
+        message = (
+            "📋 *Países disponibles*\n\n"
+            "Obteniendo lista de países disponibles...\n"
+            "Esto puede tardar un momento."
+        )
+        keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_countries_{user_id}")]]
+        # Aquí podrías implementar una lista paginada de países
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def service_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja los callbacks específicos de servicios"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    action = parts[1]
+    user_id = int(parts[2])
+
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    user_services = db.get_user_services(user_id)
+    services = ['ticketmaster', 'spotify', 'setlistfm']
+
+    if action == "activate":
+        # Mostrar servicios inactivos para activar
+        inactive_services = [s for s in services if not user_services.get(s, True)]
+
+        if not inactive_services:
+            message = "✅ Todos los servicios ya están activos."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "✅ *Activar servicio*\n\nSelecciona el servicio a activar:"
+            keyboard = []
+            for i, service in enumerate(inactive_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_enable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    elif action == "deactivate":
+        # Mostrar servicios activos para desactivar
+        active_services = [s for s in services if user_services.get(s, True)]
+
+        if len(active_services) <= 1:
+            message = "❌ Debes mantener al menos un servicio activo."
+            keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"config_services_{user_id}")]]
+        else:
+            message = "❌ *Desactivar servicio*\n\nSelecciona el servicio a desactivar:"
+            keyboard = []
+            for i, service in enumerate(active_services, 1):
+                keyboard.append([InlineKeyboardButton(
+                    f"{i}. {service.capitalize()}",
+                    callback_data=f"service_disable_{service}_{user_id}"
+                )])
+            keyboard.append([InlineKeyboardButton("🔙 Cancelar", callback_data=f"config_services_{user_id}")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def service_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja las acciones específicas de activar/desactivar servicios"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    action = parts[1]  # enable o disable
+    service = parts[2]
+    user_id = int(parts[3])
+
+    success = False
+    if action == "enable":
+        success = db.set_service_status(user_id, service, True)
+        action_text = "activado"
+    elif action == "disable":
+        success = db.set_service_status(user_id, service, False)
+        action_text = "desactivado"
+
+    if success:
+        message = f"✅ Servicio {service.capitalize()} {action_text} correctamente."
+    else:
+        message = f"❌ Error al modificar el servicio {service.capitalize()}."
+
+    keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_services_{user_id}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(message, reply_markup=reply_markup)
+
+async def config_back_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el botón de volver al menú principal de configuración"""
+    query = update.callback_query
+    await query.answer()
+
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user_by_chat_id(query.message.chat_id)
+
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    # Actualizar usuario y mostrar menú principal
+    updated_user = db.get_user_by_chat_id(query.message.chat_id)
+    fake_update = type('obj', (object,), {'callback_query': query})()
+    await show_config_menu(fake_update, updated_user, edit_message=True)
+
+
+# Función auxiliar para manejar mensajes de texto cuando se espera input
+async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja la entrada de texto cuando se espera configuración"""
+    logger.info(f"DEBUG: handle_text_input llamado con user_data: {context.user_data}")
+
+    # PRIORIDAD 1: Cambio de hora de notificación
+    if 'waiting_for_time' in context.user_data:
+        # Procesar nueva hora de notificación
+        user_id = context.user_data['waiting_for_time']
+        time_str = update.message.text.strip()
+
+        try:
+            # Validar formato de hora
+            datetime.strptime(time_str, '%H:%M')
+
+            if db.set_notification_time(user_id, time_str):
+                await update.message.reply_text(
+                    f"✅ Hora de notificación cambiada a {time_str}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a configuración", callback_data=f"config_back_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al cambiar la hora.")
+        except ValueError:
+            await update.message.reply_text("❌ Formato inválido. Usa HH:MM (ejemplo: 09:00)")
+
+        del context.user_data['waiting_for_time']
+        return
+
+    # PRIORIDAD 2: Añadir país
+    elif 'waiting_for_country_add' in context.user_data:
+        # Procesar añadir país
+        user_id = context.user_data['waiting_for_country_add']
+        country_input = update.message.text.strip()
+
+        if country_state_city:
+            # Usar el sistema existente de añadir países
+            if len(country_input) == 2 and country_input.isalpha():
+                country_code = country_input.upper()
+                success = country_state_city.add_user_country(user_id, country_code)
+            else:
+                # Buscar por nombre
+                matching_countries = country_state_city.search_countries(country_input)
+                if len(matching_countries) == 1:
+                    success = country_state_city.add_user_country(user_id, matching_countries[0]['code'])
+                else:
+                    await update.message.reply_text("❌ País no encontrado o ambiguo. Usa el código de 2 letras.")
+                    del context.user_data['waiting_for_country_add']
+                    return
+
+            if success:
+                await update.message.reply_text(
+                    f"✅ País añadido correctamente",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a configuración", callback_data=f"config_back_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al añadir el país o ya lo tienes configurado.")
+        else:
+            await update.message.reply_text("❌ Sistema de países múltiples no disponible.")
+
+        del context.user_data['waiting_for_country_add']
+        return
+
+    # PRIORIDAD 3: Usuario de Last.fm (nuevo)
+    elif 'waiting_for_lastfm_user' in context.user_data:
+        # Procesar nuevo usuario de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_user']
+        lastfm_username = update.message.text.strip()
+
+        logger.info(f"DEBUG: Procesando usuario Last.fm: {lastfm_username}")
+
+        if not lastfm_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_lastfm_user']
+            return
+
+        # Verificar que el servicio esté disponible
+        if not lastfm_service:
+            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
+            del context.user_data['waiting_for_lastfm_user']
+            return
+
+        # Verificar que el usuario existe en Last.fm
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
+
+        try:
+            if not lastfm_service.check_user_exists(lastfm_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_lastfm_user']
+                return
+
+            # Obtener información del usuario
+            user_info = lastfm_service.get_user_info(lastfm_username)
+
+            # Guardar en base de datos
+            if db.set_user_lastfm(user_id, lastfm_username, user_info):
+                message = f"✅ Usuario de Last.fm configurado: {lastfm_username}"
+                if user_info and user_info.get('playcount', 0) > 0:
+                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🎵 Abrir Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al configurar el usuario de Last.fm.")
+
+        except Exception as e:
+            logger.error(f"Error configurando usuario Last.fm: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_lastfm_user']
+        return
+
+    # PRIORIDAD 4: Cambio de usuario de Last.fm
+    elif 'waiting_for_lastfm_change_user' in context.user_data:
+        # Procesar cambio de usuario de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_change_user']
+        lastfm_username = update.message.text.strip()
+
+        if not lastfm_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_lastfm_change_user']
+            return
+
+        if not lastfm_service:
+            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
+            del context.user_data['waiting_for_lastfm_change_user']
+            return
+
+        # Verificar usuario
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
+
+        try:
+            if not lastfm_service.check_user_exists(lastfm_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_lastfm_change_user']
+                return
+
+            # Obtener información y actualizar
+            user_info = lastfm_service.get_user_info(lastfm_username)
+
+            if db.set_user_lastfm(user_id, lastfm_username, user_info):
+                message = f"✅ Usuario de Last.fm actualizado: {lastfm_username}"
+                if user_info and user_info.get('playcount', 0) > 0:
+                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al actualizar el usuario de Last.fm.")
+
+        except Exception as e:
+            logger.error(f"Error actualizando usuario Last.fm: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_lastfm_change_user']
+        return
+
+    # PRIORIDAD 5: Límite de Last.fm
+    elif 'waiting_for_lastfm_limit' in context.user_data:
+        # Procesar nuevo límite de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_limit']
+        limit_text = update.message.text.strip()
+
+        try:
+            limit = int(limit_text)
+
+            if limit < 5 or limit > 200:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 200 artistas.")
+                del context.user_data['waiting_for_lastfm_limit']
+                return
+
+            if db.set_lastfm_sync_limit(user_id, limit):
+                await update.message.reply_text(
+                    f"✅ Límite de sincronización establecido a {limit} artistas.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al establecer el límite.")
+
+        except ValueError:
+            await update.message.reply_text("❌ Debes enviar un número válido.")
+
+        del context.user_data['waiting_for_lastfm_limit']
+        return
+
+    # PRIORIDAD 6: Añadir artista
+    elif 'waiting_for_artist_add' in context.user_data:
+        # Procesar añadir artista
+        user_id = context.user_data['waiting_for_artist_add']
+        artist_name = update.message.text.strip()
+
+        if not artist_name:
+            await update.message.reply_text("❌ Nombre de artista no válido.")
+            del context.user_data['waiting_for_artist_add']
+            return
+
+        # Simular el comando addartist
+        fake_context = type('obj', (object,), {
+            'args': artist_name.split(),
+            'user_data': context.user_data
+        })()
+
+        fake_update = type('obj', (object,), {
+            'effective_chat': type('obj', (object,), {'id': update.effective_chat.id})(),
+            'message': update.message
+        })()
+
+        # Llamar al comando addartist existente
+        await addartist_command(fake_update, fake_context)
+
+        del context.user_data['waiting_for_artist_add']
+        return
+
+    # Si no hay nada esperado, no hacer nada
+    else:
+        logger.info(f"DEBUG: No hay handlers esperando input, user_data: {context.user_data}")
+        return
+
+
+
+async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja la entrada de texto cuando se espera configuración"""
+    print(f"DEBUG: handle_text_input llamado con user_data: {context.user_data}")  # DEBUG temporal
+
+    if 'waiting_for_lastfm_user' in context.user_data:
+        # Procesar nuevo usuario de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_user']
+        lastfm_username = update.message.text.strip()
+
+        print(f"DEBUG: Procesando usuario Last.fm: {lastfm_username}")  # DEBUG temporal
+
+        if not lastfm_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_lastfm_user']
+            return
+
+        # Verificar que el servicio esté disponible
+        if not lastfm_service:
+            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
+            del context.user_data['waiting_for_lastfm_user']
+            return
+
+        # Verificar que el usuario existe en Last.fm
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
+
+        try:
+            if not lastfm_service.check_user_exists(lastfm_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_lastfm_user']
+                return
+
+            # Obtener información del usuario
+            user_info = lastfm_service.get_user_info(lastfm_username)
+
+            # Guardar en base de datos
+            if db.set_user_lastfm(user_id, lastfm_username, user_info):
+                message = f"✅ Usuario de Last.fm configurado: {lastfm_username}"
+                if user_info and user_info.get('playcount', 0) > 0:
+                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🎵 Abrir Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al configurar el usuario de Last.fm.")
+
+        except Exception as e:
+            logger.error(f"Error configurando usuario Last.fm: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_lastfm_user']
+        return
+
+    elif 'waiting_for_lastfm_limit' in context.user_data:
+        # Procesar nuevo límite de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_limit']
+        limit_text = update.message.text.strip()
+
+        try:
+            limit = int(limit_text)
+
+            if limit < 5 or limit > 200:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 200 artistas.")
+                del context.user_data['waiting_for_lastfm_limit']
+                return
+
+            if db.set_lastfm_sync_limit(user_id, limit):
+                await update.message.reply_text(
+                    f"✅ Límite de sincronización establecido a {limit} artistas.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al establecer el límite.")
+
+        except ValueError:
+            await update.message.reply_text("❌ Debes enviar un número válido.")
+
+        del context.user_data['waiting_for_lastfm_limit']
+        return
+
+    elif 'waiting_for_lastfm_change_user' in context.user_data:
+        # Procesar cambio de usuario de Last.fm
+        user_id = context.user_data['waiting_for_lastfm_change_user']
+        lastfm_username = update.message.text.strip()
+
+        if not lastfm_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_lastfm_change_user']
+            return
+
+        if not lastfm_service:
+            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
+            del context.user_data['waiting_for_lastfm_change_user']
+            return
+
+        # Verificar usuario
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
+
+        try:
+            if not lastfm_service.check_user_exists(lastfm_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_lastfm_change_user']
+                return
+
+            # Obtener información y actualizar
+            user_info = lastfm_service.get_user_info(lastfm_username)
+
+            if db.set_user_lastfm(user_id, lastfm_username, user_info):
+                message = f"✅ Usuario de Last.fm actualizado: {lastfm_username}"
+                if user_info and user_info.get('playcount', 0) > 0:
+                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al actualizar el usuario de Last.fm.")
+
+        except Exception as e:
+            logger.error(f"Error actualizando usuario Last.fm: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_lastfm_change_user']
+        return
+
+    # Resto de handlers de texto existentes (notificaciones, países, etc.)
+    elif 'waiting_for_time' in context.user_data:
+        # ... código existente para notificaciones ...
+        pass
+
+    elif 'waiting_for_country_add' in context.user_data:
+        # ... código existente para países ...
+        pass
+
+    # Si no hay nada esperado, no hacer nada
+    else:
+        print(f"DEBUG: No hay handlers esperando input, user_data: {context.user_data}")  # DEBUG temporal
+
+
+
+
+async def country_delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja la eliminación de países específicos"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    country_code = parts[2]
+    user_id = int(parts[3])
+
+    if country_state_city:
+        success = country_state_city.remove_user_country(user_id, country_code)
+        if success:
+            country_info = country_state_city.get_country_info(country_code)
+            country_name = country_info['name'] if country_info else country_code
+            message = f"✅ País {country_name} ({country_code}) eliminado correctamente."
+        else:
+            message = f"❌ Error al eliminar el país {country_code}."
+    else:
+        message = "❌ Sistema de países múltiples no disponible."
+
+    keyboard = [[InlineKeyboardButton("🔙 Volver al menú", callback_data=f"config_countries_{user_id}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(message, reply_markup=reply_markup)
+
+async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja las acciones relacionadas con artistas desde el menú de configuración"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    action = parts[1]
+    user_id = int(parts[2])
+
+    if action == "add":
+        message = (
+            "➕ *Añadir artista*\n\n"
+            "Envía el nombre del artista que quieres seguir.\n"
+            "Ejemplo: Radiohead, Metallica, Taylor Swift\n\n"
+            "Responde a este mensaje con el nombre del artista."
+        )
+        context.user_data['waiting_for_artist_add'] = user_id
+
+    elif action == "search":
+        message = (
+            "🔍 *Buscar conciertos*\n\n"
+            "Buscando conciertos de todos tus artistas seguidos...\n"
+            "Esto puede tardar un momento."
+        )
+        # Ejecutar búsqueda de conciertos (equivalente a /search)
+        # Crear un update falso para reutilizar la función existente
+        fake_update = type('obj', (object,), {
+            'effective_chat': type('obj', (object,), {'id': query.message.chat_id})(),
+            'message': type('obj', (object,), {
+                'reply_text': lambda text, **kwargs: query.message.reply_text(text, **kwargs)
+            })()
+        })()
+
+        # Llamar al comando search existente
+        await search_command(fake_update, context)
+        return
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_artists_{user_id}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
+
 
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3931,8 +5812,8 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         all_concerts = db.get_all_concerts_for_user(user['id'])
 
         # Filtrar adicional por países si es necesario
-        if country_city_service:
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_city_service)
+        if country_state_city:
+            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
             all_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
 
         # Agrupar conciertos por artista
@@ -4048,6 +5929,9 @@ def validate_services():
     if not setlistfm_service:
         issues.append("⚠️ Setlist.fm service no inicializado")
 
+    if not lastfm_service:
+        issues.append("⚠️ Last.fm service no inicializado")
+
     if issues:
         logger.warning("Problemas de configuración detectados:")
         for issue in issues:
@@ -4060,9 +5944,441 @@ def validate_services():
 # Variable global para la aplicación
 application = None
 
+async def lastfm_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /lastfm - gestión de sincronización con Last.fm"""
+    if not lastfm_service:
+        await update.message.reply_text(
+            "❌ Servicio de Last.fm no disponible.\n"
+            "Contacta al administrador para configurar la API key."
+        )
+        return
+
+    chat_id = update.effective_chat.id
+
+    # Verificar que el usuario esté registrado
+    user = db.get_user_by_chat_id(chat_id)
+    if not user:
+        await update.message.reply_text(
+            "❌ Primero debes registrarte con `/adduser <tu_nombre>`"
+        )
+        return
+
+    # Verificar si ya tiene usuario de Last.fm configurado
+    lastfm_user = db.get_user_lastfm(user['id'])
+
+    if not lastfm_user:
+        # No tiene usuario configurado, pedirlo
+        # CORREGIDO: Marcar que estamos esperando el usuario de Last.fm
+        context.user_data['waiting_for_lastfm_user'] = user['id']
+        await show_lastfm_setup(update, user, context)
+    else:
+        # Ya tiene usuario, mostrar menú principal
+        await show_lastfm_menu(update, user, lastfm_user)
+
+
+async def show_lastfm_setup(update: Update, user: Dict, context: ContextTypes.DEFAULT_TYPE = None):
+    """Muestra el setup inicial de Last.fm"""
+    message = (
+        "🎵 *Configuración de Last.fm*\n\n"
+        "Para sincronizar tus artistas más escuchados desde Last.fm, "
+        "necesito tu nombre de usuario.\n\n"
+        "Envía tu nombre de usuario de Last.fm:"
+    )
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def show_lastfm_menu(update: Update, user: Dict, lastfm_user: Dict):
+    """Muestra el menú principal de Last.fm"""
+    username = lastfm_user['lastfm_username']
+    playcount = lastfm_user.get('lastfm_playcount', 0)
+    sync_limit = lastfm_user.get('sync_limit', 20)
+
+    message = (
+        f"🎵 *Last.fm - {username}*\n\n"
+        f"📊 Reproducciones: {playcount:,}\n"
+        f"🔢 Límite de sincronización: {sync_limit} artistas\n\n"
+        f"Selecciona el período para sincronizar:"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🌟 De siempre", callback_data=f"lastfm_period_overall_{user['id']}"),
+            InlineKeyboardButton("📅 Último año", callback_data=f"lastfm_period_12month_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("📊 Último mes", callback_data=f"lastfm_period_1month_{user['id']}"),
+            InlineKeyboardButton("⚡ Última semana", callback_data=f"lastfm_period_7day_{user['id']}")
+        ],
+        [
+            InlineKeyboardButton("🔢 Cambiar cantidad", callback_data=f"lastfm_limit_{user['id']}"),
+            InlineKeyboardButton("👤 Cambiar usuario", callback_data=f"lastfm_changeuser_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def lastfm_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks de Last.fm"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Last.fm callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) < 3 or parts[0] != "lastfm":
+        return
+
+    action = parts[1]
+
+    # Obtener user_id del final
+    try:
+        user_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Error de usuario.")
+        return
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        if action == "cancel":
+            await query.edit_message_text("❌ Configuración de Last.fm cancelada.")
+
+        elif action == "period":
+            period = parts[2]
+            await handle_lastfm_period_selection(query, user, period)
+
+        elif action == "confirm":
+            period = parts[2]
+            await handle_lastfm_confirm_sync(query, user, period)
+
+        elif action == "sync":
+            period = parts[2]
+            await handle_lastfm_do_sync(query, user, period)
+
+        elif action == "limit":
+            await handle_lastfm_change_limit(query, user, context)
+
+        elif action == "changeuser":
+            await handle_lastfm_change_user(query, user, context)
+
+        else:
+            await query.edit_message_text("❌ Acción no reconocida.")
+
+    except Exception as e:
+        logger.error(f"Error en lastfm_callback_handler: {e}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
+async def handle_lastfm_period_selection(query, user: Dict, period: str):
+    """Maneja la selección de período de Last.fm"""
+    if not lastfm_service:
+        await query.edit_message_text("❌ Servicio de Last.fm no disponible.")
+        return
+
+    # Obtener usuario de Last.fm
+    lastfm_user = db.get_user_lastfm(user['id'])
+    if not lastfm_user:
+        await query.edit_message_text("❌ No tienes usuario de Last.fm configurado.")
+        return
+
+    username = lastfm_user['lastfm_username']
+    sync_limit = lastfm_user.get('sync_limit', 20)
+
+    # Mensaje de estado
+    period_name = lastfm_service.get_period_display_name(period)
+    await query.edit_message_text(
+        f"🔍 Obteniendo top artistas de {username} ({period_name})...\n"
+        f"Esto puede tardar un momento."
+    )
+
+    try:
+        # Obtener artistas de Last.fm
+        artists, status_message = lastfm_service.get_top_artists(username, period, sync_limit)
+
+        if not artists:
+            await query.edit_message_text(
+                f"📭 No se encontraron artistas para el período {period_name}.\n"
+                f"Estado: {status_message}"
+            )
+            return
+
+        # Guardar selección pendiente
+        db.save_pending_lastfm_sync(user['id'], period, artists)
+
+        # Mostrar preview de artistas
+        preview = lastfm_service.format_artists_preview(artists, 10)
+
+        message = (
+            f"🎵 *Top artistas de {username}*\n"
+            f"📊 Período: {period_name}\n"
+            f"🔢 Total encontrados: {len(artists)} artistas\n\n"
+            f"{preview}\n\n"
+            f"¿Quieres añadir estos artistas a tu lista de seguimiento?"
+        )
+
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Confirmar sincronización", callback_data=f"lastfm_sync_{period}_{user['id']}"),
+                InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error obteniendo artistas de Last.fm: {e}")
+        await query.edit_message_text(
+            f"❌ Error obteniendo artistas de {username}.\n"
+            f"Inténtalo de nuevo más tarde."
+        )
+
+async def handle_lastfm_do_sync(query, user: Dict, period: str):
+    """Realiza la sincronización de artistas de Last.fm usando MBID cuando esté disponible"""
+    # Obtener artistas pendientes
+    artists = db.get_pending_lastfm_sync(user['id'], period)
+    if not artists:
+        await query.edit_message_text("❌ No hay sincronización pendiente.")
+        return
+
+    period_name = lastfm_service.get_period_display_name(period) if lastfm_service else period
+
+    # Mensaje de estado
+    await query.edit_message_text(
+        f"⏳ Sincronizando {len(artists)} artistas de Last.fm...\n"
+        f"Esto puede tardar un momento."
+    )
+
+    try:
+        added_count = 0
+        skipped_count = 0
+        error_count = 0
+        mbid_used_count = 0
+        mbid_available_count = 0
+
+        total_artists = len(artists)
+        processed = 0
+
+        for artist_data in artists:
+            artist_name = artist_data.get('name', '')
+            artist_mbid = artist_data.get('mbid', '')
+
+            processed += 1
+
+            # Actualizar mensaje de progreso cada 5 artistas
+            if processed % 5 == 0 or processed == total_artists:
+                progress_msg = (
+                    f"⏳ Sincronizando {total_artists} artistas de Last.fm...\n"
+                    f"Progreso: {processed}/{total_artists}\n"
+                    f"✅ Añadidos: {added_count} | ⏭️ Ya seguidos: {skipped_count} | ❌ Errores: {error_count}"
+                )
+                try:
+                    await query.edit_message_text(progress_msg)
+                except:
+                    pass  # Ignorar errores de edición (rate limit)
+
+            if not artist_name:
+                error_count += 1
+                continue
+
+            try:
+                artist_id = None
+
+                # Estrategia 1: Si tenemos MBID, intentar usarlo directamente
+                if artist_mbid:
+                    mbid_available_count += 1
+                    artist_id = db.get_artist_by_mbid(artist_mbid)
+
+                    if artist_id:
+                        print(f"✅ Artista encontrado por MBID: {artist_name} ({artist_mbid})")
+                        mbid_used_count += 1
+                    else:
+                        # Crear artista usando MBID directamente
+                        candidate = {
+                            'mbid': artist_mbid,
+                            'name': artist_name,
+                            'type': '',
+                            'country': '',
+                            'disambiguation': '',
+                            'score': 100  # Score alto porque viene de Last.fm
+                        }
+
+                        # Añadir información extra de Last.fm si está disponible
+                        if 'genres' in artist_data:
+                            candidate['genres'] = artist_data['genres']
+                        if 'listeners' in artist_data:
+                            candidate['listeners'] = artist_data['listeners']
+
+                        artist_id = db.create_artist_from_candidate(candidate)
+                        if artist_id:
+                            print(f"✅ Artista creado con MBID: {artist_name} ({artist_mbid})")
+                            mbid_used_count += 1
+
+                # Estrategia 2: Si no hay MBID o falló, usar búsqueda tradicional
+                if not artist_id:
+                    candidates = db.search_artist_candidates(artist_name)
+
+                    if not candidates:
+                        skipped_count += 1
+                        print(f"⚠️ No se encontraron candidatos para: {artist_name}")
+                        continue
+
+                    # Usar el mejor candidato
+                    best_candidate = candidates[0]
+                    artist_id = db.create_artist_from_candidate(best_candidate)
+
+                    if artist_id:
+                        print(f"✅ Artista creado por búsqueda: {artist_name}")
+
+                if not artist_id:
+                    error_count += 1
+                    print(f"❌ Error creando artista: {artist_name}")
+                    continue
+
+                # Añadir a seguimiento
+                was_new = db.add_followed_artist(user['id'], artist_id)
+
+                if was_new:
+                    added_count += 1
+                else:
+                    skipped_count += 1  # Ya lo seguía
+
+                # Pausa breve para no sobrecargar
+                await asyncio.sleep(0.1)
+
+            except Exception as e:
+                logger.error(f"Error procesando artista {artist_name}: {e}")
+                error_count += 1
+                continue
+
+        # Limpiar sincronización pendiente
+        db.clear_pending_lastfm_sync(user['id'], period)
+
+        # Mensaje de resultado detallado
+        message = (
+            f"✅ *Sincronización de Last.fm completada*\n\n"
+            f"📊 Período: {period_name}\n"
+            f"➕ Artistas añadidos: {added_count}\n"
+            f"⏭️ Ya seguidos: {skipped_count}\n"
+        )
+
+        if error_count > 0:
+            message += f"❌ Errores: {error_count}\n"
+
+        message += f"\n🎯 *Estadísticas de MBID:*\n"
+        message += f"📋 Artistas con MBID: {mbid_available_count}/{total_artists}\n"
+        message += f"🎵 Sincronizados via MBID: {mbid_used_count}\n"
+
+        # Calcular porcentaje de éxito
+        success_rate = ((added_count + skipped_count) / total_artists) * 100 if total_artists > 0 else 0
+        message += f"📈 Tasa de éxito: {success_rate:.1f}%\n"
+
+        message += f"\nUsa `/list` para ver todos tus artistas seguidos."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user['id']}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error en sincronización de Last.fm: {e}")
+        await query.edit_message_text("❌ Error durante la sincronización. Inténtalo de nuevo.")
+
+
+async def handle_lastfm_change_limit(query, user: Dict, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el cambio de límite de sincronización"""
+    message = (
+        "🔢 *Cambiar cantidad de artistas*\n\n"
+        "Envía el número de artistas que quieres sincronizar por período.\n"
+        "Rango permitido: 5-200 artistas\n\n"
+        "Ejemplo: 50"
+    )
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # CORREGIDO: Marcar que estamos esperando el límite
+    context.user_data['waiting_for_lastfm_limit'] = user['id']
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def handle_lastfm_change_user(query, user: Dict, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el cambio de usuario de Last.fm"""
+    message = (
+        "👤 *Cambiar usuario de Last.fm*\n\n"
+        "Envía tu nuevo nombre de usuario de Last.fm:"
+    )
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Marcar que estamos esperando el nuevo usuario
+    context.user_data['waiting_for_lastfm_change_user'] = user['id']
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def lastfm_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Vuelve al menú principal de Last.fm"""
+    query = update.callback_query
+    await query.answer()
+
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user_by_chat_id(query.message.chat_id)
+
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    lastfm_user = db.get_user_lastfm(user['id'])
+    if not lastfm_user:
+        await query.edit_message_text("❌ No tienes usuario de Last.fm configurado.")
+        return
+
+    # Mostrar menú principal
+    fake_update = type('obj', (object,), {'message': query.message})()
+    await show_lastfm_menu(fake_update, user, lastfm_user)
+
+
+
 def main():
     """Función principal MODIFICADA para incluir sistema de países"""
-    global db, application, country_city_service
+    global db, application, country_state_city
 
     # Configuración
     TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_CONCIERTOS')
@@ -4079,8 +6395,11 @@ def main():
     # Inicializar servicios de conciertos
     initialize_concert_services()
 
-    # NUEVO: Inicializar servicio de países
+    # Inicializar servicio de países
     initialize_country_service()
+
+    # Inicializar servicio de Lastfm
+    initialize_lastfm_service()
 
     # Configurar MusicBrainz si está disponible
     user_agent = {
@@ -4101,7 +6420,7 @@ def main():
     # Crear la aplicación y agregar handlers
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Handlers existentes
+    # Handlers de comandos básicos
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("adduser", adduser_command))
@@ -4109,39 +6428,59 @@ def main():
     application.add_handler(CommandHandler("list", list_command))
     application.add_handler(CommandHandler("remove", remove_command))
     application.add_handler(CommandHandler("notify", notify_command))
-    application.add_handler(CommandHandler("search", search_command))  # Versión modificada
-    application.add_handler(CommandHandler("searchartist", searchartist_command))  # Versión modificada
-    application.add_handler(CommandHandler("serviceon", serviceon_command))
-    application.add_handler(CommandHandler("serviceoff", serviceoff_command))
-    application.add_handler(CommandHandler("country", country_command))  # Versión legacy modificada
-    application.add_handler(CommandHandler("config", config_command))  # Versión modificada
+
+    # Handlers de búsqueda
+    application.add_handler(CommandHandler("search", search_command))
+    application.add_handler(CommandHandler("searchartist", searchartist_command))
     application.add_handler(CommandHandler("showartist", showartist_command))
 
-    # NUEVOS: Handlers para países múltiples
+    # Handlers de servicios
+    application.add_handler(CommandHandler("serviceon", serviceon_command))
+    application.add_handler(CommandHandler("serviceoff", serviceoff_command))
+
+    # Handlers de países
+    application.add_handler(CommandHandler("country", country_command))
     application.add_handler(CommandHandler("addcountry", addcountry_command))
     application.add_handler(CommandHandler("removecountry", removecountry_command))
     application.add_handler(CommandHandler("mycountries", mycountries_command))
     application.add_handler(CommandHandler("listcountries", listcountries_command))
     application.add_handler(CommandHandler("refreshcountries", refreshcountries_command))
 
-    # Handlers para callbacks
+    # Handler de configuración
+    application.add_handler(CommandHandler("config", config_command))
+
+    # Handler de Last.fm
+    application.add_handler(CommandHandler("lastfm", lastfm_command))
+
+    # IMPORTANTE: Los handlers de callback deben ir en orden específico para evitar conflictos
+
+    # Handlers específicos de Last.fm (DEBEN IR ANTES que los genéricos)
+    application.add_handler(CallbackQueryHandler(lastfm_callback_handler, pattern="^lastfm_"))
+    application.add_handler(CallbackQueryHandler(lastfm_menu_callback, pattern="^lastfm_menu_"))
+
+    # Handlers específicos de otros sistemas
     application.add_handler(CallbackQueryHandler(artist_selection_callback, pattern="^(select_artist_|cancel_artist_selection)"))
+    application.add_handler(CallbackQueryHandler(country_selection_callback, pattern="^(select_country_|cancel_country_selection)"))
     application.add_handler(CallbackQueryHandler(expand_concerts_callback, pattern="^(expand_all_|back_to_search_)"))
     application.add_handler(CallbackQueryHandler(show_artist_concerts_callback, pattern="^show_artist_concerts_"))
     application.add_handler(CallbackQueryHandler(back_to_summary_callback, pattern="^back_to_summary_"))
 
-    # NUEVO: Handler para selecciones de países
-    application.add_handler(CallbackQueryHandler(country_selection_callback, pattern="^(select_country_|cancel_country_selection)"))
+    # Handler genérico de configuración (DEBE IR AL FINAL de los callbacks)
+    application.add_handler(CallbackQueryHandler(config_callback_handler, pattern="^(config_|notif_|country_|service_|artist_)"))
+
+    # Handler de texto (DEBE SER EL ÚLTIMO)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
 
     # Iniciar el bot
     logger.info("🤖 Bot de seguimiento de artistas iniciado con sistema de países múltiples.")
-    if country_city_service:
+    if country_state_city:
         logger.info("✅ Sistema de países múltiples activado")
     else:
         logger.info("⚠️ Sistema de países múltiples no disponible (falta API key)")
 
     logger.info("🔔 Para notificaciones, ejecuta: python notification_scheduler.py")
     logger.info("Presiona Ctrl+C para detenerlo.")
+
 
     try:
         application.run_polling()
