@@ -611,44 +611,39 @@ El bot buscará el artista en MusicBrainz y luego consultará los próximos lanz
             )
 
     async def mostrar_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Comando /mostrar - Muestra próximos lanzamientos de todos los artistas seguidos"""
+        """Comando /mostrar - Muestra próximos lanzamientos de todos los artistas seguidos usando el endpoint optimizado"""
 
         # Mensaje de "cargando..."
         loading_msg = await update.message.reply_text(
-            "🔍 Buscando próximos lanzamientos de todos tus artistas seguidos...\n"
-            "⏳ Esto puede tomar unos momentos...",
+            "🔍 Obteniendo todos tus próximos lanzamientos...",
             parse_mode='Markdown'
         )
 
         try:
-            # Obtener lista de artistas seguidos
-            artists = await self.get_followed_artists()
+            # Usar el endpoint optimizado de Muspy para obtener todos los releases del usuario
+            releases = await self.get_all_user_releases()
 
-            if not artists:
+            if not releases:
                 await loading_msg.edit_text(
-                    "📭 No se encontraron artistas seguidos en tu cuenta de Muspy.",
+                    "📭 No se encontraron próximos lanzamientos en tu cuenta de Muspy.",
                     parse_mode='Markdown'
                 )
                 return
 
-            await loading_msg.edit_text(
-                f"🔍 Consultando lanzamientos para {len(artists)} artistas...\n"
-                f"⏳ Por favor espera...",
-                parse_mode='Markdown'
-            )
+            # Filtrar solo lanzamientos futuros
+            today = date.today().strftime("%Y-%m-%d")
+            future_releases = [r for r in releases if r.get('date', '0000-00-00') >= today]
 
-            # Obtener todos los lanzamientos
-            all_releases = await self.get_all_upcoming_releases(artists, loading_msg)
-
-            if not all_releases:
+            if not future_releases:
                 await loading_msg.edit_text(
-                    f"📭 No se encontraron próximos lanzamientos para ninguno de tus {len(artists)} artistas seguidos.",
+                    f"📭 No hay próximos lanzamientos anunciados.\n"
+                    f"📊 Total de lanzamientos en la base de datos: {len(releases)}",
                     parse_mode='Markdown'
                 )
                 return
 
             # Formatear y enviar resultados
-            await self.format_and_send_all_releases(loading_msg, all_releases)
+            await self.format_and_send_all_releases(loading_msg, future_releases)
 
         except Exception as e:
             logger.error(f"Error en comando mostrar: {e}")
@@ -656,68 +651,58 @@ El bot buscará el artista en MusicBrainz y luego consultará los próximos lanz
                 "❌ Error al obtener los lanzamientos. Inténtalo más tarde."
             )
 
-    async def get_all_upcoming_releases(self, artists: List[Dict], status_msg) -> List[Dict]:
+    async def get_all_user_releases(self) -> List[Dict]:
         """
-        Obtiene todos los próximos lanzamientos para una lista de artistas
+        Obtiene todos los lanzamientos del usuario usando el endpoint optimizado
 
         Returns:
-            Lista de releases con información del artista incluida
+            Lista de releases del usuario
         """
-        all_releases = []
-        today = date.today().strftime("%Y-%m-%d")
-        processed = 0
+        try:
+            # Usar el endpoint releases/<userid> para obtener todos los releases del usuario de una vez
+            url = f"{self.muspy_base_url}/releases/{self.muspy_api_key}"
+            auth = (self.muspy_username, self.muspy_password)
 
-        for artist in artists:
-            try:
-                mbid = artist["mbid"]
-                artist_name = artist["name"]
+            response = requests.get(url, auth=auth, timeout=30)
 
-                # Actualizar estado cada 10 artistas
-                processed += 1
-                if processed % 10 == 0:
-                    await status_msg.edit_text(
-                        f"🔍 Procesando artistas... ({processed}/{len(artists)})\n"
-                        f"⏳ Consultando: *{artist_name}*",
-                        parse_mode='Markdown'
-                    )
+            if response.status_code == 401:
+                logger.error("Error de autenticación con Muspy")
+                return []
+            elif response.status_code == 404:
+                logger.error("Endpoint no encontrado o usuario sin lanzamientos")
+                return []
+            elif response.status_code != 200:
+                logger.error(f"Error al consultar lanzamientos del usuario: {response.status_code}")
+                return []
 
-                # Consultar API de Muspy
-                url = f"{self.muspy_base_url}/releases"
-                params = {"mbid": mbid}
-                auth = (self.muspy_username, self.muspy_password)
+            releases = response.json()
 
-                response = requests.get(url, auth=auth, params=params, timeout=10)
+            # Ordenar por fecha
+            releases.sort(key=lambda x: x.get('date', '9999-99-99'))
 
-                if response.status_code == 200:
-                    releases = response.json()
+            return releases
 
-                    # Filtrar solo lanzamientos futuros y agregar info del artista
-                    future_releases = []
-                    for release in releases:
-                        if release.get('date', '0000-00-00') >= today:
-                            release['artist_name'] = artist_name
-                            release['artist_mbid'] = mbid
-                            future_releases.append(release)
-
-                    all_releases.extend(future_releases)
-
-                # Pequeña pausa para no sobrecargar la API
-                await asyncio.sleep(0.1)
-
-            except Exception as e:
-                logger.error(f"Error obteniendo releases para {artist.get('name', 'artista')}: {e}")
-                continue
-
-        # Ordenar por fecha
-        all_releases.sort(key=lambda x: x.get('date', '9999-99-99'))
-
-        return all_releases
+        except requests.RequestException as e:
+            logger.error(f"Error de conexión con Muspy: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error obteniendo lanzamientos del usuario: {e}")
+            return []
 
     async def format_and_send_all_releases(self, message, releases: List[Dict]) -> None:
         """Formatea y envía todos los lanzamientos encontrados"""
 
+        # Debug: imprimir estructura de un release para entender el formato
+        if releases:
+            logger.info(f"Estructura del primer release: {json.dumps(releases[0], indent=2)}")
+
         # Agrupar por artista para estadísticas
-        artists_with_releases = set(r['artist_name'] for r in releases)
+        artists_with_releases = set()
+
+        for release in releases:
+            artist_name = self.extract_artist_name(release)
+            if artist_name != 'Artista desconocido':
+                artists_with_releases.add(artist_name)
 
         header = f"🎵 *Próximos lanzamientos*\n"
         header += f"📊 {len(releases)} lanzamientos de {len(artists_with_releases)} artistas\n\n"
@@ -726,14 +711,15 @@ El bot buscará el artista en MusicBrainz y luego consultará los próximos lanz
         messages_to_send = []
 
         for i, release in enumerate(releases, 1):
-            artist_name = release.get('artist_name', 'Artista desconocido')
-            title = release.get('title', 'Sin título')
+            # Extraer información del release
+            artist_name = self.extract_artist_name(release)
+            title = self.extract_title(release)
             date_str = release.get('date', 'Fecha desconocida')
-            release_type = release.get('type', 'Release').title()
+            release_type = self.extract_release_type(release)
 
             # Formatear fecha
             try:
-                if date_str != 'Fecha desconocida':
+                if date_str != 'Fecha desconocida' and date_str:
                     date_obj = datetime.strptime(date_str, "%Y-%m-%d")
                     formatted_date = date_obj.strftime("%d/%m/%Y")
                 else:
@@ -777,6 +763,75 @@ El bot buscará el artista en MusicBrainz y luego consultará los próximos lanz
                 "📭 No se encontraron próximos lanzamientos.",
                 parse_mode='Markdown'
             )
+
+
+    def extract_artist_name(self, release: Dict) -> str:
+        """Extrae el nombre del artista desde diferentes posibles campos"""
+
+        # Opción 1: artist_credit (común en MusicBrainz)
+        if 'artist_credit' in release and isinstance(release['artist_credit'], list) and len(release['artist_credit']) > 0:
+            artist = release['artist_credit'][0]
+            if isinstance(artist, dict):
+                return artist.get('name', artist.get('artist', {}).get('name', 'Artista desconocido'))
+            elif isinstance(artist, str):
+                return artist
+
+        # Opción 2: artist_name directo
+        if 'artist_name' in release and release['artist_name']:
+            return release['artist_name']
+
+        # Opción 3: artist como objeto
+        if 'artist' in release:
+            artist = release['artist']
+            if isinstance(artist, dict):
+                return artist.get('name', 'Artista desconocido')
+            elif isinstance(artist, str):
+                return artist
+
+        # Opción 4: artists como lista
+        if 'artists' in release and isinstance(release['artists'], list) and len(release['artists']) > 0:
+            first_artist = release['artists'][0]
+            if isinstance(first_artist, dict):
+                return first_artist.get('name', 'Artista desconocido')
+            elif isinstance(first_artist, str):
+                return first_artist
+
+        # Opción 5: campos alternativos comunes
+        for field in ['performer', 'creator', 'artist_display_name']:
+            if field in release and release[field]:
+                return release[field]
+
+        return 'Artista desconocido'
+
+    def extract_title(self, release: Dict) -> str:
+        """Extrae el título del lanzamiento desde diferentes posibles campos"""
+
+        # Campos comunes para el título
+        for field in ['title', 'name', 'album', 'release_name']:
+            if field in release and release[field]:
+                return release[field]
+
+        return 'Sin título'
+
+    def extract_release_type(self, release: Dict) -> str:
+        """Extrae el tipo de lanzamiento"""
+
+        # Campos comunes para el tipo
+        for field in ['type', 'release_type', 'primary_type']:
+            if field in release and release[field]:
+                return release[field].title()
+
+        # Si hay información de grupo de release
+        if 'release_group' in release:
+            rg = release['release_group']
+            if isinstance(rg, dict):
+                for field in ['type', 'primary_type']:
+                    if field in rg and rg[field]:
+                        return rg[field].title()
+
+        return 'Release'
+
+
 
     async def format_and_send_releases(self, message, artist_name: str, releases: List[Dict]) -> None:
         """Formatea y envía la lista de lanzamientos"""
@@ -894,7 +949,7 @@ El bot buscará el artista en MusicBrainz y luego consultará los próximos lanz
 def main():
     """Función principal"""
     # Obtener credenciales de variables de entorno
-    telegram_token = os.getenv('TELEGRAM_BOT_CONCIERTOS')
+    telegram_token = os.getenv('TELEGRAM_BOT_RYMERS')
     muspy_username = os.getenv('MUSPY_USERNAME')
     muspy_api_key = os.getenv('MUSPY_API_KEY')
     muspy_pw = os.getenv('MUSPY_PW')
@@ -903,7 +958,7 @@ def main():
     if not all([telegram_token, muspy_username, muspy_api_key]):
         print("❌ Error: Faltan credenciales requeridas.")
         print("Asegúrate de configurar las siguientes variables de entorno:")
-        print("- TELEGRAM_BOT_CONCIERTOS")
+        print("- TELEGRAM_BOT_RYMERS")
         print("- MUSPY_USERNAME")
         print("- MUSPY_API_KEY")
         print("- MUSPY_PW")

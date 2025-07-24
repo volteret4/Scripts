@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Script separado para el sistema de notificaciones del bot de artistas
-Se ejecuta de forma independiente y envía notificaciones a las horas programadas
+Script mejorado para el sistema de notificaciones del bot de artistas
+- 08:00: Búsqueda global de TODOS los artistas
+- Cada minuto: Notificaciones filtradas por países del usuario
 """
 
 import os
@@ -12,7 +13,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Set
 import requests
 import json
 
@@ -24,6 +25,7 @@ try:
     from apis.ticketmaster import TicketmasterService
     from apis.spotify import SpotifyService
     from apis.setlistfm import SetlistfmService
+    from apis.country_state_city import CountryCityService, ArtistTrackerDatabaseExtended
 except ImportError as e:
     print(f"Error importando servicios: {e}")
     sys.exit(1)
@@ -40,15 +42,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class NotificationService:
-    """Servicio para manejar notificaciones"""
+    """Servicio mejorado para manejar notificaciones"""
 
     def __init__(self, db_path: str, telegram_token: str):
         self.db_path = db_path
         self.telegram_token = telegram_token
         self.telegram_api_url = f"https://api.telegram.org/bot{telegram_token}"
 
-        # Inicializar servicios de búsqueda de conciertos
+        # Inicializar servicios
         self.init_concert_services()
+        self.init_country_service()
+
+        # Control de búsqueda diaria
+        self.last_global_search = None
 
     def init_concert_services(self):
         """Inicializa los servicios de búsqueda de conciertos"""
@@ -93,41 +99,87 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error inicializando servicios: {e}")
 
+    def init_country_service(self):
+        """Inicializa el servicio de países"""
+        COUNTRY_API_KEY = os.environ.get("COUNTRY_CITY_API_KEY")
+
+        if COUNTRY_API_KEY:
+            try:
+                self.country_city_service = CountryCityService(
+                    api_key=COUNTRY_API_KEY,
+                    db_path=self.db_path
+                )
+                logger.info("✅ Servicio de países inicializado")
+            except Exception as e:
+                logger.error(f"Error inicializando servicio de países: {e}")
+                self.country_city_service = None
+        else:
+            logger.warning("⚠️ COUNTRY_CITY_API_KEY no configurada")
+            self.country_city_service = None
+
     def get_db_connection(self):
         """Obtiene conexión a la base de datos"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
-    async def search_concerts_for_artist(self, artist_name: str, user_services: Dict[str, bool]) -> List[Dict]:
-        """Busca conciertos para un artista usando los servicios habilitados por el usuario"""
+    async def search_concerts_for_artist_global(self, artist_name: str) -> List[Dict]:
+        """
+        Busca conciertos para un artista GLOBALMENTE (todos los países)
+        Usa la misma lógica que el bot pero sin filtrar por usuario
+        """
         all_concerts = []
-        country_code = user_services.get('country_filter', 'ES')
 
-        # Buscar en Ticketmaster si está habilitado
-        if user_services.get('ticketmaster', True) and 'ticketmaster' in self.services:
+        # Buscar en Ticketmaster GLOBALMENTE
+        if 'ticketmaster' in self.services:
             try:
-                concerts, _ = self.services['ticketmaster'].search_concerts(artist_name, country_code)
+                # Usar búsqueda global si está disponible, sino usar sin país específico
+                if hasattr(self.services['ticketmaster'], 'search_concerts_global'):
+                    concerts, _ = self.services['ticketmaster'].search_concerts_global(artist_name)
+                else:
+                    # Fallback: buscar sin país específico
+                    concerts, _ = self.services['ticketmaster'].search_concerts(artist_name, size=200)
+
+                # Asegurar que tengan fuente
+                for concert in concerts:
+                    if not concert.get('source'):
+                        concert['source'] = 'Ticketmaster'
+
                 all_concerts.extend(concerts)
-                logger.info(f"Ticketmaster: {len(concerts)} conciertos encontrados para {artist_name}")
+                logger.info(f"Ticketmaster global: {len(concerts)} conciertos para {artist_name}")
             except Exception as e:
                 logger.error(f"Error buscando en Ticketmaster: {e}")
 
-        # Buscar en Spotify si está habilitado
-        if user_services.get('spotify', True) and 'spotify' in self.services:
+        # Buscar en Spotify
+        if 'spotify' in self.services:
             try:
                 concerts, _ = self.services['spotify'].search_artist_and_concerts(artist_name)
+
+                # Asegurar que tengan fuente
+                for concert in concerts:
+                    if not concert.get('source'):
+                        concert['source'] = 'Spotify'
+
                 all_concerts.extend(concerts)
-                logger.info(f"Spotify: {len(concerts)} conciertos encontrados para {artist_name}")
+                logger.info(f"Spotify: {len(concerts)} conciertos para {artist_name}")
             except Exception as e:
                 logger.error(f"Error buscando en Spotify: {e}")
 
-        # Buscar en Setlist.fm si está habilitado
-        if user_services.get('setlistfm', True) and 'setlistfm' in self.services:
+        # Buscar en Setlist.fm (países principales para no sobrecargar)
+        if 'setlistfm' in self.services:
             try:
-                concerts, _ = self.services['setlistfm'].search_concerts(artist_name, country_code)
-                all_concerts.extend(concerts)
-                logger.info(f"Setlist.fm: {len(concerts)} conciertos encontrados para {artist_name}")
+                main_countries = ['ES', 'US', 'FR', 'DE', 'IT', 'GB', 'AR', 'MX', 'BR', 'CA']
+                for country_code in main_countries:
+                    concerts, _ = self.services['setlistfm'].search_concerts(artist_name, country_code)
+
+                    # Asegurar que tengan fuente
+                    for concert in concerts:
+                        if not concert.get('source'):
+                            concert['source'] = 'Setlist.fm'
+
+                    all_concerts.extend(concerts)
+
+                logger.info(f"Setlist.fm: {len([c for c in all_concerts if c.get('source') == 'Setlist.fm'])} conciertos para {artist_name}")
             except Exception as e:
                 logger.error(f"Error buscando en Setlist.fm: {e}")
 
@@ -183,8 +235,83 @@ class NotificationService:
         finally:
             conn.close()
 
-    def get_user_services(self, user_id: int) -> Dict[str, bool]:
-        """Obtiene la configuración de servicios para un usuario"""
+    def get_all_artists(self) -> List[str]:
+        """Obtiene TODOS los artistas únicos de la base de datos"""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("SELECT DISTINCT name FROM artists ORDER BY name")
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo todos los artistas: {e}")
+            return []
+        finally:
+            conn.close()
+
+    async def perform_daily_global_search(self):
+        """
+        Realiza búsqueda global diaria de TODOS los artistas
+        Se ejecuta a las 08:00
+        """
+        logger.info("🌍 INICIANDO BÚSQUEDA GLOBAL DIARIA DE CONCIERTOS")
+
+        # Obtener todos los artistas únicos
+        all_artists = self.get_all_artists()
+
+        if not all_artists:
+            logger.warning("⚠️ No hay artistas en la base de datos")
+            return
+
+        logger.info(f"📋 Buscando conciertos para {len(all_artists)} artistas únicos")
+
+        total_new_concerts = 0
+        total_processed = 0
+
+        for artist_name in all_artists:
+            try:
+                logger.info(f"🔍 [{total_processed + 1}/{len(all_artists)}] Buscando: {artist_name}")
+
+                # Buscar conciertos globalmente
+                concerts = await self.search_concerts_for_artist_global(artist_name)
+
+                # Guardar TODOS los conciertos encontrados
+                artist_new_concerts = 0
+                for concert in concerts:
+                    # Asegurar que el nombre del artista sea consistente
+                    concert['artist'] = artist_name
+
+                    concert_id = self.save_concert(concert)
+                    if concert_id:
+                        artist_new_concerts += 1
+                        total_new_concerts += 1
+
+                if artist_new_concerts > 0:
+                    logger.info(f"✅ {artist_name}: {artist_new_concerts} nuevos conciertos de {len(concerts)} encontrados")
+                else:
+                    logger.info(f"ℹ️ {artist_name}: 0 nuevos conciertos (ya existían)")
+
+                total_processed += 1
+
+                # Pausa para no sobrecargar las APIs
+                await asyncio.sleep(2)
+
+            except Exception as e:
+                logger.error(f"❌ Error procesando {artist_name}: {e}")
+                total_processed += 1
+                continue
+
+        logger.info(f"🎉 BÚSQUEDA GLOBAL COMPLETADA:")
+        logger.info(f"   📊 Artistas procesados: {total_processed}/{len(all_artists)}")
+        logger.info(f"   🆕 Nuevos conciertos guardados: {total_new_concerts}")
+
+        # Marcar que se realizó la búsqueda hoy
+        self.last_global_search = datetime.now().date()
+
+    def get_user_services(self, user_id: int) -> Dict[str, any]:
+        """Obtiene la configuración de servicios para un usuario (VERSIÓN EXTENDIDA)"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
 
@@ -195,21 +322,28 @@ class NotificationService:
             """, (user_id,))
 
             row = cursor.fetchone()
-            if row:
-                return {
-                    'ticketmaster': bool(row[0]),
-                    'spotify': bool(row[1]),
-                    'setlistfm': bool(row[2]),
-                    'country_filter': row[3] or 'ES'
-                }
-
-            # Valores por defecto si no se encuentra el usuario
-            return {
-                'ticketmaster': True,
-                'spotify': True,
-                'setlistfm': True,
-                'country_filter': 'ES'
+            services = {
+                'ticketmaster': bool(row[0]) if row else True,
+                'spotify': bool(row[1]) if row else True,
+                'setlistfm': bool(row[2]) if row else True,
+                'country_filter': row[3] if row else 'ES'
             }
+
+            # Añadir información de países múltiples
+            if self.country_city_service:
+                user_countries = self.country_city_service.get_user_country_codes(user_id)
+                services['countries'] = user_countries
+
+                # Mantener compatibilidad con country_filter
+                if user_countries:
+                    services['country_filter'] = list(user_countries)[0]
+                elif not services['country_filter']:
+                    services['country_filter'] = 'ES'
+            else:
+                # Solo country_filter legacy
+                services['countries'] = {services['country_filter']}
+
+            return services
 
         except sqlite3.Error as e:
             logger.error(f"Error obteniendo configuración de servicios: {e}")
@@ -217,30 +351,9 @@ class NotificationService:
                 'ticketmaster': True,
                 'spotify': True,
                 'setlistfm': True,
-                'country_filter': 'ES'
+                'country_filter': 'ES',
+                'countries': {'ES'}
             }
-        finally:
-            conn.close()
-
-    def get_user_followed_artists(self, user_id: int) -> List[Dict]:
-        """Obtiene artistas seguidos por un usuario"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute("""
-                SELECT a.name
-                FROM artists a
-                JOIN user_followed_artists ufa ON a.id = ufa.artist_id
-                WHERE ufa.user_id = ?
-            """, (user_id,))
-
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-
-        except sqlite3.Error as e:
-            logger.error(f"Error obteniendo artistas seguidos: {e}")
-            return []
         finally:
             conn.close()
 
@@ -264,91 +377,14 @@ class NotificationService:
             return []
         finally:
             conn.close()
-        """Obtiene la configuración de servicios para un usuario"""
+
+    def get_unnotified_concerts_for_user(self, user_id: int, user_countries: Set[str] = None) -> List[Dict]:
+        """Obtiene conciertos no notificados para un usuario FILTRADOS por sus países"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
-                SELECT service_ticketmaster, service_spotify, service_setlistfm, country_filter
-                FROM users WHERE id = ?
-            """, (user_id,))
-
-            row = cursor.fetchone()
-            if row:
-                return {
-                    'ticketmaster': bool(row[0]),
-                    'spotify': bool(row[1]),
-                    'setlistfm': bool(row[2]),
-                    'country_filter': row[3] or 'ES'
-                }
-
-            # Valores por defecto si no se encuentra el usuario
-            return {
-                'ticketmaster': True,
-                'spotify': True,
-                'setlistfm': True,
-                'country_filter': 'ES'
-            }
-
-        except sqlite3.Error as e:
-            logger.error(f"Error obteniendo configuración de servicios: {e}")
-            return {
-                'ticketmaster': True,
-                'spotify': True,
-                'setlistfm': True,
-                'country_filter': 'ES'
-            }
-        finally:
-            conn.close()
-        """Obtiene usuarios que deben recibir notificación a una hora específica"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute("""
-                SELECT * FROM users
-                WHERE notification_enabled = 1
-                AND notification_time = ?
-            """, (notification_time,))
-
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-
-        except sqlite3.Error as e:
-            logger.error(f"Error obteniendo usuarios para hora {notification_time}: {e}")
-            return []
-        finally:
-            conn.close()
-
-    def get_user_followed_artists(self, user_id: int) -> List[Dict]:
-        """Obtiene artistas seguidos por un usuario"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute("""
-                SELECT a.name
-                FROM artists a
-                JOIN user_followed_artists ufa ON a.id = ufa.artist_id
-                WHERE ufa.user_id = ?
-            """, (user_id,))
-
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-
-        except sqlite3.Error as e:
-            logger.error(f"Error obteniendo artistas seguidos: {e}")
-            return []
-        finally:
-            conn.close()
-
-    def get_unnotified_concerts_for_user(self, user_id: int) -> List[Dict]:
-        """Obtiene conciertos no notificados para un usuario"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        try:
+            # Obtener todos los conciertos no notificados del usuario
             cursor.execute("""
                 SELECT DISTINCT c.*
                 FROM concerts c
@@ -363,7 +399,26 @@ class NotificationService:
             """, (user_id, user_id))
 
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            all_concerts = [dict(row) for row in rows]
+
+            # Filtrar por países del usuario
+            if user_countries and self.country_city_service:
+                extended_db = ArtistTrackerDatabaseExtended(self.db_path, self.country_city_service)
+                filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+
+                logger.info(f"Conciertos filtrados para usuario {user_id}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
+                return filtered_concerts
+            else:
+                # Filtrado básico por país si no hay servicio de países
+                if user_countries:
+                    filtered_concerts = []
+                    for concert in all_concerts:
+                        concert_country = concert.get('country', '').upper()
+                        if not concert_country or concert_country in {c.upper() for c in user_countries}:
+                            filtered_concerts.append(concert)
+                    return filtered_concerts
+
+            return all_concerts
 
         except sqlite3.Error as e:
             logger.error(f"Error obteniendo conciertos no notificados: {e}")
@@ -407,11 +462,14 @@ class NotificationService:
             concerts_by_artist[artist].append(concert)
 
         for artist, artist_concerts in concerts_by_artist.items():
-            message_lines.append(f"*{artist}*:")
+            # Escapar caracteres especiales para Markdown
+            safe_artist = artist.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+            message_lines.append(f"*{safe_artist}*:")
 
             for concert in artist_concerts[:3]:  # Limitar a 3 por artista en notificaciones
                 venue = concert.get('venue', 'Lugar desconocido')
                 city = concert.get('city', '')
+                country = concert.get('country', '')
                 date = concert.get('date', 'Fecha desconocida')
                 url = concert.get('url', '')
                 source = concert.get('source', '')
@@ -424,12 +482,27 @@ class NotificationService:
                     except ValueError:
                         pass
 
-                location = f"{venue}, {city}" if city else venue
+                # Escapar caracteres especiales
+                safe_venue = str(venue).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+                safe_city = str(city).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+
+                # Construir ubicación
+                location_parts = []
+                if safe_venue:
+                    location_parts.append(safe_venue)
+                if safe_city:
+                    location_parts.append(safe_city)
+                if country:
+                    location_parts.append(f"({country})")
+
+                location = ", ".join(location_parts) if location_parts else "Ubicación desconocida"
 
                 concert_line = f"• {date}: "
 
                 if url and url.startswith(('http://', 'https://')):
-                    concert_line += f"[{location}]({url})"
+                    # Escapar paréntesis en URL
+                    escaped_url = url.replace(")", "\\)")
+                    concert_line += f"[{location}]({escaped_url})"
                 else:
                     concert_line += location
 
@@ -476,8 +549,8 @@ class NotificationService:
             return False
 
     async def process_notifications_for_time(self, notification_time: str):
-        """Procesa notificaciones para una hora específica"""
-        logger.info(f"Procesando notificaciones para las {notification_time}")
+        """Procesa notificaciones para una hora específica (SOLO notifica, NO busca conciertos)"""
+        logger.info(f"🔔 Procesando notificaciones para las {notification_time}")
 
         # Obtener usuarios para esta hora
         users = self.get_users_for_time(notification_time)
@@ -492,71 +565,55 @@ class NotificationService:
             try:
                 logger.info(f"Procesando notificaciones para {user['username']}")
 
-                # Obtener artistas seguidos
-                followed_artists = self.get_user_followed_artists(user['id'])
-
-                if not followed_artists:
-                    logger.info(f"Usuario {user['username']} no sigue ningún artista")
-                    continue
-
-                # Obtener configuración de servicios del usuario
+                # Obtener configuración de servicios del usuario (incluye países)
                 user_services = self.get_user_services(user['id'])
+                user_countries = user_services.get('countries', {'ES'})
 
-                # Verificar que tenga al menos un servicio activo
-                active_services = [s for s, active in user_services.items() if active and s != 'country_filter']
-                if not active_services:
-                    logger.warning(f"Usuario {user['username']} no tiene servicios activos")
-                    continue
+                logger.info(f"Países configurados para {user['username']}: {user_countries}")
 
-                logger.info(f"Servicios activos para {user['username']}: {active_services}, País: {user_services['country_filter']}")
-
-                # Buscar y guardar nuevos conciertos
-                total_new_concerts = 0
-                for artist in followed_artists:
-                    artist_name = artist['name']
-                    logger.info(f"Buscando conciertos para {artist_name} con configuración del usuario")
-
-                    concerts = await self.search_concerts_for_artist(artist_name, user_services)
-
-                    for concert in concerts:
-                        concert_id = self.save_concert(concert)
-                        if concert_id:
-                            total_new_concerts += 1
-
-                    # Pausa para no sobrecargar las APIs
-                    await asyncio.sleep(1)
-
-                logger.info(f"Encontrados {total_new_concerts} nuevos conciertos para {user['username']}")
-
-                # Obtener conciertos no notificados
-                unnotified_concerts = self.get_unnotified_concerts_for_user(user['id'])
+                # Obtener conciertos no notificados FILTRADOS por países del usuario
+                unnotified_concerts = self.get_unnotified_concerts_for_user(user['id'], user_countries)
 
                 if unnotified_concerts:
                     # Limitar a 15 conciertos por notificación
                     concerts_to_notify = unnotified_concerts[:15]
 
                     # Formatear mensaje
-                    message = self.format_concerts_message(concerts_to_notify)
+                    message = self.format_concerts_message(
+                        concerts_to_notify,
+                        f"🔔 Nuevos conciertos en {', '.join(sorted(user_countries))}"
+                    )
 
                     # Enviar notificación
                     if await self.send_telegram_message(user['chat_id'], message):
-                        # Marcar conciertos como notificados
+                        # Marcar conciertos como notificados para este usuario
                         for concert in concerts_to_notify:
                             self.mark_concert_notified(user['id'], concert['id'])
 
-                        logger.info(f"Notificación enviada a {user['username']}: {len(concerts_to_notify)} conciertos")
+                        logger.info(f"✅ Notificación enviada a {user['username']}: {len(concerts_to_notify)} conciertos")
                     else:
-                        logger.error(f"Falló el envío de notificación a {user['username']}")
+                        logger.error(f"❌ Falló el envío de notificación a {user['username']}")
                 else:
-                    logger.info(f"No hay nuevos conciertos para {user['username']}")
+                    logger.info(f"ℹ️ No hay nuevos conciertos para {user['username']} en sus países")
 
             except Exception as e:
-                logger.error(f"Error procesando notificaciones para {user['username']}: {e}")
+                logger.error(f"❌ Error procesando notificaciones para {user['username']}: {e}")
 
-        logger.info(f"Notificaciones completadas para las {notification_time}")
+        logger.info(f"🎉 Notificaciones completadas para las {notification_time}")
+
+    def should_perform_global_search(self) -> bool:
+        """Verifica si debe realizar la búsqueda global diaria"""
+        current_time = datetime.now()
+        current_hour = current_time.hour
+        today = current_time.date()
+
+        # Solo a las 08:00 y si no se ha hecho hoy
+        return (current_hour == 8 and
+                current_time.minute == 0 and
+                self.last_global_search != today)
 
 def main():
-    """Función principal del script de notificaciones"""
+    """Función principal del script de notificaciones mejorado"""
     # Configuración desde variables de entorno
     TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_CONCIERTOS')
     DB_PATH = os.getenv('DB_PATH', 'artist_tracker.db')
@@ -572,15 +629,22 @@ def main():
     # Crear servicio de notificaciones
     notification_service = NotificationService(DB_PATH, TELEGRAM_TOKEN)
 
-    logger.info("🔔 Script de notificaciones iniciado")
-    logger.info("⏰ Verificando notificaciones cada minuto...")
+    logger.info("🔔 Script de notificaciones mejorado iniciado")
+    logger.info("🌍 Búsqueda global: 08:00 diaria")
+    logger.info("⏰ Notificaciones: Cada minuto según configuración de usuarios")
 
     try:
         while True:
-            current_time = datetime.now().strftime('%H:%M')
+            current_time = datetime.now()
+            time_str = current_time.strftime('%H:%M')
 
-            # Ejecutar notificaciones para la hora actual
-            asyncio.run(notification_service.process_notifications_for_time(current_time))
+            # 1. Verificar si es hora de búsqueda global (08:00)
+            if notification_service.should_perform_global_search():
+                logger.info("🌅 Es hora de la búsqueda global diaria (08:00)")
+                asyncio.run(notification_service.perform_daily_global_search())
+
+            # 2. Procesar notificaciones para la hora actual
+            asyncio.run(notification_service.process_notifications_for_time(time_str))
 
             # Esperar hasta el siguiente minuto
             time.sleep(60)
