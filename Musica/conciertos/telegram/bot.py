@@ -6066,9 +6066,22 @@ async def lastfm_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             period = parts[2]
             await handle_lastfm_period_selection(query, user, period)
 
-        elif action == "confirm":
+        elif action == "page":
+            # NUEVO: Manejar paginación
             period = parts[2]
-            await handle_lastfm_confirm_sync(query, user, period)
+            page = int(parts[3])
+
+            # Obtener artistas pendientes
+            artists = db.get_pending_lastfm_sync(user['id'], period)
+            if not artists:
+                await query.edit_message_text("❌ No hay datos de artistas disponibles.")
+                return
+
+            await show_lastfm_artists_page(query, user, period, artists, page)
+
+        elif callback_data == "current_lastfm_page":
+            # No hacer nada si presiona el botón de página actual
+            return
 
         elif action == "sync":
             period = parts[2]
@@ -6123,30 +6136,8 @@ async def handle_lastfm_period_selection(query, user: Dict, period: str):
         # Guardar selección pendiente
         db.save_pending_lastfm_sync(user['id'], period, artists)
 
-        # Mostrar preview de artistas
-        preview = lastfm_service.format_artists_preview(artists, 10)
-
-        message = (
-            f"🎵 *Top artistas de {username}*\n"
-            f"📊 Período: {period_name}\n"
-            f"🔢 Total encontrados: {len(artists)} artistas\n\n"
-            f"{preview}\n\n"
-            f"¿Quieres añadir estos artistas a tu lista de seguimiento?"
-        )
-
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Confirmar sincronización", callback_data=f"lastfm_sync_{period}_{user['id']}"),
-                InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text(
-            message,
-            parse_mode='Markdown',
-            reply_markup=reply_markup
-        )
+        # CAMBIO: Mostrar primera página en lugar de preview
+        await show_lastfm_artists_page(query, user, period, artists, page=0)
 
     except Exception as e:
         logger.error(f"Error obteniendo artistas de Last.fm: {e}")
@@ -6154,6 +6145,119 @@ async def handle_lastfm_period_selection(query, user: Dict, period: str):
             f"❌ Error obteniendo artistas de {username}.\n"
             f"Inténtalo de nuevo más tarde."
         )
+
+async def show_lastfm_artists_page(query, user: Dict, period: str, artists: List[Dict], page: int = 0):
+    """
+    Muestra una página de artistas de Last.fm con paginación
+
+    Args:
+        query: Query del callback
+        user: Usuario de la base de datos
+        period: Período de Last.fm
+        artists: Lista completa de artistas
+        page: Número de página (empezando desde 0)
+    """
+    artists_per_page = 15  # Mostrar 15 artistas por página
+    total_pages = (len(artists) + artists_per_page - 1) // artists_per_page
+
+    if page >= total_pages:
+        page = total_pages - 1
+    elif page < 0:
+        page = 0
+
+    start_idx = page * artists_per_page
+    end_idx = min(start_idx + artists_per_page, len(artists))
+    page_artists = artists[start_idx:end_idx]
+
+    # Obtener nombre del período
+    period_name = lastfm_service.get_period_display_name(period) if lastfm_service else period
+    username = db.get_user_lastfm(user['id'])['lastfm_username']
+
+    # Construir texto
+    message_lines = [
+        f"🎵 *Top artistas de {username}*",
+        f"📊 Período: {period_name}",
+        f"🔢 Total encontrados: {len(artists)} artistas",
+        f"📄 Página {page + 1} de {total_pages}\n"
+    ]
+
+    # Contar artistas con MBID en esta página
+    mbid_count = sum(1 for artist in page_artists if artist.get("mbid"))
+
+    for i, artist in enumerate(page_artists, start_idx + 1):
+        playcount = artist.get("playcount", 0)
+        name = artist.get("name", "Nombre desconocido")
+        mbid = artist.get("mbid", "")
+
+        # Escapar caracteres especiales para Markdown
+        safe_name = name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+
+        line = f"{i}. *{safe_name}*"
+
+        # Añadir información de reproducción
+        if playcount > 0:
+            line += f" ({playcount:,} reproducciones)"
+
+        # Indicar si tiene MBID
+        if mbid:
+            line += " 🎵"  # Emoji para indicar que tiene MBID
+
+        # Añadir géneros si están disponibles
+        genres = artist.get("genres", [])
+        if genres:
+            genre_text = ", ".join(genres[:2])  # Mostrar hasta 2 géneros
+            line += f" _{genre_text}_"
+
+        message_lines.append(line)
+
+    message_lines.append("")
+    message_lines.append(f"🎵 {mbid_count}/{len(page_artists)} artistas con MBID para sincronización precisa")
+
+    # Crear botones de navegación
+    keyboard = []
+    nav_buttons = []
+
+    # Botón anterior
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton("⬅️ Anterior", callback_data=f"lastfm_page_{period}_{page-1}_{user['id']}")
+        )
+
+    # Botón de página actual
+    nav_buttons.append(
+        InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="current_lastfm_page")
+    )
+
+    # Botón siguiente
+    if page < total_pages - 1:
+        nav_buttons.append(
+            InlineKeyboardButton("Siguiente ➡️", callback_data=f"lastfm_page_{period}_{page+1}_{user['id']}")
+        )
+
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    # Botón para confirmar sincronización
+    keyboard.append([
+        InlineKeyboardButton("✅ Sincronizar todos", callback_data=f"lastfm_sync_{period}_{user['id']}")
+    ])
+
+    # Botón para cancelar
+    keyboard.append([
+        InlineKeyboardButton("❌ Cancelar", callback_data=f"lastfm_cancel_{user['id']}")
+    ])
+
+    message = "\n".join(message_lines)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+
 
 async def handle_lastfm_do_sync(query, user: Dict, period: str):
     """Realiza la sincronización de artistas de Last.fm usando MBID cuando esté disponible"""
