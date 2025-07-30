@@ -2356,7 +2356,7 @@ async def mycountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(plain_response)
 
 async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /listcountries - muestra países disponibles"""
+    """Comando /listcountries - muestra continentes para seleccionar países"""
     if not country_state_city:
         await update.message.reply_text(
             "❌ Servicio de países no disponible."
@@ -2365,11 +2365,11 @@ async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Mensaje de estado
     status_message = await update.message.reply_text(
-        "🔍 Obteniendo lista de países disponibles..."
+        "🌍 Cargando continentes disponibles..."
     )
 
     try:
-        # Obtener países (usar caché si está disponible)
+        # Obtener países para verificar disponibilidad
         countries = country_state_city.get_available_countries()
 
         if not countries:
@@ -2379,72 +2379,296 @@ async def listcountries_command(update: Update, context: ContextTypes.DEFAULT_TY
             )
             return
 
-        # Agrupar países por continente/región (simplificado)
-        regions = {
-            'Europa': ['AD', 'AL', 'AT', 'BA', 'BE', 'BG', 'BY', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IS', 'IT', 'LI', 'LT', 'LU', 'LV', 'MC', 'MD', 'ME', 'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'RU', 'SE', 'SI', 'SK', 'SM', 'UA', 'VA'],
-            'América del Norte': ['CA', 'MX', 'US'],
-            'América del Sur': ['AR', 'BO', 'BR', 'CL', 'CO', 'EC', 'GY', 'PE', 'PY', 'SR', 'UY', 'VE'],
-            'Asia': ['CN', 'IN', 'JP', 'KR', 'TH', 'VN', 'ID', 'MY', 'PH', 'SG', 'TW'],
-            'Oceanía': ['AU', 'NZ', 'FJ'],
-            'África': ['ZA', 'EG', 'NG', 'KE', 'MA', 'TN']
+        # Crear mensaje con botones de continentes
+        message = (
+            "🌍 *Países disponibles por continente*\n\n"
+            f"📊 Total de países: {len(countries)}\n\n"
+            "Selecciona un continente para ver todos sus países:"
+        )
+
+        # Definir continentes con emojis
+        continents = [
+            ("🇪🇺", "Europa", "europe"),
+            ("🇺🇸", "América del Norte", "north_america"),
+            ("🇧🇷", "América del Sur", "south_america"),
+            ("🇨🇳", "Asia", "asia"),
+            ("🇦🇺", "Oceanía", "oceania"),
+            ("🇿🇦", "África", "africa"),
+            ("🌍", "Otros", "others")
+        ]
+
+        # Crear teclado con botones de continentes
+        keyboard = []
+        for emoji, name, code in continents:
+            keyboard.append([InlineKeyboardButton(f"{emoji} {name}", callback_data=f"continent_{code}")])
+
+        # Botón para ver todos los países de una vez
+        keyboard.append([InlineKeyboardButton("📋 Ver todos los países", callback_data="continent_all")])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await status_message.edit_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error en comando listcountries: {e}")
+        await status_message.edit_text(
+            "❌ Error al cargar continentes. Inténtalo de nuevo más tarde."
+        )
+
+async def continent_selection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja la selección de continentes y muestra todos los países"""
+    query = update.callback_query
+    await query.answer()
+
+    if not query.data.startswith("continent_"):
+        return
+
+    continent_code = query.data.replace("continent_", "")
+
+    if not country_state_city:
+        await query.edit_message_text("❌ Servicio de países no disponible.")
+        return
+
+    # Mensaje de estado
+    await query.edit_message_text("🔍 Cargando países del continente...")
+
+    try:
+        # Obtener todos los países
+        countries = country_state_city.get_available_countries()
+
+        if not countries:
+            await query.edit_message_text(
+                "❌ No se pudieron obtener los países."
+            )
+            return
+
+        # Definir mapeo de países por continente (más completo)
+        continent_countries = {
+            'europe': [
+                'AD', 'AL', 'AT', 'BA', 'BE', 'BG', 'BY', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR',
+                'GB', 'GE', 'GR', 'HR', 'HU', 'IE', 'IS', 'IT', 'LI', 'LT', 'LU', 'LV', 'MC', 'MD', 'ME', 'MK',
+                'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'RU', 'SE', 'SI', 'SK', 'SM', 'UA', 'VA', 'XK'
+            ],
+            'north_america': [
+                'AG', 'BB', 'BZ', 'CA', 'CR', 'CU', 'DM', 'DO', 'GD', 'GT', 'HN', 'HT', 'JM', 'KN', 'LC',
+                'MX', 'NI', 'PA', 'SV', 'TT', 'US', 'VC'
+            ],
+            'south_america': [
+                'AR', 'BO', 'BR', 'CL', 'CO', 'EC', 'FK', 'GF', 'GY', 'PE', 'PY', 'SR', 'UY', 'VE'
+            ],
+            'asia': [
+                'AE', 'AF', 'AM', 'AZ', 'BD', 'BH', 'BN', 'BT', 'CN', 'ID', 'IL', 'IN', 'IQ', 'IR', 'JO',
+                'JP', 'KG', 'KH', 'KP', 'KR', 'KW', 'KZ', 'LA', 'LB', 'LK', 'MM', 'MN', 'MO', 'MV', 'MY',
+                'NP', 'OM', 'PH', 'PK', 'PS', 'QA', 'SA', 'SG', 'SY', 'TH', 'TJ', 'TL', 'TM', 'TR', 'TW',
+                'UZ', 'VN', 'YE'
+            ],
+            'oceania': [
+                'AS', 'AU', 'CK', 'FJ', 'FM', 'GU', 'KI', 'MH', 'MP', 'NC', 'NR', 'NU', 'NZ', 'PF', 'PG',
+                'PN', 'PW', 'SB', 'TK', 'TO', 'TV', 'VU', 'WF', 'WS'
+            ],
+            'africa': [
+                'AO', 'BF', 'BI', 'BJ', 'BW', 'CD', 'CF', 'CG', 'CI', 'CM', 'CV', 'DJ', 'DZ', 'EG', 'EH',
+                'ER', 'ET', 'GA', 'GH', 'GM', 'GN', 'GQ', 'GW', 'KE', 'KM', 'LR', 'LS', 'LY', 'MA', 'MG',
+                'ML', 'MR', 'MU', 'MW', 'MZ', 'NA', 'NE', 'NG', 'RW', 'SC', 'SD', 'SL', 'SN', 'SO', 'SS',
+                'ST', 'SZ', 'TD', 'TG', 'TN', 'TZ', 'UG', 'ZA', 'ZM', 'ZW'
+            ]
         }
 
-        # Crear mensaje por regiones
-        message_lines = ["🌍 *Países disponibles por región:*\n"]
+        # Determinar qué países mostrar
+        if continent_code == "all":
+            selected_countries = countries
+            continent_name = "Todos los continentes"
+            continent_emoji = "🌍"
+        else:
+            # Filtrar países del continente seleccionado
+            continent_codes = continent_countries.get(continent_code, [])
 
-        countries_by_code = {c.get('iso2', c.get('code', '')): c for c in countries}
+            # Crear diccionario de países por código para búsqueda rápida
+            countries_by_code = {}
+            for country in countries:
+                code = country.get('iso2', country.get('code', ''))
+                if code:
+                    countries_by_code[code] = country
 
-        for region_name, region_codes in regions.items():
-            region_countries = []
-            for code in region_codes:
+            # Filtrar países del continente
+            selected_countries = []
+            for code in continent_codes:
                 if code in countries_by_code:
-                    country = countries_by_code[code]
-                    region_countries.append(f"{code} - {country.get('name', '')}")
+                    selected_countries.append(countries_by_code[code])
 
-            if region_countries:
-                message_lines.append(f"*{region_name}:*")
-                # Mostrar solo primeros 10 por región para no sobrecargar
-                for country_info in region_countries[:10]:
-                    message_lines.append(f"  • {country_info}")
-                if len(region_countries) > 10:
-                    message_lines.append(f"  _...y {len(region_countries) - 10} más_")
-                message_lines.append("")
+            # Obtener nombre y emoji del continente
+            continent_info = {
+                'europe': ('🇪🇺', 'Europa'),
+                'north_america': ('🇺🇸', 'América del Norte'),
+                'south_america': ('🇧🇷', 'América del Sur'),
+                'asia': ('🇨🇳', 'Asia'),
+                'oceania': ('🇦🇺', 'Oceanía'),
+                'africa': ('🇿🇦', 'África'),
+                'others': ('🌍', 'Otros')
+            }
 
-        message_lines.append(f"📊 Total países disponibles: {len(countries)}")
-        message_lines.append("\n💡 *Uso:*")
-        message_lines.append("`/addcountry ES` - Añadir por código")
-        message_lines.append("`/addcountry Spain` - Añadir por nombre")
+            continent_emoji, continent_name = continent_info.get(continent_code, ('🌍', 'Desconocido'))
+
+        # Si hay países para otros continentes, añadirlos a "others"
+        if continent_code == "others":
+            all_continent_codes = set()
+            for codes in continent_countries.values():
+                all_continent_codes.update(codes)
+
+            countries_by_code = {country.get('iso2', country.get('code', '')): country for country in countries}
+            selected_countries = [country for code, country in countries_by_code.items()
+                                if code and code not in all_continent_codes]
+
+        if not selected_countries:
+            await query.edit_message_text(
+                f"❌ No se encontraron países para {continent_name}.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Volver a continentes", callback_data="back_to_continents")
+                ]])
+            )
+            return
+
+        # Ordenar países alfabéticamente
+        selected_countries.sort(key=lambda x: x.get('name', ''))
+
+        # Crear mensaje con todos los países del continente
+        message_lines = [
+            f"{continent_emoji} *Países de {continent_name}*\n",
+            f"📊 Total: {len(selected_countries)} países\n"
+        ]
+
+        # Mostrar TODOS los países (sin límites)
+        for i, country in enumerate(selected_countries, 1):
+            code = country.get('iso2', country.get('code', ''))
+            name = country.get('name', 'Nombre desconocido')
+
+            # Información adicional si está disponible
+            details = []
+            if country.get('phonecode'):
+                details.append(f"+{country['phonecode']}")
+            if country.get('currency'):
+                details.append(f"{country['currency']}")
+
+            line = f"{i:2d}. *{code}* - {name}"
+            if details:
+                line += f" ({' | '.join(details)})"
+
+            message_lines.append(line)
+
+        message_lines.append(f"\n💡 *Uso:* `/addcountry <código>` o `/addcountry <nombre>`")
 
         response = "\n".join(message_lines)
+
+        # Botón para volver
+        keyboard = [[InlineKeyboardButton("🔙 Volver a continentes", callback_data="back_to_continents")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Dividir en chunks si es muy largo
         if len(response) > 4000:
             chunks = split_long_message(response, max_length=4000)
 
-            # Editar el primer chunk
-            await status_message.edit_text(
+            # Editar mensaje original con el primer chunk
+            await query.edit_message_text(
                 chunks[0],
-                parse_mode='Markdown'
+                parse_mode='Markdown',
+                reply_markup=reply_markup
             )
 
             # Enviar chunks adicionales
             for chunk in chunks[1:]:
-                await update.message.reply_text(
+                await query.message.reply_text(
                     chunk,
                     parse_mode='Markdown'
                 )
         else:
-            await status_message.edit_text(
+            await query.edit_message_text(
                 response,
-                parse_mode='Markdown'
+                parse_mode='Markdown',
+                reply_markup=reply_markup
             )
 
     except Exception as e:
-        logger.error(f"Error en comando listcountries: {e}")
-        await status_message.edit_text(
-            "❌ Error al obtener la lista de países. Inténtalo de nuevo más tarde."
+        logger.error(f"Error mostrando países del continente: {e}")
+        await query.edit_message_text(
+            "❌ Error cargando países. Inténtalo de nuevo.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Volver a continentes", callback_data="back_to_continents")
+            ]])
         )
 
+
+async def back_to_continents_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Vuelve al menú de selección de continentes"""
+    query = update.callback_query
+    await query.answer()
+
+    # Simular el comando listcountries original
+    fake_update = type('obj', (object,), {
+        'message': query.message
+    })()
+
+    fake_context = type('obj', (object,), {
+        'args': []
+    })()
+
+    # Reutilizar la lógica del comando original
+    if not country_state_city:
+        await query.edit_message_text("❌ Servicio de países no disponible.")
+        return
+
+    try:
+        # Obtener países para verificar disponibilidad
+        countries = country_state_city.get_available_countries()
+
+        if not countries:
+            await query.edit_message_text(
+                "❌ No se pudieron obtener los países disponibles."
+            )
+            return
+
+        # Crear mensaje con botones de continentes
+        message = (
+            "🌍 *Países disponibles por continente*\n\n"
+            f"📊 Total de países: {len(countries)}\n\n"
+            "Selecciona un continente para ver todos sus países:"
+        )
+
+        # Definir continentes con emojis
+        continents = [
+            ("🇪🇺", "Europa", "europe"),
+            ("🇺🇸", "América del Norte", "north_america"),
+            ("🇧🇷", "América del Sur", "south_america"),
+            ("🇨🇳", "Asia", "asia"),
+            ("🇦🇺", "Oceanía", "oceania"),
+            ("🇿🇦", "África", "africa"),
+            ("🌍", "Otros", "others")
+        ]
+
+        # Crear teclado con botones de continentes
+        keyboard = []
+        for emoji, name, code in continents:
+            keyboard.append([InlineKeyboardButton(f"{emoji} {name}", callback_data=f"continent_{code}")])
+
+        # Botón para ver todos los países de una vez
+        keyboard.append([InlineKeyboardButton("📋 Ver todos los países", callback_data="continent_all")])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error volviendo a continentes: {e}")
+        await query.edit_message_text(
+            "❌ Error al cargar continentes."
+        )
 
 async def refreshcountries_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /refreshcountries - actualiza la base de datos de países (solo admins)"""
@@ -2598,6 +2822,7 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
             filtered_concerts.append(concert)
 
     return filtered_concerts
+
 
 
 
@@ -3042,7 +3267,7 @@ async def show_artist_concerts_callback(update: Update, context: ContextTypes.DE
 
 
 async def showartist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /showartist - muestra todos los conciertos de un artista específico"""
+    """Comando /showartist - muestra conciertos futuros de un artista filtrados por países del usuario"""
     if not context.args:
         await update.message.reply_text(
             "❌ Uso incorrecto. Debes especificar el nombre del artista.\n"
@@ -3061,47 +3286,376 @@ async def showartist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
-    # Obtener todos los conciertos del usuario
-    all_concerts = db.get_all_concerts_for_user(user['id'])
+    # Obtener configuración de países del usuario
+    user_services = db.get_user_services(user['id'])
+    if not user_services:
+        user_services = {'countries': {'ES'}, 'country_filter': 'ES'}
 
-    # Filtrar conciertos del artista específico (búsqueda case-insensitive)
-    artist_concerts = [c for c in all_concerts if c.get('artist_name', '').lower() == artist_name.lower()]
+    user_countries = user_services.get('countries', set())
+    if not user_countries:
+        country_filter = user_services.get('country_filter', 'ES')
+        user_countries = {country_filter}
 
-    if not artist_concerts:
+    # Obtener TODOS los conciertos del artista de la base de datos
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT DISTINCT c.*
+            FROM concerts c
+            WHERE LOWER(c.artist_name) = LOWER(?)
+            ORDER BY c.date ASC
+        """, (artist_name,))
+
+        rows = cursor.fetchall()
+        all_artist_concerts = [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error obteniendo conciertos de {artist_name}: {e}")
+        all_artist_concerts = []
+    finally:
+        conn.close()
+
+    if not all_artist_concerts:
         await update.message.reply_text(
-            f"📭 No se encontraron conciertos para '{artist_name}'.\n"
-            "Verifica que esté en tu lista de artistas seguidos con `/list`"
+            f"📭 No se encontraron conciertos para '{artist_name}' en la base de datos.\n"
+            f"💡 Sugerencias:\n"
+            f"• Verifica la ortografía del nombre\n"
+            f"• Usa `/addartist {artist_name}` para seguir al artista\n"
+            f"• Usa `/searchartist {artist_name}` para buscar nuevos conciertos"
         )
         return
 
-    # Usar el formato original pero mostrando TODOS los conciertos del artista
-    message = format_single_artist_concerts_complete(artist_concerts, artist_name, show_notified=True)
+    # Filtrar solo conciertos futuros de TODOS los conciertos
+    today = datetime.now().date()
+    all_future_concerts = []
 
-    # Dividir en chunks si es muy largo
-    if len(message) > 4000:
-        chunks = split_long_message(message)
+    for concert in all_artist_concerts:
+        concert_date = concert.get('date', '')
+        if concert_date and len(concert_date) >= 10:
+            try:
+                concert_date_obj = datetime.strptime(concert_date[:10], '%Y-%m-%d').date()
+                if concert_date_obj >= today:
+                    all_future_concerts.append(concert)
+            except ValueError:
+                all_future_concerts.append(concert)
+        else:
+            all_future_concerts.append(concert)
 
-        # Enviar el primer chunk
+    if not all_future_concerts:
         await update.message.reply_text(
-            chunks[0],
-            parse_mode='Markdown',
-            disable_web_page_preview=True
+            f"📅 No hay conciertos futuros para '{artist_name}'.\n"
+            f"📊 Total en base de datos: {len(all_artist_concerts)} conciertos (todos pasados)"
+        )
+        return
+
+    # Filtrar por países del usuario
+    countries_text = ", ".join(sorted(user_countries))
+    filtered_concerts = []
+
+    if country_state_city:
+        try:
+            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
+            filtered_concerts = extended_db.filter_concerts_by_countries(all_future_concerts, user_countries)
+        except Exception as e:
+            logger.error(f"Error filtrando conciertos por países: {e}")
+            # Fallback a filtrado básico
+            for concert in all_future_concerts:
+                concert_country = concert.get('country', '').upper()
+                if not concert_country or concert_country in user_countries:
+                    filtered_concerts.append(concert)
+    else:
+        # Filtrado básico si no hay servicio de países
+        for concert in all_future_concerts:
+            concert_country = concert.get('country', '').upper()
+            if not concert_country or concert_country in user_countries:
+                filtered_concerts.append(concert)
+
+    # Verificar si el usuario sigue a este artista
+    followed_artists = db.get_user_followed_artists(user['id'])
+    is_following = any(artist['name'].lower() == artist_name.lower() for artist in followed_artists)
+
+    # Mensaje de información inicial
+    info_message = f"🎵 Conciertos de *{artist_name}*\n"
+    info_message += f"🌍 Mostrando países: {countries_text}\n"
+    info_message += f"📊 {len(filtered_concerts)} de {len(all_future_concerts)} conciertos futuros\n"
+
+    if not is_following:
+        info_message += f"💡 Usa `/addartist {artist_name}` para seguir y recibir notificaciones\n"
+
+    info_message += "─" * 30
+
+    # Mostrar primero los conciertos filtrados por países
+    if not filtered_concerts:
+        # No hay conciertos en los países del usuario
+        no_concerts_message = (
+            f"📭 *{artist_name}* no tiene conciertos futuros en tus países ({countries_text})\n\n"
+            f"📊 Pero tiene {len(all_future_concerts)} conciertos futuros en otros países\n\n"
+            f"¿Quieres verlos todos?"
         )
 
-        # Enviar chunks adicionales
-        for chunk in chunks[1:]:
+        keyboard = [[
+            InlineKeyboardButton("🌍 Ver todos los conciertos", callback_data=f"showartist_all_{user['id']}_{artist_name}")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            no_concerts_message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+        # Guardar en caché los conciertos para el botón
+        save_artist_concerts_cache(user['id'], artist_name, all_future_concerts)
+
+    else:
+        # Hay conciertos en los países del usuario
+        await update.message.reply_text(info_message, parse_mode='Markdown')
+
+        # Usar la función mejorada que filtra conciertos futuros automáticamente
+        message = format_single_artist_concerts_complete(
+            filtered_concerts,
+            artist_name,
+            show_notified=is_following
+        )
+
+        # Crear botón "Mostrar todos" solo si hay más conciertos en otros países
+        keyboard = None
+        if len(all_future_concerts) > len(filtered_concerts):
+            additional_concerts = len(all_future_concerts) - len(filtered_concerts)
+            keyboard = [[
+                InlineKeyboardButton(
+                    f"🌍 Ver todos ({additional_concerts} más en otros países)",
+                    callback_data=f"showartist_all_{user['id']}_{artist_name}"
+                )
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Guardar en caché todos los conciertos para el botón
+            save_artist_concerts_cache(user['id'], artist_name, all_future_concerts)
+        else:
+            reply_markup = None
+
+        # Dividir en chunks si es muy largo
+        if len(message) > 4000:
+            chunks = split_long_message(message)
+
+            # Enviar el primer chunk
             await update.message.reply_text(
-                chunk,
+                chunks[0],
                 parse_mode='Markdown',
                 disable_web_page_preview=True
             )
-    else:
-        await update.message.reply_text(
-            message,
-            parse_mode='Markdown',
-            disable_web_page_preview=True
+
+            # Enviar chunks adicionales con pausa
+            for i, chunk in enumerate(chunks[1:], 1):
+                await asyncio.sleep(0.5)
+                # Solo añadir el botón al último chunk
+                chunk_markup = reply_markup if i == len(chunks) - 1 else None
+                await update.message.reply_text(
+                    chunk,
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True,
+                    reply_markup=chunk_markup
+                )
+        else:
+            await update.message.reply_text(
+                message,
+                parse_mode='Markdown',
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
+            )
+
+def save_artist_concerts_cache(user_id: int, artist_name: str, concerts: List[Dict]):
+    """Guarda conciertos de un artista en caché temporal para botones"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Limpiar caché anterior del usuario para este artista
+        cursor.execute("""
+            DELETE FROM user_search_cache
+            WHERE user_id = ? AND search_type LIKE ?
+        """, (user_id, f"showartist_{artist_name}%"))
+
+        # Guardar nuevos datos
+        cursor.execute("""
+            INSERT INTO user_search_cache (user_id, search_type, search_data)
+            VALUES (?, ?, ?)
+        """, (user_id, f"showartist_{artist_name}", json.dumps(concerts)))
+
+        conn.commit()
+        logger.info(f"Caché de conciertos guardado para {artist_name}")
+
+    except sqlite3.Error as e:
+        logger.error(f"Error guardando caché de artista: {e}")
+    finally:
+        conn.close()
+
+
+
+def get_artist_concerts_cache(user_id: int, artist_name: str) -> Optional[List[Dict]]:
+    """Obtiene conciertos de un artista del caché"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Limpiar caché antiguo (más de 1 hora)
+        cursor.execute("""
+            DELETE FROM user_search_cache
+            WHERE created_at < datetime('now', '-1 hour')
+        """)
+
+        # Obtener datos del artista
+        cursor.execute("""
+            SELECT search_data
+            FROM user_search_cache
+            WHERE user_id = ? AND search_type = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id, f"showartist_{artist_name}"))
+
+        row = cursor.fetchone()
+        if row:
+            data = json.loads(row[0])
+            return data
+
+        return None
+
+    except (sqlite3.Error, json.JSONDecodeError) as e:
+        logger.error(f"Error obteniendo caché de artista: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+
+async def showartist_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el botón 'Ver todos los conciertos' de un artista"""
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        # Parsear callback data: showartist_all_USERID_ARTISTNAME
+        parts = query.data.split("_", 3)  # Dividir en máximo 4 partes
+        if len(parts) < 4:
+            await query.edit_message_text("❌ Error en los datos del callback.")
+            return
+
+        user_id = int(parts[2])
+        artist_name = parts[3]
+
+        # Verificar usuario
+        user = db.get_user_by_chat_id(query.message.chat_id)
+        if not user or user['id'] != user_id:
+            await query.edit_message_text("❌ Error de autenticación.")
+            return
+
+        # Obtener conciertos del caché
+        all_concerts = get_artist_concerts_cache(user_id, artist_name)
+        if not all_concerts:
+            await query.edit_message_text(
+                f"❌ Los datos han expirado. Usa `/showartist {artist_name}` de nuevo."
+            )
+            return
+
+        # Verificar si sigue al artista
+        followed_artists = db.get_user_followed_artists(user['id'])
+        is_following = any(artist['name'].lower() == artist_name.lower() for artist in followed_artists)
+
+        # Mensaje de información
+        info_message = (
+            f"🌍 *Todos los conciertos futuros de {artist_name}*\n"
+            f"📊 {len(all_concerts)} conciertos en todo el mundo\n"
         )
 
+        if not is_following:
+            info_message += f"💡 Usa `/addartist {artist_name}` para seguir y recibir notificaciones\n"
+
+        info_message += "─" * 30
+
+        # Formatear todos los conciertos
+        message = format_single_artist_concerts_complete(
+            all_concerts,
+            artist_name,
+            show_notified=is_following
+        )
+
+        # Botón para volver a la vista filtrada
+        user_services = db.get_user_services(user_id)
+        user_countries = user_services.get('countries', {'ES'}) if user_services else {'ES'}
+        countries_text = ", ".join(sorted(user_countries))
+
+        keyboard = [[
+            InlineKeyboardButton(
+                f"🔙 Volver a países ({countries_text})",
+                callback_data=f"showartist_filtered_{user_id}_{artist_name}"
+            )
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Dividir en chunks si es muy largo
+        full_message = info_message + "\n\n" + message
+
+        if len(full_message) > 4000:
+            # Enviar info primero
+            await query.edit_message_text(
+                info_message,
+                parse_mode='Markdown'
+            )
+
+            chunks = split_long_message(message)
+            for i, chunk in enumerate(chunks):
+                await asyncio.sleep(0.5)
+                # Solo añadir botón al último chunk
+                chunk_markup = reply_markup if i == len(chunks) - 1 else None
+                await query.message.reply_text(
+                    chunk,
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True,
+                    reply_markup=chunk_markup
+                )
+        else:
+            await query.edit_message_text(
+                full_message,
+                parse_mode='Markdown',
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
+            )
+
+    except Exception as e:
+        logger.error(f"Error en showartist_all_callback: {e}")
+        await query.edit_message_text(
+            "❌ Error mostrando todos los conciertos. Inténtalo de nuevo."
+        )
+
+
+async def showartist_filtered_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el botón 'Volver a países filtrados' de un artista"""
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        # Parsear callback data: showartist_filtered_USERID_ARTISTNAME
+        parts = query.data.split("_", 3)
+        if len(parts) < 4:
+            await query.edit_message_text("❌ Error en los datos del callback.")
+            return
+
+        user_id = int(parts[2])
+        artist_name = parts[3]
+
+        # Redirigir al comando showartist original
+        await query.edit_message_text(
+            f"🔄 Volviendo a la vista filtrada de {artist_name}...\n"
+            f"Usa `/showartist {artist_name}` para ver la vista completa."
+        )
+
+    except Exception as e:
+        logger.error(f"Error en showartist_filtered_callback: {e}")
+        await query.edit_message_text(
+            "❌ Error volviendo a la vista filtrada."
+        )
 
 
 
@@ -3109,7 +3663,7 @@ async def showartist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # Funciones de comando
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start MODIFICADO con nuevos comandos de países"""
+    """Comando /start MODIFICADO con comandos actualizados"""
     help_text = (
         "¡Bienvenido al Bot de Seguimiento de Artistas! 🎵\n\n"
         "📝 *Comandos básicos:*\n"
@@ -3118,12 +3672,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/list [usuario] - Ver artistas seguidos\n"
         "/remove <artista> - Dejar de seguir un artista\n\n"
         "🔍 *Comandos de búsqueda:*\n"
-        "/search - Ver conciertos de tus artistas\n"
+        "/search - Buscar nuevos conciertos de tus artistas (APIs)\n"
+        "/show - Ver conciertos guardados de tus artistas (BD)\n"
         "/searchartist <artista> - Buscar conciertos específicos\n"
         "/showartist <artista> - Ver todos los conciertos de un artista\n\n"
         "/lastfm - Sincronizar artistas desde Last.fm\n\n"
         "/spotify - Gestionar artistas desde Spotify\n\n"
-
     )
 
     if country_state_city:
@@ -3146,10 +3700,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/serviceon <servicio> - Activar servicio (ticketmaster/spotify/setlistfm)\n"
         "/serviceoff <servicio> - Desactivar servicio\n"
         "/config - Ver tu configuración actual\n"
-        "/help - Mostrar este mensaje de ayuda"
+        "/help - Mostrar este mensaje de ayuda\n\n"
+        "💡 *Diferencia entre comandos:*\n"
+        "• `/search` = Busca nuevos conciertos en APIs (más lento)\n"
+        "• `/show` = Consulta conciertos ya guardados (más rápido)"
     )
 
     await update.message.reply_text(help_text, parse_mode='Markdown')
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /help"""
@@ -3761,7 +4319,6 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
             message_lines.append(f"✅ Previamente notificados: {notified_count}")
 
     return "\n".join(message_lines)
-
 
 
 
@@ -5791,8 +6348,8 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             limit = int(limit_text)
 
-            if limit < 5 or limit > 100:
-                await update.message.reply_text("❌ El límite debe estar entre 5 y 100 artistas.")
+            if limit < 5 or limit > 1000:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 1000 artistas.")
                 del context.user_data['waiting_for_spotify_limit']
                 return
 
@@ -6221,10 +6778,8 @@ async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
     await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
 
-
-
-async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /search - muestra conciertos futuros de artistas seguidos desde la base de datos"""
+async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /show - muestra conciertos futuros de artistas seguidos desde la base de datos"""
     chat_id = update.effective_chat.id
 
     # Verificar que el usuario esté registrado
@@ -6255,9 +6810,9 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Mensaje de estado inicial
     countries_text = ", ".join(sorted(user_countries))
     status_message = await update.message.reply_text(
-        f"🔍 Buscando conciertos de tus artistas seguidos...\n"
+        f"📊 Consultando conciertos de tus artistas seguidos...\n"
         f"🌍 Países configurados: {countries_text}\n"
-        f"📊 Consultando base de datos..."
+        f"📂 Consultando base de datos..."
     )
 
     try:
@@ -6268,7 +6823,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status_message.edit_text(
                 "📭 No tienes artistas seguidos aún.\n"
                 "Usa `/addartist <nombre>` para seguir artistas.\n"
-                "Usa `/searchartist <nombre>` para buscar conciertos de un artista específico."
+                "Usa `/search` para buscar nuevos conciertos de tus artistas."
             )
             return
 
@@ -6359,7 +6914,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message = format_single_artist_concerts_complete(
                     artist_concerts,
                     artist_name,
-                    show_notified=False  # No mostrar notificaciones en /search
+                    show_notified=False  # No mostrar notificaciones en /show
                 )
 
                 # Dividir en chunks si es muy largo
@@ -6399,19 +6954,243 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"• En tus países: {len(filtered_concerts)}\n\n"
                 f"💡 Sugerencias:\n"
                 f"• Usa `/addcountry <país>` para añadir más países\n"
-                f"• Usa `/searchartist <nombre>` para buscar nuevos conciertos\n"
-                f"• Algunos conciertos pueden anunciarse más cerca de las fechas"
+                f"• Usa `/search` para buscar nuevos conciertos\n"
+                f"• Usa `/searchartist <nombre>` para buscar conciertos de un artista específico"
             )
         else:
             summary_message = (
-                f"🎉 *Resultados de búsqueda*\n\n"
+                f"🎉 *Resultados de consulta*\n\n"
                 f"📊 Artistas con conciertos futuros: {artists_with_concerts}\n"
                 f"📅 Total de conciertos próximos: {len(filtered_concerts)}\n"
                 f"📤 Mensajes enviados: {messages_sent}\n"
                 f"🌍 Países consultados: {countries_text}\n\n"
                 f"💡 Comandos útiles:\n"
+                f"• `/search` - Buscar nuevos conciertos\n"
                 f"• `/showartist <nombre>` - Ver todos los conciertos de un artista\n"
-                f"• `/searchartist <nombre>` - Buscar nuevos conciertos\n"
+                f"• `/searchartist <nombre>` - Buscar conciertos específicos\n"
+                f"• `/addcountry <país>` - Añadir más países"
+            )
+            await update.message.reply_text(
+                summary_message,
+                parse_mode='Markdown'
+            )
+
+        # Actualizar mensaje de estado final
+        await status_message.edit_text(
+            f"✅ Consulta completada\n"
+            f"🎵 {artists_with_concerts} artistas con conciertos\n"
+            f"📅 {len(filtered_concerts)} conciertos futuros\n"
+            f"📤 {messages_sent} mensajes enviados"
+        )
+
+    except Exception as e:
+        logger.error(f"Error en comando show: {e}")
+        await status_message.edit_text(
+            f"❌ Error al consultar conciertos. Inténtalo de nuevo más tarde.\n"
+            f"Error: {str(e)[:100]}..."
+        )
+
+
+
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /search - busca nuevos conciertos de artistas seguidos y los muestra organizadamente"""
+    chat_id = update.effective_chat.id
+
+    # Verificar que el usuario esté registrado
+    user = db.get_user_by_chat_id(chat_id)
+    if not user:
+        await update.message.reply_text(
+            "❌ Primero debes registrarte con `/adduser <tu_nombre>`"
+        )
+        return
+
+    # Obtener configuración del usuario
+    user_services = db.get_user_services(user['id'])
+
+    # Manejar caso donde user_services puede ser None
+    if not user_services:
+        user_services = {
+            'countries': {'ES'},
+            'country_filter': 'ES'
+        }
+
+    # Verificar que tenga países configurados
+    user_countries = user_services.get('countries', set())
+    if not user_countries:
+        # Usar país por defecto si no tiene configurado
+        country_filter = user_services.get('country_filter', 'ES')
+        user_countries = {country_filter}
+
+    # Verificar que tenga al menos un servicio activo
+    active_services = [s for s, active in user_services.items() if active and s not in ['country_filter', 'countries']]
+    if not active_services:
+        await update.message.reply_text(
+            "❌ No tienes ningún servicio de búsqueda activo.\n"
+            "Usa `/serviceon <servicio>` para activar al menos uno.\n"
+            "Servicios disponibles: ticketmaster, spotify, setlistfm"
+        )
+        return
+
+    # Obtener artistas seguidos
+    followed_artists = db.get_user_followed_artists(user['id'])
+
+    if not followed_artists:
+        await update.message.reply_text(
+            "📭 No tienes artistas seguidos aún.\n"
+            "Usa `/addartist <nombre>` para seguir artistas.\n"
+            "Usa `/show` para ver conciertos ya guardados en base de datos."
+        )
+        return
+
+    # Mensaje de estado inicial
+    countries_text = ", ".join(sorted(user_countries))
+    services_text = ", ".join(active_services)
+
+    status_message = await update.message.reply_text(
+        f"🔍 Buscando nuevos conciertos de tus artistas seguidos...\n"
+        f"🎵 Artistas a procesar: {len(followed_artists)}\n"
+        f"🔧 Servicios activos: {services_text}\n"
+        f"🌍 Países: {countries_text}\n\n"
+        f"⏳ Iniciando búsqueda activa..."
+    )
+
+    try:
+        all_new_concerts = []
+        processed_artists = 0
+        total_artists = len(followed_artists)
+
+        # Buscar conciertos para cada artista seguido
+        for artist in followed_artists:
+            artist_name = artist['name']
+            processed_artists += 1
+
+            # Actualizar progreso cada 3 artistas
+            if processed_artists % 3 == 0 or processed_artists == total_artists:
+                await status_message.edit_text(
+                    f"🔍 Buscando nuevos conciertos...\n"
+                    f"📊 Progreso: {processed_artists}/{total_artists} artistas\n"
+                    f"🎵 Actual: {artist_name}\n"
+                    f"🔧 Servicios: {services_text}\n"
+                    f"🌍 Países: {countries_text}"
+                )
+
+            try:
+                # Buscar conciertos para este artista
+                artist_concerts = await search_concerts_for_artist(
+                    artist_name,
+                    user_services,
+                    user_id=user['id']
+                )
+
+                # Los conciertos ya se guardan en search_concerts_for_artist
+                all_new_concerts.extend(artist_concerts)
+
+                # Pausa para no sobrecargar las APIs
+                await asyncio.sleep(1.5)
+
+            except Exception as e:
+                logger.error(f"Error buscando conciertos para {artist_name}: {e}")
+                continue
+
+        # Actualizar mensaje de estado
+        await status_message.edit_text(
+            f"✅ Búsqueda completada!\n"
+            f"📊 {processed_artists} artistas procesados\n"
+            f"🎵 {len(all_new_concerts)} conciertos encontrados\n"
+            f"🌍 Filtrados para: {countries_text}\n\n"
+            f"📤 Organizando y enviando resultados..."
+        )
+
+        # Filtrar solo conciertos futuros
+        today = datetime.now().date()
+        future_concerts = []
+
+        for concert in all_new_concerts:
+            concert_date = concert.get('date', '')
+            if concert_date and len(concert_date) >= 10:
+                try:
+                    concert_date_obj = datetime.strptime(concert_date[:10], '%Y-%m-%d').date()
+                    if concert_date_obj >= today:
+                        future_concerts.append(concert)
+                except ValueError:
+                    future_concerts.append(concert)  # Incluir si no se puede parsear
+            else:
+                future_concerts.append(concert)  # Incluir si no hay fecha
+
+        # Agrupar conciertos por artista
+        concerts_by_artist = {}
+        for concert in future_concerts:
+            artist_name = concert.get('artist_name', 'Artista desconocido')
+            if artist_name not in concerts_by_artist:
+                concerts_by_artist[artist_name] = []
+            concerts_by_artist[artist_name].append(concert)
+
+        # Enviar un mensaje por cada artista con conciertos futuros
+        artists_with_concerts = 0
+        messages_sent = 0
+
+        for artist_name, artist_concerts in concerts_by_artist.items():
+            if artist_concerts:  # Solo enviar si tiene conciertos futuros
+                # Formatear mensaje del artista
+                message = format_single_artist_concerts_complete(
+                    artist_concerts,
+                    artist_name,
+                    show_notified=False  # No mostrar notificaciones en /search
+                )
+
+                # Dividir en chunks si es muy largo
+                if len(message) > 4000:
+                    chunks = split_long_message(message, max_length=4000)
+                    for i, chunk in enumerate(chunks):
+                        await update.message.reply_text(
+                            chunk,
+                            parse_mode='Markdown',
+                            disable_web_page_preview=True
+                        )
+                        messages_sent += 1
+                        # Pausa entre chunks del mismo artista
+                        if i < len(chunks) - 1:
+                            await asyncio.sleep(0.5)
+                else:
+                    await update.message.reply_text(
+                        message,
+                        parse_mode='Markdown',
+                        disable_web_page_preview=True
+                    )
+                    messages_sent += 1
+
+                artists_with_concerts += 1
+
+                # Pausa entre mensajes de diferentes artistas
+                await asyncio.sleep(1.0)
+
+        # Mensaje final de resumen
+        if artists_with_concerts == 0:
+            await update.message.reply_text(
+                f"📭 No se encontraron conciertos futuros nuevos en tus países configurados ({countries_text}).\n\n"
+                f"📊 Estadísticas de búsqueda:\n"
+                f"• Artistas procesados: {processed_artists}\n"
+                f"• Conciertos encontrados: {len(all_new_concerts)}\n"
+                f"• Conciertos futuros: {len(future_concerts)}\n"
+                f"• En tus países: {len(future_concerts)}\n"
+                f"• Servicios usados: {services_text}\n\n"
+                f"💡 Sugerencias:\n"
+                f"• Usa `/show` para ver conciertos ya guardados\n"
+                f"• Usa `/addcountry <país>` para añadir más países\n"
+                f"• Algunos conciertos pueden anunciarse más cerca de las fechas"
+            )
+        else:
+            summary_message = (
+                f"🎉 *Resultados de búsqueda activa*\n\n"
+                f"📊 Artistas con conciertos nuevos: {artists_with_concerts}\n"
+                f"📅 Total de conciertos futuros: {len(future_concerts)}\n"
+                f"📤 Mensajes enviados: {messages_sent}\n"
+                f"🔧 Servicios utilizados: {services_text}\n"
+                f"🌍 Países consultados: {countries_text}\n\n"
+                f"💡 Comandos útiles:\n"
+                f"• `/show` - Ver todos los conciertos guardados\n"
+                f"• `/showartist <nombre>` - Ver conciertos de un artista específico\n"
                 f"• `/addcountry <país>` - Añadir más países"
             )
             await update.message.reply_text(
@@ -6422,8 +7201,9 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Actualizar mensaje de estado final
         await status_message.edit_text(
             f"✅ Búsqueda completada\n"
-            f"🎵 {artists_with_concerts} artistas con conciertos\n"
-            f"📅 {len(filtered_concerts)} conciertos futuros\n"
+            f"🔍 {processed_artists} artistas procesados\n"
+            f"🎵 {artists_with_concerts} con conciertos nuevos\n"
+            f"📅 {len(future_concerts)} conciertos futuros\n"
             f"📤 {messages_sent} mensajes enviados"
         )
 
@@ -8082,9 +8862,9 @@ def main():
 
     # Configurar MusicBrainz si está disponible
     user_agent = {
-        "app": "ArtistTrackerBot",
-        "version": "1.0",
-        "contact": "dev@example.com"
+        "app": "MusicLiveShowsTrackerBot",
+        "version": "0.1",
+        "contact": "frodobolson+server@disroot.org"
     }
 
     try:
@@ -8110,6 +8890,7 @@ def main():
 
     # Handlers de búsqueda
     application.add_handler(CommandHandler("search", search_command))
+    application.add_handler(CommandHandler("show", show_command))
     application.add_handler(CommandHandler("searchartist", searchartist_command))
     application.add_handler(CommandHandler("showartist", showartist_command))
 
@@ -8137,6 +8918,10 @@ def main():
 
     # IMPORTANTE: Los handlers de callback deben ir en orden específico para evitar conflictos
 
+    # Handlers específicos de showartist (DEBEN IR ANTES que los genéricos)
+    application.add_handler(CallbackQueryHandler(showartist_all_callback, pattern="^showartist_all_"))
+    application.add_handler(CallbackQueryHandler(showartist_filtered_callback, pattern="^showartist_filtered_"))
+
     # Handlers específicos de Last.fm (DEBEN IR ANTES que los genéricos)
     application.add_handler(CallbackQueryHandler(lastfm_callback_handler, pattern="^lastfm_"))
     application.add_handler(CallbackQueryHandler(lastfm_menu_callback, pattern="^lastfm_menu_"))
@@ -8147,6 +8932,9 @@ def main():
     application.add_handler(CallbackQueryHandler(expand_concerts_callback, pattern="^(expand_all_|back_to_search_)"))
     application.add_handler(CallbackQueryHandler(show_artist_concerts_callback, pattern="^show_artist_concerts_"))
     application.add_handler(CallbackQueryHandler(back_to_summary_callback, pattern="^back_to_summary_"))
+    application.add_handler(CallbackQueryHandler(continent_selection_callback, pattern="^continent_"))
+    application.add_handler(CallbackQueryHandler(back_to_continents_callback, pattern="^back_to_continents$"))
+
 
     # Handlers específicos de Spotify (DEBEN IR ANTES que los genéricos)
     application.add_handler(CallbackQueryHandler(spotify_callback_handler, pattern="^spotify_"))

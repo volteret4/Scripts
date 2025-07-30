@@ -337,6 +337,7 @@ class CountryCityService:
     def find_city_country(self, city_name: str, user_countries: Set[str] = None) -> Optional[str]:
         """
         Encuentra el país de una ciudad, priorizando países del usuario
+        VERSIÓN MEJORADA: Filtro más estricto para evitar falsos positivos
 
         Args:
             city_name: Nombre de la ciudad a buscar
@@ -352,38 +353,93 @@ class CountryCityService:
         cursor = conn.cursor()
 
         try:
-            # Búsqueda exacta primero
+            city_clean = city_name.strip()
+
+            # 1. BÚSQUEDA EXACTA (más estricta)
             cursor.execute("""
                 SELECT country_code FROM cities
                 WHERE LOWER(name) = LOWER(?)
                 ORDER BY country_code
-            """, (city_name.strip(),))
+            """, (city_clean,))
 
-            matches = [row[0] for row in cursor.fetchall()]
+            exact_matches = [row[0] for row in cursor.fetchall()]
 
-            if not matches:
-                # Búsqueda parcial si no hay coincidencia exacta
-                cursor.execute("""
-                    SELECT country_code FROM cities
-                    WHERE LOWER(name) LIKE LOWER(?)
-                    ORDER BY country_code
-                """, (f"%{city_name.strip()}%",))
-
-                matches = [row[0] for row in cursor.fetchall()]
-
-            if matches:
-                # Si el usuario tiene países configurados, priorizar esos
+            if exact_matches:
+                # Si hay coincidencia exacta, priorizar países del usuario
                 if user_countries:
-                    for country in matches:
+                    for country in exact_matches:
                         if country in user_countries:
-                            logger.info(f"🎯 Ciudad {city_name} encontrada en país preferido: {country}")
+                            logger.info(f"🎯 Ciudad '{city_name}' encontrada exacta en país preferido: {country}")
                             return country
 
                 # Si no hay match con países del usuario, retornar el primero
-                logger.info(f"🌍 Ciudad {city_name} encontrada en: {matches[0]}")
-                return matches[0]
+                logger.info(f"🌍 Ciudad '{city_name}' encontrada exacta en: {exact_matches[0]}")
+                return exact_matches[0]
 
-            logger.info(f"❓ Ciudad {city_name} no encontrada en base de datos")
+            # 2. BÚSQUEDA CON VARIACIONES COMUNES (más controlada)
+            # Solo si no hay coincidencia exacta y la ciudad tiene más de 3 caracteres
+            if len(city_clean) > 3:
+                variations = self._generate_city_variations(city_clean)
+
+                for variation in variations:
+                    cursor.execute("""
+                        SELECT country_code FROM cities
+                        WHERE LOWER(name) = LOWER(?)
+                        ORDER BY country_code
+                    """, (variation,))
+
+                    var_matches = [row[0] for row in cursor.fetchall()]
+
+                    if var_matches:
+                        # Priorizar países del usuario
+                        if user_countries:
+                            for country in var_matches:
+                                if country in user_countries:
+                                    logger.info(f"🎯 Ciudad '{city_name}' (variación '{variation}') encontrada en país preferido: {country}")
+                                    return country
+
+                        logger.info(f"🌍 Ciudad '{city_name}' (variación '{variation}') encontrada en: {var_matches[0]}")
+                        return var_matches[0]
+
+            # 3. BÚSQUEDA PARCIAL MUY RESTRICTIVA (solo como último recurso)
+            # Solo para ciudades largas y con condiciones muy estrictas
+            if len(city_clean) >= 6:
+                # Buscar solo si la ciudad consultada es substancialmente similar
+                cursor.execute("""
+                    SELECT country_code, name FROM cities
+                    WHERE LOWER(name) LIKE LOWER(?)
+                    AND LENGTH(name) BETWEEN ? AND ?
+                    ORDER BY LENGTH(name), country_code
+                """, (f"{city_clean}%", len(city_clean), len(city_clean) + 3))
+
+                partial_matches = cursor.fetchall()
+
+                # Filtrar para evitar casos como "Rome" -> "Romeral"
+                filtered_matches = []
+                for country_code, db_city_name in partial_matches:
+                    # Solo aceptar si:
+                    # 1. La ciudad de BD empieza con la ciudad consultada
+                    # 2. La diferencia de longitud no es excesiva
+                    # 3. No hay caracteres raros en la diferencia
+                    if (db_city_name.lower().startswith(city_clean.lower()) and
+                        len(db_city_name) - len(city_clean) <= 3 and
+                        self._is_valid_city_extension(city_clean, db_city_name)):
+                        filtered_matches.append((country_code, db_city_name))
+
+                if filtered_matches:
+                    # Priorizar países del usuario
+                    if user_countries:
+                        for country_code, db_city_name in filtered_matches:
+                            if country_code in user_countries:
+                                logger.info(f"🎯 Ciudad '{city_name}' (parcial '{db_city_name}') encontrada en país preferido: {country_code}")
+                                return country_code
+
+                    # Si no hay match con países del usuario, retornar el primero
+                    country_code, db_city_name = filtered_matches[0]
+                    logger.info(f"🌍 Ciudad '{city_name}' (parcial '{db_city_name}') encontrada en: {country_code}")
+                    return country_code
+
+            logger.info(f"❓ Ciudad '{city_name}' no encontrada en base de datos")
             return None
 
         except sqlite3.Error as e:
@@ -391,6 +447,113 @@ class CountryCityService:
             return None
         finally:
             conn.close()
+
+    def _generate_city_variations(self, city_name: str) -> List[str]:
+        """
+        Genera variaciones comunes de nombres de ciudades
+
+        Args:
+            city_name: Nombre original de la ciudad
+
+        Returns:
+            Lista de variaciones posibles
+        """
+        variations = []
+        city_lower = city_name.lower()
+
+        # Variaciones comunes de acentos y caracteres especiales
+        accent_replacements = {
+            'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a',
+            'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
+            'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
+            'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
+            'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
+            'ñ': 'n', 'ç': 'c'
+        }
+
+        # Crear versión sin acentos
+        no_accents = city_lower
+        for accented, plain in accent_replacements.items():
+            no_accents = no_accents.replace(accented, plain)
+
+        if no_accents != city_lower:
+            variations.append(no_accents)
+
+        # Crear versión con acentos (reverso)
+        reverse_replacements = {v: k for k, v in accent_replacements.items()}
+        with_accents = city_lower
+        for plain, accented in reverse_replacements.items():
+            with_accents = with_accents.replace(plain, accented)
+
+        if with_accents != city_lower and with_accents not in variations:
+            variations.append(with_accents)
+
+        # Variaciones específicas comunes
+        common_variations = {
+            'saint': ['st', 'san', 'santa'],
+            'st': ['saint', 'san', 'santa'],
+            'san': ['saint', 'st', 'santa'],
+            'santa': ['saint', 'st', 'san'],
+            'mount': ['mt', 'monte'],
+            'mt': ['mount', 'monte'],
+            'monte': ['mount', 'mt']
+        }
+
+        for original, alternatives in common_variations.items():
+            if original in city_lower:
+                for alt in alternatives:
+                    variation = city_lower.replace(original, alt)
+                    if variation not in variations:
+                        variations.append(variation)
+
+        return variations[:5]  # Limitar a 5 variaciones máximo
+
+
+    def _is_valid_city_extension(self, query_city: str, db_city: str) -> bool:
+        """
+        Verifica si la extensión de una ciudad es válida
+        Evita casos como "Rome" -> "Romeral"
+
+        Args:
+            query_city: Ciudad consultada
+            db_city: Ciudad en base de datos
+
+        Returns:
+            True si la extensión es válida
+        """
+        if len(db_city) <= len(query_city):
+            return True
+
+        extension = db_city[len(query_city):].lower()
+
+        # Extensiones válidas (sufijos comunes de ciudades)
+        valid_extensions = [
+            ' city', ' town', ' beach', ' hill', ' park', ' valley',
+            ' springs', ' falls', ' lake', ' river', ' bay', ' port',
+            'ville', 'burg', 'ton', 'ham', 'ford', 'field', 'wood',
+            'land', 'stead', 'worth', 'borough', 'wich', 'thorpe',
+            'by', 'stad', 'borg', 'havn', 'heim', 'dal', 'vik',
+            'a', 'o', 'i', 'e', 'u',  # Vocales sueltas
+            's', 'n', 't', 'r', 'l',  # Consonantes comunes al final
+            'es', 'os', 'as', 'is',   # Plurales simples
+            'ino', 'ina', 'ito', 'ita'  # Diminutivos
+        ]
+
+        # Si la extensión es muy corta (1-3 caracteres), probablemente es válida
+        if len(extension) <= 3:
+            return True
+
+        # Verificar si la extensión contiene algún sufijo válido
+        for valid_ext in valid_extensions:
+            if extension.startswith(valid_ext) or extension.endswith(valid_ext):
+                return True
+
+        # Si la extensión es completamente diferente (como "al" en "Romeral"), rechazar
+        if len(extension) > 3 and not any(c in 'aeiou' for c in extension):
+            return False
+
+        return True
+
 
     def get_country_info(self, country_code: str) -> Optional[Dict]:
         """
