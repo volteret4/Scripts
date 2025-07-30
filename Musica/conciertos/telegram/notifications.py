@@ -378,13 +378,65 @@ class NotificationService:
         finally:
             conn.close()
 
-    def get_unnotified_concerts_for_user(self, user_id: int, user_countries: Set[str] = None) -> List[Dict]:
-        """Obtiene conciertos no notificados para un usuario FILTRADOS por sus países"""
+    def get_future_concerts_by_artist_for_user(self, user_id: int, user_countries: Set[str] = None) -> Dict[str, List[Dict]]:
+        """Obtiene TODOS los conciertos futuros agrupados por artista para un usuario"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
 
         try:
-            # Obtener todos los conciertos no notificados del usuario
+            # Obtener todos los conciertos futuros del usuario
+            today = datetime.now().strftime('%Y-%m-%d')
+            cursor.execute("""
+                SELECT DISTINCT c.*
+                FROM concerts c
+                JOIN artists a ON LOWER(c.artist_name) = LOWER(a.name)
+                JOIN user_followed_artists ufa ON a.id = ufa.artist_id
+                WHERE ufa.user_id = ?
+                AND (c.date >= ? OR c.date = '' OR c.date IS NULL)
+                ORDER BY c.artist_name, c.date ASC
+            """, (user_id, today))
+
+            rows = cursor.fetchall()
+            all_concerts = [dict(row) for row in rows]
+
+            # Filtrar por países del usuario
+            if user_countries and self.country_city_service:
+                extended_db = ArtistTrackerDatabaseExtended(self.db_path, self.country_city_service)
+                filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+            else:
+                # Filtrado básico por país si no hay servicio de países
+                if user_countries:
+                    filtered_concerts = []
+                    for concert in all_concerts:
+                        concert_country = concert.get('country', '').upper()
+                        if not concert_country or concert_country in {c.upper() for c in user_countries}:
+                            filtered_concerts.append(concert)
+                else:
+                    filtered_concerts = all_concerts
+
+            # Agrupar por artista
+            concerts_by_artist = {}
+            for concert in filtered_concerts:
+                artist_name = concert.get('artist_name', 'Artista desconocido')
+                if artist_name not in concerts_by_artist:
+                    concerts_by_artist[artist_name] = []
+                concerts_by_artist[artist_name].append(concert)
+
+            return concerts_by_artist
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo conciertos futuros por artista: {e}")
+            return {}
+        finally:
+            conn.close()
+
+    def get_unnotified_concerts_by_artist_for_user(self, user_id: int, user_countries: Set[str] = None) -> Dict[str, List[Dict]]:
+        """Obtiene conciertos NO NOTIFICADOS agrupados por artista para un usuario"""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Obtener conciertos no notificados del usuario
             cursor.execute("""
                 SELECT DISTINCT c.*
                 FROM concerts c
@@ -395,7 +447,7 @@ class NotificationService:
                     SELECT 1 FROM notifications_sent ns
                     WHERE ns.user_id = ? AND ns.concert_id = c.id
                 )
-                ORDER BY c.date ASC
+                ORDER BY c.artist_name, c.date ASC
             """, (user_id, user_id))
 
             rows = cursor.fetchall()
@@ -405,9 +457,6 @@ class NotificationService:
             if user_countries and self.country_city_service:
                 extended_db = ArtistTrackerDatabaseExtended(self.db_path, self.country_city_service)
                 filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
-
-                logger.info(f"Conciertos filtrados para usuario {user_id}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
-                return filtered_concerts
             else:
                 # Filtrado básico por país si no hay servicio de países
                 if user_countries:
@@ -416,109 +465,111 @@ class NotificationService:
                         concert_country = concert.get('country', '').upper()
                         if not concert_country or concert_country in {c.upper() for c in user_countries}:
                             filtered_concerts.append(concert)
-                    return filtered_concerts
+                else:
+                    filtered_concerts = all_concerts
 
-            return all_concerts
+            # Para cada artista con conciertos no notificados, obtener TODOS sus conciertos futuros
+            artists_with_new_concerts = {concert['artist_name'] for concert in filtered_concerts}
+
+            # Obtener todos los conciertos futuros de estos artistas
+            all_future_concerts = self.get_future_concerts_by_artist_for_user(user_id, user_countries)
+
+            # Filtrar solo los artistas que tienen conciertos nuevos
+            concerts_by_artist = {}
+            for artist_name in artists_with_new_concerts:
+                if artist_name in all_future_concerts:
+                    concerts_by_artist[artist_name] = all_future_concerts[artist_name]
+
+            return concerts_by_artist
 
         except sqlite3.Error as e:
-            logger.error(f"Error obteniendo conciertos no notificados: {e}")
-            return []
+            logger.error(f"Error obteniendo conciertos no notificados por artista: {e}")
+            return {}
         finally:
             conn.close()
 
-    def mark_concert_notified(self, user_id: int, concert_id: int) -> bool:
-        """Marca un concierto como notificado para un usuario"""
+    def mark_artist_concerts_notified(self, user_id: int, artist_concerts: List[Dict]) -> bool:
+        """Marca todos los conciertos de un artista como notificados para un usuario"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
-                INSERT OR IGNORE INTO notifications_sent (user_id, concert_id)
-                VALUES (?, ?)
-            """, (user_id, concert_id))
+            for concert in artist_concerts:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO notifications_sent (user_id, concert_id)
+                    VALUES (?, ?)
+                """, (user_id, concert['id']))
 
             conn.commit()
-            return cursor.rowcount > 0
+            return True
 
         except sqlite3.Error as e:
-            logger.error(f"Error marcando concierto como notificado: {e}")
+            logger.error(f"Error marcando conciertos del artista como notificados: {e}")
             return False
         finally:
             conn.close()
 
-    def format_concerts_message(self, concerts: List[Dict], title: str = "🔔 Nuevos conciertos encontrados") -> str:
-        """Formatea una lista de conciertos para mostrar en Telegram (versión para notificaciones)"""
+    def format_artist_concerts_message(self, artist_name: str, concerts: List[Dict], user_countries: Set[str]) -> str:
+        """Formatea un mensaje con todos los conciertos futuros de un artista"""
         if not concerts:
-            return f"{title}\n\n❌ No se encontraron conciertos."
+            return ""
 
-        message_lines = [f"{title}\n"]
+        # Escapar caracteres especiales para Markdown
+        safe_artist = artist_name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
 
-        # Agrupar por artista
-        concerts_by_artist = {}
-        for concert in concerts:
-            artist = concert.get('artist_name', 'Artista desconocido')
-            if artist not in concerts_by_artist:
-                concerts_by_artist[artist] = []
-            concerts_by_artist[artist].append(concert)
+        message_lines = [f"🎵 *{safe_artist}*"]
+        message_lines.append(f"📍 Conciertos en {', '.join(sorted(user_countries))}\n")
 
-        for artist, artist_concerts in concerts_by_artist.items():
-            # Escapar caracteres especiales para Markdown
-            safe_artist = artist.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
-            message_lines.append(f"*{safe_artist}*:")
+        # Ordenar conciertos por fecha
+        concerts_sorted = sorted(concerts, key=lambda x: x.get('date', '9999-12-31'))
 
-            for concert in artist_concerts[:3]:  # Limitar a 3 por artista en notificaciones
-                venue = concert.get('venue', 'Lugar desconocido')
-                city = concert.get('city', '')
-                country = concert.get('country', '')
-                date = concert.get('date', 'Fecha desconocida')
-                url = concert.get('url', '')
-                source = concert.get('source', '')
+        for concert in concerts_sorted:
+            venue = concert.get('venue', 'Lugar desconocido')
+            city = concert.get('city', '')
+            country = concert.get('country', '')
+            date = concert.get('date', 'Fecha desconocida')
+            url = concert.get('url', '')
+            source = concert.get('source', '')
 
-                # Formatear fecha
-                if date and len(date) >= 10 and '-' in date:
-                    try:
-                        date_obj = datetime.strptime(date[:10], '%Y-%m-%d')
-                        date = date_obj.strftime('%d/%m/%Y')
-                    except ValueError:
-                        pass
+            # Formatear fecha
+            if date and len(date) >= 10 and '-' in date:
+                try:
+                    date_obj = datetime.strptime(date[:10], '%Y-%m-%d')
+                    date = date_obj.strftime('%d/%m/%Y')
+                except ValueError:
+                    pass
 
-                # Escapar caracteres especiales
-                safe_venue = str(venue).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
-                safe_city = str(city).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+            # Escapar caracteres especiales
+            safe_venue = str(venue).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+            safe_city = str(city).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
 
-                # Construir ubicación
-                location_parts = []
-                if safe_venue:
-                    location_parts.append(safe_venue)
-                if safe_city:
-                    location_parts.append(safe_city)
-                if country:
-                    location_parts.append(f"({country})")
+            # Construir ubicación
+            location_parts = []
+            if safe_venue:
+                location_parts.append(safe_venue)
+            if safe_city:
+                location_parts.append(safe_city)
+            if country:
+                location_parts.append(f"({country})")
 
-                location = ", ".join(location_parts) if location_parts else "Ubicación desconocida"
+            location = ", ".join(location_parts) if location_parts else "Ubicación desconocida"
 
-                concert_line = f"• {date}: "
+            concert_line = f"📅 {date}: "
 
-                if url and url.startswith(('http://', 'https://')):
-                    # Escapar paréntesis en URL
-                    escaped_url = url.replace(")", "\\)")
-                    concert_line += f"[{location}]({escaped_url})"
-                else:
-                    concert_line += location
+            if url and url.startswith(('http://', 'https://')):
+                # Escapar paréntesis en URL
+                escaped_url = url.replace(")", "\\)")
+                concert_line += f"[{location}]({escaped_url})"
+            else:
+                concert_line += location
 
-                if source:
-                    concert_line += f" _{source}_"
+            if source:
+                concert_line += f" _{source}_"
 
-                message_lines.append(concert_line)
+            message_lines.append(concert_line)
 
-            if len(artist_concerts) > 3:
-                remaining = len(artist_concerts) - 3
-                message_lines.append(f"_...y {remaining} más_")
-
-            message_lines.append("")
-
-        message_lines.append(f"📊 Total: {len(concerts)} conciertos")
-        message_lines.append(f"\n💡 Usa `/search` en el bot para ver todos los detalles")
+        message_lines.append(f"\n📊 Total: {len(concerts)} conciertos")
+        message_lines.append(f"💡 Usa /search {artist_name} para más detalles")
 
         return "\n".join(message_lines)
 
@@ -549,7 +600,7 @@ class NotificationService:
             return False
 
     async def process_notifications_for_time(self, notification_time: str):
-        """Procesa notificaciones para una hora específica (SOLO notifica, NO busca conciertos)"""
+        """Procesa notificaciones para una hora específica - ENVÍA UN MENSAJE POR ARTISTA"""
         logger.info(f"🔔 Procesando notificaciones para las {notification_time}")
 
         # Obtener usuarios para esta hora
@@ -571,28 +622,37 @@ class NotificationService:
 
                 logger.info(f"Países configurados para {user['username']}: {user_countries}")
 
-                # Obtener conciertos no notificados FILTRADOS por países del usuario
-                unnotified_concerts = self.get_unnotified_concerts_for_user(user['id'], user_countries)
+                # Obtener conciertos no notificados agrupados por artista
+                # Esto incluye TODOS los conciertos futuros de artistas que tienen nuevos conciertos
+                artists_concerts = self.get_unnotified_concerts_by_artist_for_user(user['id'], user_countries)
 
-                if unnotified_concerts:
-                    # Limitar a 15 conciertos por notificación
-                    concerts_to_notify = unnotified_concerts[:15]
+                if artists_concerts:
+                    logger.info(f"Artistas con nuevos conciertos para {user['username']}: {list(artists_concerts.keys())}")
 
-                    # Formatear mensaje
-                    message = self.format_concerts_message(
-                        concerts_to_notify,
-                        f"🔔 Nuevos conciertos en {', '.join(sorted(user_countries))}"
-                    )
+                    # Enviar un mensaje por cada artista
+                    total_messages_sent = 0
+                    for artist_name, concerts in artists_concerts.items():
+                        try:
+                            # Formatear mensaje para este artista
+                            message = self.format_artist_concerts_message(artist_name, concerts, user_countries)
 
-                    # Enviar notificación
-                    if await self.send_telegram_message(user['chat_id'], message):
-                        # Marcar conciertos como notificados para este usuario
-                        for concert in concerts_to_notify:
-                            self.mark_concert_notified(user['id'], concert['id'])
+                            if message:
+                                # Enviar mensaje del artista
+                                if await self.send_telegram_message(user['chat_id'], message):
+                                    # Marcar TODOS los conciertos de este artista como notificados
+                                    self.mark_artist_concerts_notified(user['id'], concerts)
+                                    total_messages_sent += 1
+                                    logger.info(f"✅ Mensaje enviado para {artist_name}: {len(concerts)} conciertos")
 
-                        logger.info(f"✅ Notificación enviada a {user['username']}: {len(concerts_to_notify)} conciertos")
-                    else:
-                        logger.error(f"❌ Falló el envío de notificación a {user['username']}")
+                                    # Pausa entre mensajes para evitar spam
+                                    await asyncio.sleep(1)
+                                else:
+                                    logger.error(f"❌ Falló el envío del mensaje para {artist_name}")
+
+                        except Exception as e:
+                            logger.error(f"❌ Error enviando mensaje para {artist_name}: {e}")
+
+                    logger.info(f"✅ Notificaciones completadas para {user['username']}: {total_messages_sent} mensajes enviados")
                 else:
                     logger.info(f"ℹ️ No hay nuevos conciertos para {user['username']} en sus países")
 

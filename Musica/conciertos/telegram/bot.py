@@ -230,6 +230,36 @@ class ArtistTrackerDatabase:
                 )
             """)
 
+
+            # Nueva tabla para usuarios de Spotify
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_spotify (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    spotify_username TEXT NOT NULL,
+                    spotify_display_name TEXT DEFAULT '',
+                    spotify_followers INTEGER DEFAULT 0,
+                    spotify_playlists INTEGER DEFAULT 0,
+                    artists_limit INTEGER DEFAULT 20,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id)
+                )
+            """)
+
+            # Tabla para almacenar artistas pendientes de Spotify
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pending_spotify_artists (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    artists_data TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id)
+                )
+            """)
+
             # Índices para optimizar consultas
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_chat_id ON users(chat_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
@@ -248,6 +278,10 @@ class ArtistTrackerDatabase:
             # Índices para Last.fm
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_lastfm_user_id ON user_lastfm(user_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pending_lastfm_user_id ON pending_lastfm_sync(user_id)")
+
+            # Índices para Spotify
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_spotify_user_id ON user_spotify(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pending_spotify_user_id ON pending_spotify_artists(user_id)")
 
 
             conn.commit()
@@ -343,6 +377,188 @@ class ArtistTrackerDatabase:
             return None
         finally:
             conn.close()
+
+# spotify
+
+    def set_user_spotify(self, user_id: int, spotify_username: str, user_info: dict = None) -> bool:
+        """
+        Establece el usuario de Spotify para un usuario
+
+        Args:
+            user_id: ID del usuario
+            spotify_username: Nombre de usuario de Spotify
+            user_info: Información adicional del usuario (opcional)
+
+        Returns:
+            True si se estableció correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            followers = 0
+            display_name = spotify_username
+            public_playlists = 0
+
+            if user_info:
+                followers = user_info.get('followers', 0)
+                display_name = user_info.get('display_name', spotify_username)
+                public_playlists = user_info.get('public_playlists', 0)
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_spotify
+                (user_id, spotify_username, spotify_display_name, spotify_followers,
+                 spotify_playlists, artists_limit, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, spotify_username, display_name, followers, public_playlists, 20))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error estableciendo usuario Spotify: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_user_spotify(self, user_id: int) -> Optional[Dict]:
+        """
+        Obtiene el usuario de Spotify asociado
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Diccionario con datos de Spotify o None si no existe
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("SELECT * FROM user_spotify WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return dict(row)
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo usuario Spotify: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def set_spotify_artists_limit(self, user_id: int, limit: int) -> bool:
+        """
+        Establece el límite de artistas para Spotify
+
+        Args:
+            user_id: ID del usuario
+            limit: Número de artistas a mostrar
+
+        Returns:
+            True si se estableció correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE user_spotify SET artists_limit = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            """, (limit, user_id))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error estableciendo límite de artistas Spotify: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def save_pending_spotify_artists(self, user_id: int, artists_data: List[Dict]) -> bool:
+        """
+        Guarda artistas pendientes de Spotify
+
+        Args:
+            user_id: ID del usuario
+            artists_data: Lista de artistas
+
+        Returns:
+            True si se guardó correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                INSERT OR REPLACE INTO pending_spotify_artists
+                (user_id, artists_data, created_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+            """, (user_id, json.dumps(artists_data)))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error guardando artistas pendientes Spotify: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_pending_spotify_artists(self, user_id: int) -> Optional[List[Dict]]:
+        """
+        Obtiene artistas pendientes de Spotify
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Lista de artistas o None si no existe
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT artists_data FROM pending_spotify_artists
+                WHERE user_id = ?
+            """, (user_id,))
+
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row[0])
+            return None
+
+        except (sqlite3.Error, json.JSONDecodeError) as e:
+            logger.error(f"Error obteniendo artistas pendientes Spotify: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def clear_pending_spotify_artists(self, user_id: int):
+        """
+        Limpia artistas pendientes de Spotify
+
+        Args:
+            user_id: ID del usuario
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("DELETE FROM pending_spotify_artists WHERE user_id = ?", (user_id,))
+            conn.commit()
+
+        except sqlite3.Error as e:
+            logger.error(f"Error limpiando artistas pendientes Spotify: {e}")
+        finally:
+            conn.close()
+
 
 # lastfm
 
@@ -2299,7 +2515,7 @@ def get_user_services_extended(user_id: int) -> Dict[str, any]:
 async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, any] = None, user_id: int = None) -> List[Dict]:
     """
     Busca conciertos para un artista usando los servicios habilitados
-    VERSIÓN MODIFICADA: Ticketmaster busca globalmente y luego filtra
+    VERSIÓN MEJORADA: Guarda todos los conciertos pero retorna solo los filtrados por países del usuario
     """
     if user_services is None:
         user_services = {
@@ -2313,14 +2529,19 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
     all_concerts = []
     user_countries = user_services.get('countries', {'ES'})
 
-    # Buscar en Ticketmaster si está habilitado - BÚSQUEDA GLOBAL
+    # Buscar en Ticketmaster si está habilitado - BÚSQUEDA GLOBAL Y GUARDADO
     if user_services.get('ticketmaster', True) and ticketmaster_service:
         try:
-            # Usar búsqueda global en lugar de por país
+            # Usar búsqueda global para obtener TODOS los conciertos
             concerts, _ = ticketmaster_service.search_concerts_global(artist_name)
-            all_concerts.extend(concerts)
 
-            logger.info(f"Ticketmaster global: {len([c for c in concerts if c.get('source') == 'Ticketmaster'])} conciertos encontrados para {artist_name}")
+            # GUARDAR TODOS los conciertos encontrados (sin filtrar)
+            for concert in concerts:
+                concert_id = db.save_concert(concert)
+                logger.debug(f"Guardado concierto: {concert.get('name', '')} en {concert.get('country', '')}")
+
+            all_concerts.extend(concerts)
+            logger.info(f"Ticketmaster global: {len(concerts)} conciertos encontrados y guardados para {artist_name}")
         except Exception as e:
             logger.error(f"Error buscando en Ticketmaster: {e}")
 
@@ -2328,8 +2549,10 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
     if user_services.get('spotify', True) and spotify_service:
         try:
             concerts, _ = spotify_service.search_artist_and_concerts(artist_name)
+            for concert in concerts:
+                db.save_concert(concert)
             all_concerts.extend(concerts)
-            logger.info(f"Spotify: {len([c for c in all_concerts if c.get('source') == 'Spotify'])} conciertos encontrados para {artist_name}")
+            logger.info(f"Spotify: {len([c for c in concerts if c.get('source') == 'Spotify'])} conciertos encontrados para {artist_name}")
         except Exception as e:
             logger.error(f"Error buscando en Spotify: {e}")
 
@@ -2339,19 +2562,21 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
             # Setlist.fm mantiene búsqueda por país ya que es más específico
             for country_code in user_countries:
                 concerts, _ = setlistfm_service.search_concerts(artist_name, country_code)
+                for concert in concerts:
+                    db.save_concert(concert)
                 all_concerts.extend(concerts)
 
             logger.info(f"Setlist.fm: {len([c for c in all_concerts if c.get('source') == 'Setlist.fm'])} conciertos encontrados para {artist_name}")
         except Exception as e:
             logger.error(f"Error buscando en Setlist.fm: {e}")
 
-    # Filtrar conciertos por países del usuario si el servicio está disponible
-    if country_city_service and user_id:
+    # FILTRAR por países del usuario SOLO para retorno (no para guardado)
+    if country_state_city and user_id:
         try:
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_city_service)
+            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
             filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
 
-            logger.info(f"Conciertos filtrados para {artist_name}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
+            logger.info(f"Conciertos para {artist_name}: {len(all_concerts)} totales guardados -> {len(filtered_concerts)} filtrados para países: {user_countries}")
             return filtered_concerts
         except Exception as e:
             logger.error(f"Error filtrando conciertos: {e}")
@@ -2365,90 +2590,23 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
             logger.info(f"Filtrado básico aplicado: {len(all_concerts)} -> {len(filtered_concerts)}")
             return filtered_concerts
 
-    return all_concerts
+    # Si no hay servicio de países, filtrar manualmente
+    filtered_concerts = []
+    for concert in all_concerts:
+        concert_country = concert.get('country', '').upper()
+        if not concert_country or concert_country in user_countries:
+            filtered_concerts.append(concert)
+
+    return filtered_concerts
 
 
-async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, any] = None, user_id: int = None) -> List[Dict]:
-    """
-    Busca conciertos para un artista usando los servicios habilitados
-    VERSIÓN EXTENDIDA con filtrado por países múltiples
 
-    Args:
-        artist_name: Nombre del artista
-        user_services: Configuración de servicios del usuario
-        user_id: ID del usuario (para filtrado por países)
-
-    Returns:
-        Lista de conciertos encontrados y filtrados
-    """
-    if user_services is None:
-        # Configuración por defecto si no se proporciona
-        user_services = {
-            'ticketmaster': True,
-            'spotify': True,
-            'setlistfm': True,
-            'country_filter': 'ES',
-            'countries': {'ES'}
-        }
-
-    all_concerts = []
-
-    # Obtener países del usuario
-    user_countries = user_services.get('countries', {'ES'})
-    primary_country = user_services.get('country_filter', 'ES')
-
-    # Buscar en Ticketmaster si está habilitado
-    if user_services.get('ticketmaster', True) and ticketmaster_service:
-        try:
-            # Buscar en cada país del usuario
-            for country_code in user_countries:
-                concerts, _ = ticketmaster_service.search_concerts(artist_name, country_code)
-                all_concerts.extend(concerts)
-
-            logger.info(f"Ticketmaster: {len([c for c in all_concerts if c.get('source') == 'Ticketmaster'])} conciertos encontrados para {artist_name}")
-        except Exception as e:
-            logger.error(f"Error buscando en Ticketmaster: {e}")
-
-    # Buscar en Spotify si está habilitado
-    if user_services.get('spotify', True) and spotify_service:
-        try:
-            concerts, _ = spotify_service.search_artist_and_concerts(artist_name)
-            all_concerts.extend(concerts)
-            logger.info(f"Spotify: {len([c for c in all_concerts if c.get('source') == 'Spotify'])} conciertos encontrados para {artist_name}")
-        except Exception as e:
-            logger.error(f"Error buscando en Spotify: {e}")
-
-    # Buscar en Setlist.fm si está habilitado
-    if user_services.get('setlistfm', True) and setlistfm_service:
-        try:
-            # Buscar en cada país del usuario
-            for country_code in user_countries:
-                concerts, _ = setlistfm_service.search_concerts(artist_name, country_code)
-                all_concerts.extend(concerts)
-
-            logger.info(f"Setlist.fm: {len([c for c in all_concerts if c.get('source') == 'Setlist.fm'])} conciertos encontrados para {artist_name}")
-        except Exception as e:
-            logger.error(f"Error buscando en Setlist.fm: {e}")
-
-    # Filtrar conciertos por países del usuario si el servicio está disponible
-    if country_state_city and user_id:
-        try:
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
-            filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
-
-            logger.info(f"Conciertos filtrados para {artist_name}: {len(all_concerts)} -> {len(filtered_concerts)} (países: {user_countries})")
-            return filtered_concerts
-        except Exception as e:
-            logger.error(f"Error filtrando conciertos: {e}")
-            return all_concerts
-
-    return all_concerts
 
 
 async def update_concerts_database():
     """
     Actualiza la base de datos con nuevos conciertos
-    VERSIÓN MODIFICADA: Guarda todos los conciertos globalmente
+    VERSIÓN MEJORADA: Guarda todos los conciertos globalmente con pausas
     """
     logger.info("Actualizando base de datos de conciertos...")
 
@@ -2462,31 +2620,42 @@ async def update_concerts_database():
 
         total_new_concerts = 0
         total_all_concerts = 0
+        processed_artists = 0
+
+        logger.info(f"Iniciando actualización para {len(artists)} artistas")
 
         for artist_name in artists:
-            logger.info(f"Buscando conciertos globalmente para {artist_name}")
+            processed_artists += 1
+
+            if processed_artists % 10 == 0:
+                logger.info(f"Progreso: {processed_artists}/{len(artists)} artistas procesados")
+
+            logger.debug(f"Buscando conciertos globalmente para {artist_name}")
 
             # Buscar con configuración global (todos los servicios activos)
             global_services = {
                 'ticketmaster': True,
                 'spotify': True,
                 'setlistfm': True,
-                'countries': {'ES', 'US', 'FR', 'DE', 'IT', 'GB'}  # Países principales para Setlist.fm
+                'countries': {'ES', 'US', 'FR', 'DE', 'IT', 'GB', 'CA', 'AU', 'JP', 'BR'}  # Países principales
             }
 
             concerts = await search_concerts_for_artist(artist_name, global_services)
             total_all_concerts += len(concerts)
 
-            # Guardar TODOS los conciertos encontrados
+            # Los conciertos ya se guardan dentro de search_concerts_for_artist
+            # Solo necesitamos contar los nuevos
             for concert in concerts:
+                # Verificar si es nuevo (esto es aproximado ya que save_concert devuelve ID o None)
                 concert_id = db.save_concert(concert)
                 if concert_id:
                     total_new_concerts += 1
 
-            # Pausa para no sobrecargar las APIs
-            await asyncio.sleep(1)
+            # Pausa de 1 segundo para no sobrecargar las APIs
+            await asyncio.sleep(1.0)
 
         logger.info(f"Actualización completada: {total_new_concerts} nuevos conciertos de {total_all_concerts} encontrados")
+        logger.info(f"Total artistas procesados: {processed_artists}")
 
     except Exception as e:
         logger.error(f"Error actualizando base de datos de conciertos: {e}")
@@ -2829,7 +2998,7 @@ async def show_artist_concerts_callback(update: Update, context: ContextTypes.DE
             return
 
         # Formatear mensaje detallado
-        message = format_artist_concerts_detailed(artist_concerts, artist_name, show_notified=True)
+        message = format_artist_concerts_detailed(artist_concerts, artist_name, show_notified=False)
 
         # Botón para volver
         keyboard = [[
@@ -2906,7 +3075,7 @@ async def showartist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     # Usar el formato original pero mostrando TODOS los conciertos del artista
-    message = format_single_artist_concerts(artist_concerts, artist_name, show_notified=True)
+    message = format_single_artist_concerts_complete(artist_concerts, artist_name, show_notified=True)
 
     # Dividir en chunks si es muy largo
     if len(message) > 4000:
@@ -2933,68 +3102,7 @@ async def showartist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             disable_web_page_preview=True
         )
 
-def format_single_artist_concerts(concerts: List[Dict], artist_name: str, show_notified: bool = False) -> str:
-    """
-    Formatea los conciertos de un solo artista usando el formato original
-    """
-    if not concerts:
-        return f"🎵 Conciertos de {artist_name}\n\n❌ No se encontraron conciertos."
 
-    # Escapar caracteres especiales del nombre del artista
-    safe_artist = artist_name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
-
-    message_lines = [f"🎵 Conciertos de {safe_artist}\n"]
-    message_lines.append(f"*{safe_artist}*:")
-
-    # Ordenar conciertos por fecha (más recientes primero)
-    sorted_concerts = sorted(concerts, key=lambda x: x.get('date', ''), reverse=True)
-
-    for concert in sorted_concerts:  # Mostrar TODOS los conciertos
-        venue = concert.get('venue', 'Lugar desconocido')
-        city = concert.get('city', '')
-        date = concert.get('date', 'Fecha desconocida')
-        url = concert.get('url', '')
-        source = concert.get('source', '')
-
-        # Formatear fecha
-        if date and len(date) >= 10 and '-' in date:
-            try:
-                date_obj = datetime.strptime(date[:10], '%Y-%m-%d')
-                date = date_obj.strftime('%d/%m/%Y')
-            except ValueError:
-                pass
-
-        # Escapar caracteres especiales
-        safe_venue = str(venue).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
-        safe_city = str(city).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
-
-        location = f"{safe_venue}, {safe_city}" if safe_city else safe_venue
-
-        concert_line = f"• {date}: "
-
-        if url and url.startswith(('http://', 'https://')):
-            url = url.replace(")", "\\)")
-            concert_line += f"[{location}]({url})"
-        else:
-            concert_line += location
-
-        if source:
-            concert_line += f" _{source}_"
-
-        if show_notified and concert.get('notified'):
-            concert_line += " ✅"
-
-        message_lines.append(concert_line)
-
-    message_lines.append("")
-    message_lines.append(f"📊 Total: {len(concerts)} conciertos de {safe_artist}")
-
-    if show_notified:
-        notified_count = sum(1 for c in concerts if c.get('notified'))
-        pending_count = len(concerts) - notified_count
-        message_lines.append(f"✅ Notificados: {notified_count} | 🔔 Pendientes: {pending_count}")
-
-    return "\n".join(message_lines)
 
 
 
@@ -3014,6 +3122,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/searchartist <artista> - Buscar conciertos específicos\n"
         "/showartist <artista> - Ver todos los conciertos de un artista\n\n"
         "/lastfm - Sincronizar artistas desde Last.fm\n\n"
+        "/spotify - Gestionar artistas desde Spotify\n\n"
+
     )
 
     if country_state_city:
@@ -3528,29 +3638,52 @@ async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: str, show_notified: bool = False) -> str:
     """
     Formatea todos los conciertos de un artista específico
+    VERSIÓN MEJORADA: Filtra y muestra solo conciertos futuros (SIN filtrar por notificaciones)
 
     Args:
         concerts: Lista de conciertos del artista
         artist_name: Nombre del artista
-        show_notified: Si mostrar el estado de notificación
+        show_notified: Si mostrar información de notificación (no filtra, solo muestra)
 
     Returns:
-        Mensaje formateado con todos los conciertos del artista
+        Mensaje formateado con todos los conciertos futuros del artista
     """
     if not concerts:
         return f"🎵 *{artist_name}*\n\n❌ No se encontraron conciertos."
 
+    # Filtrar solo conciertos futuros (NO filtrar por notificaciones)
+    today = datetime.now().date()
+    future_concerts = []
+
+    for concert in concerts:
+        concert_date = concert.get('date', '')
+        if concert_date and len(concert_date) >= 10:
+            try:
+                concert_date_obj = datetime.strptime(concert_date[:10], '%Y-%m-%d').date()
+                if concert_date_obj >= today:
+                    future_concerts.append(concert)
+            except ValueError:
+                # Si no se puede parsear la fecha, incluir el concierto por seguridad
+                future_concerts.append(concert)
+        else:
+            # Si no hay fecha, incluir por seguridad
+            future_concerts.append(concert)
+
+    if not future_concerts:
+        return f"🎵 *{artist_name}*\n\n📅 No hay conciertos futuros programados."
+
     # Escapar caracteres especiales del nombre del artista
     safe_artist = artist_name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
 
-    message_lines = [f"🎵 *{safe_artist}*\n"]
+    message_lines = [f"🎵 *{safe_artist} - Próximos conciertos*\n"]
 
-    # Ordenar conciertos por fecha (más recientes primero)
-    sorted_concerts = sorted(concerts, key=lambda x: x.get('date', ''), reverse=True)
+    # Ordenar conciertos por fecha (más próximos primero)
+    sorted_concerts = sorted(future_concerts, key=lambda x: x.get('date', '9999-12-31'))
 
     for i, concert in enumerate(sorted_concerts, 1):
         venue = concert.get('venue', 'Lugar desconocido')
         city = concert.get('city', '')
+        country = concert.get('country', '')
         date = concert.get('date', 'Fecha desconocida')
         time = concert.get('time', '')
         url = concert.get('url', '')
@@ -3562,6 +3695,15 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
             try:
                 date_obj = datetime.strptime(date[:10], '%Y-%m-%d')
                 formatted_date = date_obj.strftime('%d/%m/%Y')
+
+                # Calcular días hasta el concierto
+                days_until = (date_obj.date() - today).days
+                if days_until == 0:
+                    formatted_date += " (¡HOY!)"
+                elif days_until == 1:
+                    formatted_date += " (mañana)"
+                elif days_until <= 7:
+                    formatted_date += f" (en {days_until} días)"
             except ValueError:
                 pass
 
@@ -3575,45 +3717,52 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
         if time:
             concert_line += f" a las {time}"
 
+        concert_line += "\n"
+
         # Ubicación con enlace si está disponible
-        location = f"{safe_venue}"
+        location_parts = []
+        if safe_venue:
+            location_parts.append(safe_venue)
         if safe_city:
-            location += f", {safe_city}"
+            location_parts.append(safe_city)
+        if country:
+            location_parts.append(f"({country})")
+
+        location = ", ".join(location_parts) if location_parts else "Ubicación desconocida"
 
         if url and url.startswith(('http://', 'https://')):
             # Escapar paréntesis en URL
             escaped_url = url.replace(")", "\\)")
-            concert_line += f"\n📍 [{location}]({escaped_url})"
+            concert_line += f"   📍 [{location}]({escaped_url})"
         else:
-            concert_line += f"\n📍 {location}"
+            concert_line += f"   📍 {location}"
 
         # Información adicional
         if source:
-            concert_line += f"\n🔗 _{source}_"
+            concert_line += f"\n   🔗 _{source}_"
 
-        # Estado de notificación
+        # OPCIONAL: Mostrar información de notificación (solo informativo, no filtra)
         if show_notified:
             if concert.get('notified'):
-                concert_line += " ✅"
-            else:
-                concert_line += " 🔔"
+                concert_line += " ✅"  # Ya notificado
+            # No mostrar nada si no está notificado (evitar spam visual)
 
         message_lines.append(concert_line)
         message_lines.append("")  # Línea en blanco entre conciertos
 
     # Estadísticas finales
-    total_concerts = len(concerts)
-    message_lines.append(f"📊 *Total: {total_concerts} conciertos*")
+    total_concerts = len(future_concerts)
+    message_lines.append(f"📊 *Total: {total_concerts} conciertos futuros*")
 
+    # OPCIONAL: Mostrar estadísticas de notificación solo si se solicita y hay datos
     if show_notified:
-        notified_count = sum(1 for c in concerts if c.get('notified'))
-        pending_count = total_concerts - notified_count
+        notified_count = sum(1 for c in future_concerts if c.get('notified'))
         if notified_count > 0:
-            message_lines.append(f"✅ Notificados: {notified_count}")
-        if pending_count > 0:
-            message_lines.append(f"🔔 Pendientes: {pending_count}")
+            message_lines.append(f"✅ Previamente notificados: {notified_count}")
 
     return "\n".join(message_lines)
+
+
 
 
 async def serviceon_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3980,7 +4129,7 @@ async def expand_concerts_callback(update: Update, context: ContextTypes.DEFAULT
                 return
 
             # Mostrar todos los conciertos del artista usando formato original
-            message = format_single_artist_concerts(artist_concerts, artist_name, show_notified=True)
+            message = format_single_artist_concerts_complete(artist_concerts, artist_name, show_notified=True)
 
             # Botón para volver
             keyboard = [[
@@ -5509,10 +5658,226 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del context.user_data['waiting_for_artist_add']
         return
 
-    # Si no hay nada esperado, no hacer nada
-    else:
-        logger.info(f"DEBUG: No hay handlers esperando input, user_data: {context.user_data}")
+# PRIORIDAD: Usuario de Spotify
+    elif 'waiting_for_spotify_user' in context.user_data:
+        # Procesar nuevo usuario de Spotify
+        user_id = context.user_data['waiting_for_spotify_user']
+        spotify_username = update.message.text.strip()
+
+        if not spotify_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_spotify_user']
+            return
+
+        # Verificar que el servicio esté disponible
+        if not spotify_service:
+            await update.message.reply_text("❌ Servicio de Spotify no disponible.")
+            del context.user_data['waiting_for_spotify_user']
+            return
+
+        # Verificar que el usuario existe en Spotify
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{spotify_username}'...")
+
+        try:
+            if not spotify_service.check_user_exists(spotify_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{spotify_username}' no existe en Spotify.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_spotify_user']
+                return
+
+            # Obtener información del usuario
+            user_info = spotify_service.get_user_info(spotify_username)
+
+            # Obtener número de playlists
+            playlists_count = spotify_service.get_user_playlists_count(spotify_username)
+            if user_info:
+                user_info['public_playlists'] = playlists_count
+
+            # Guardar en base de datos
+            if db.set_user_spotify(user_id, spotify_username, user_info):
+                message = f"✅ Usuario de Spotify configurado: {spotify_username}"
+                if user_info:
+                    display_name = user_info.get('display_name', spotify_username)
+                    followers = user_info.get('followers', 0)
+                    if display_name != spotify_username:
+                        message += f" ({display_name})"
+                    message += f"\n👥 Seguidores: {followers:,}"
+                    message += f"\n🎵 Playlists: {playlists_count}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🎵 Abrir Spotify", callback_data=f"spotify_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al configurar el usuario de Spotify.")
+
+        except Exception as e:
+            logger.error(f"Error configurando usuario Spotify: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_spotify_user']
         return
+
+    # PRIORIDAD: Cambio de usuario de Spotify
+    elif 'waiting_for_spotify_change_user' in context.user_data:
+        # Procesar cambio de usuario de Spotify
+        user_id = context.user_data['waiting_for_spotify_change_user']
+        spotify_username = update.message.text.strip()
+
+        if not spotify_username:
+            await update.message.reply_text("❌ Nombre de usuario no válido.")
+            del context.user_data['waiting_for_spotify_change_user']
+            return
+
+        if not spotify_service:
+            await update.message.reply_text("❌ Servicio de Spotify no disponible.")
+            del context.user_data['waiting_for_spotify_change_user']
+            return
+
+        # Verificar usuario
+        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{spotify_username}'...")
+
+        try:
+            if not spotify_service.check_user_exists(spotify_username):
+                await status_message.edit_text(
+                    f"❌ El usuario '{spotify_username}' no existe en Spotify.\n"
+                    f"Verifica el nombre e inténtalo de nuevo."
+                )
+                del context.user_data['waiting_for_spotify_change_user']
+                return
+
+            # Obtener información y actualizar
+            user_info = spotify_service.get_user_info(spotify_username)
+            playlists_count = spotify_service.get_user_playlists_count(spotify_username)
+            if user_info:
+                user_info['public_playlists'] = playlists_count
+
+            if db.set_user_spotify(user_id, spotify_username, user_info):
+                message = f"✅ Usuario de Spotify actualizado: {spotify_username}"
+                if user_info:
+                    display_name = user_info.get('display_name', spotify_username)
+                    followers = user_info.get('followers', 0)
+                    if display_name != spotify_username:
+                        message += f" ({display_name})"
+                    message += f"\n👥 Seguidores: {followers:,}"
+                    message += f"\n🎵 Playlists: {playlists_count}"
+
+                await status_message.edit_text(
+                    message,
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Spotify", callback_data=f"spotify_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text("❌ Error al actualizar el usuario de Spotify.")
+
+        except Exception as e:
+            logger.error(f"Error actualizando usuario Spotify: {e}")
+            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
+
+        del context.user_data['waiting_for_spotify_change_user']
+        return
+
+    # PRIORIDAD: Límite de Spotify
+    elif 'waiting_for_spotify_limit' in context.user_data:
+        # Procesar nuevo límite de Spotify
+        user_id = context.user_data['waiting_for_spotify_limit']
+        limit_text = update.message.text.strip()
+
+        try:
+            limit = int(limit_text)
+
+            if limit < 5 or limit > 100:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 100 artistas.")
+                del context.user_data['waiting_for_spotify_limit']
+                return
+
+            if db.set_spotify_artists_limit(user_id, limit):
+                await update.message.reply_text(
+                    f"✅ Límite de artistas establecido a {limit}.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a Spotify", callback_data=f"spotify_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al establecer el límite.")
+
+        except ValueError:
+            await update.message.reply_text("❌ Debes enviar un número válido.")
+
+        del context.user_data['waiting_for_spotify_limit']
+        return
+
+
+
+
+    # PRIORIDAD MÁXIMA: Código de autorización OAuth de Spotify
+    elif 'waiting_for_spotify_code' in context.user_data:
+        # Procesar código de autorización OAuth
+        user_id = context.user_data['waiting_for_spotify_code']
+        authorization_code = update.message.text.strip()
+
+        logger.info(f"DEBUG: Procesando código OAuth: {authorization_code[:10]}...")
+
+        if not authorization_code:
+            await update.message.reply_text("❌ Código de autorización no válido.")
+            del context.user_data['waiting_for_spotify_code']
+            return
+
+        # Verificar que el servicio esté disponible
+        if not spotify_service:
+            await update.message.reply_text("❌ Servicio de Spotify no disponible.")
+            del context.user_data['waiting_for_spotify_code']
+            return
+
+        # Procesar código de autorización
+        status_message = await update.message.reply_text("🔄 Procesando código de autorización...")
+
+        try:
+            success, message_text, user_info = spotify_service.process_authorization_code(user_id, authorization_code)
+
+            if success:
+                # Actualizar información en base de datos
+                spotify_username = user_info.get('spotify_id', 'unknown')
+                db.set_user_spotify(user_id, spotify_username, user_info)
+
+                success_message = (
+                    f"✅ *¡Autenticación exitosa!*\n\n"
+                    f"👤 Usuario: {user_info.get('display_name', spotify_username)}\n"
+                    f"🆔 ID: {spotify_username}\n"
+                    f"👥 Seguidores: {user_info.get('followers', 0):,}\n"
+                    f"🎵 Playlists: {user_info.get('public_playlists', 0)}\n"
+                    f"🌍 País: {user_info.get('country', 'No especificado')}\n"
+                    f"💎 Tipo: {user_info.get('product', 'free').title()}\n\n"
+                    f"Ahora puedes acceder a todas las funciones de Spotify."
+                )
+
+                await status_message.edit_text(
+                    success_message,
+                    parse_mode='Markdown',
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🎵 Abrir Spotify", callback_data=f"spotify_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text(
+                    f"❌ Error en autenticación:\n{message_text}\n\n"
+                    f"Inténtalo de nuevo con `/spotify`"
+                )
+
+        except Exception as e:
+            logger.error(f"Error procesando código OAuth: {e}")
+            await status_message.edit_text(
+                "❌ Error procesando el código. Verifica que sea correcto e inténtalo de nuevo."
+            )
+
+        del context.user_data['waiting_for_spotify_code']
+        return
+
 
 
 
@@ -5657,12 +6022,130 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Resto de handlers de texto existentes (notificaciones, países, etc.)
     elif 'waiting_for_time' in context.user_data:
-        # ... código existente para notificaciones ...
-        pass
+        # Procesar nueva hora de notificación
+        user_id = context.user_data['waiting_for_time']
+        time_str = update.message.text.strip()
+
+        try:
+            # Validar formato de hora
+            datetime.strptime(time_str, '%H:%M')
+
+            if db.set_notification_time(user_id, time_str):
+                await update.message.reply_text(
+                    f"✅ Hora de notificación cambiada a {time_str}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Volver a configuración", callback_data=f"config_back_{user_id}")
+                    ]])
+                )
+            else:
+                await update.message.reply_text("❌ Error al cambiar la hora.")
+        except ValueError:
+            await update.message.reply_text("❌ Formato inválido. Usa HH:MM (ejemplo: 09:00)")
+
+        del context.user_data['waiting_for_time']
 
     elif 'waiting_for_country_add' in context.user_data:
-        # ... código existente para países ...
-        pass
+        # Procesar añadir país
+        user_id = context.user_data['waiting_for_country_add']
+        country_input = update.message.text.strip()
+
+        if country_city_service:
+            # Usar el sistema existente de añadir países
+            if len(country_input) == 2 and country_input.isalpha():
+                country_code = country_input.upper()
+                success = country_city_service.add_user_country(user_id, country_code)
+            else:
+                # Buscar por nombre
+                matching_countries = country_city_service.search_countries(country_input)
+                if len(matching_countries) == 1:
+                    success = country_city_service.add_user_country(user_id, matching_countries[0]['code'])
+                else:
+                    await update.message.reply_text("❌ País no encontrado o ambiguo. Usa el código de 2 letras.")
+                    del context.user_data['waiting_for_country_add']
+
+# PRIORIDAD MÁXIMA: Código de autorización OAuth de Spotify
+    if 'waiting_for_spotify_code' in context.user_data:
+        # Procesar código de autorización OAuth
+        user_id = context.user_data['waiting_for_spotify_code']
+        user_input = update.message.text.strip()
+
+        logger.info(f"DEBUG: Procesando input OAuth: {user_input[:20]}...")
+
+        if not user_input:
+            await update.message.reply_text("❌ Entrada no válida.")
+            del context.user_data['waiting_for_spotify_code']
+            return
+
+        # Verificar que el servicio esté disponible
+        if not spotify_service:
+            await update.message.reply_text("❌ Servicio de Spotify no disponible.")
+            del context.user_data['waiting_for_spotify_code']
+            return
+
+        # Procesar input - puede ser código o URL completa
+        status_message = await update.message.reply_text("🔄 Procesando autorización...")
+
+        try:
+            # Extraer código de diferentes formatos posibles
+            authorization_code = extract_auth_code_from_input(user_input)
+
+            if not authorization_code:
+                await status_message.edit_text(
+                    "❌ No se pudo extraer el código de autorización.\n\n"
+                    "Envía:\n"
+                    "• La URL completa de redirección\n"
+                    "• Solo el código (parte después de 'code=')\n"
+                    "• Si la página muestra 'Authorization successful', copia todo el texto"
+                )
+                del context.user_data['waiting_for_spotify_code']
+                return
+
+            success, message_text, user_info = spotify_service.process_authorization_code(user_id, authorization_code)
+
+            if success:
+                # Actualizar información en base de datos
+                spotify_username = user_info.get('spotify_id', 'unknown')
+                db.set_user_spotify(user_id, spotify_username, user_info)
+
+                success_message = (
+                    f"✅ *¡Autenticación exitosa!*\n\n"
+                    f"👤 Usuario: {user_info.get('display_name', spotify_username)}\n"
+                    f"🆔 ID: {spotify_username}\n"
+                    f"👥 Seguidores: {user_info.get('followers', 0):,}\n"
+                    f"🎵 Playlists: {user_info.get('public_playlists', 0)}\n"
+                    f"🌍 País: {user_info.get('country', 'No especificado')}\n"
+                    f"💎 Tipo: {user_info.get('product', 'free').title()}\n\n"
+                    f"Ahora puedes acceder a todas las funciones de Spotify."
+                )
+
+                await status_message.edit_text(
+                    success_message,
+                    parse_mode='Markdown',
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🎵 Abrir Spotify", callback_data=f"spotify_menu_{user_id}")
+                    ]])
+                )
+            else:
+                await status_message.edit_text(
+                    f"❌ Error en autenticación:\n{message_text}\n\n"
+                    f"💡 **Consejos:**\n"
+                    f"• Verifica que copiaste el código completo\n"
+                    f"• El código expira en 10 minutos\n"
+                    f"• Intenta generar una nueva URL con `/spotify`"
+                )
+
+        except Exception as e:
+            logger.error(f"Error procesando código OAuth: {e}")
+            await status_message.edit_text(
+                "❌ Error procesando el código.\n\n"
+                "🔄 Intenta de nuevo:\n"
+                "1. Ve a `/spotify`\n"
+                "2. Genera nueva URL de autorización\n"
+                "3. Copia el código completo"
+            )
+
+        del context.user_data['waiting_for_spotify_code']
+        return
 
     # Si no hay nada esperado, no hacer nada
     else:
@@ -5741,7 +6224,7 @@ async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /search - VERSIÓN EXTENDIDA con países múltiples"""
+    """Comando /search - muestra conciertos futuros de artistas seguidos desde la base de datos"""
     chat_id = update.effective_chat.id
 
     # Verificar que el usuario esté registrado
@@ -5752,73 +6235,106 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Obtener configuración de servicios del usuario (versión extendida)
+    # Obtener configuración del usuario
     user_services = db.get_user_services(user['id'])
 
-    # Verificar que tenga al menos un servicio activo
-    active_services = [s for s, active in user_services.items() if active and s not in ['country_filter', 'countries']]
-    if not active_services:
-        await update.message.reply_text(
-            "❌ No tienes ningún servicio de búsqueda activo.\n"
-            "Usa `/serviceon <servicio>` para activar al menos uno.\n"
-            "Servicios disponibles: ticketmaster, spotify, setlistfm"
-        )
-        return
+    # Manejar caso donde user_services puede ser None
+    if not user_services:
+        user_services = {
+            'countries': {'ES'},
+            'country_filter': 'ES'
+        }
 
     # Verificar que tenga países configurados
     user_countries = user_services.get('countries', set())
     if not user_countries:
-        await update.message.reply_text(
-            "❌ No tienes países configurados.\n"
-            "Usa `/addcountry <país>` para añadir países.\n"
-            "Ejemplo: `/addcountry ES`"
-        )
-        return
+        # Usar país por defecto si no tiene configurado
+        country_filter = user_services.get('country_filter', 'ES')
+        user_countries = {country_filter}
 
-    # Mensaje de estado
-    services_text = ", ".join(active_services)
+    # Mensaje de estado inicial
     countries_text = ", ".join(sorted(user_countries))
     status_message = await update.message.reply_text(
         f"🔍 Buscando conciertos de tus artistas seguidos...\n"
-        f"🔧 Servicios activos: {services_text}\n"
-        f"🌍 Países: {countries_text}"
+        f"🌍 Países configurados: {countries_text}\n"
+        f"📊 Consultando base de datos..."
     )
 
     try:
-        # Actualizar base de datos con nuevos conciertos
+        # Obtener artistas seguidos
         followed_artists = db.get_user_followed_artists(user['id'])
 
         if not followed_artists:
             await status_message.edit_text(
                 "📭 No tienes artistas seguidos aún.\n"
-                "Usa `/addartist` para seguir artistas."
+                "Usa `/addartist <nombre>` para seguir artistas.\n"
+                "Usa `/searchartist <nombre>` para buscar conciertos de un artista específico."
             )
             return
 
-        total_new_concerts = 0
-        for artist in followed_artists:
-            concerts = await search_concerts_for_artist(
-                artist['name'],
-                user_services,
-                user_id=user['id']  # Pasar user_id para filtrado
-            )
-            for concert in concerts:
-                concert_id = db.save_concert(concert)
-                if concert_id:
-                    total_new_concerts += 1
-            await asyncio.sleep(0.5)  # Pausa corta
+        # Obtener TODOS los conciertos de los artistas seguidos desde la base de datos
+        conn = db.get_connection()
+        cursor = conn.cursor()
 
-        # Obtener todos los conciertos para el usuario
-        all_concerts = db.get_all_concerts_for_user(user['id'])
+        artist_names = [artist['name'] for artist in followed_artists]
+        placeholders = ','.join(['?' for _ in artist_names])
 
-        # Filtrar adicional por países si es necesario
+        cursor.execute(f"""
+            SELECT DISTINCT c.*
+            FROM concerts c
+            WHERE LOWER(c.artist_name) IN ({','.join(['LOWER(?)' for _ in artist_names])})
+            ORDER BY c.date ASC
+        """, artist_names)
+
+        rows = cursor.fetchall()
+        all_concerts = [dict(row) for row in rows]
+        conn.close()
+
+        await status_message.edit_text(
+            f"📊 Encontrados {len(all_concerts)} conciertos en base de datos\n"
+            f"🌍 Filtrando por países: {countries_text}\n"
+            f"📅 Filtrando solo conciertos futuros..."
+        )
+
+        # Filtrar solo conciertos futuros
+        today = datetime.now().date()
+        future_concerts = []
+
+        for concert in all_concerts:
+            concert_date = concert.get('date', '')
+            if concert_date and len(concert_date) >= 10:
+                try:
+                    concert_date_obj = datetime.strptime(concert_date[:10], '%Y-%m-%d').date()
+                    if concert_date_obj >= today:
+                        future_concerts.append(concert)
+                except ValueError:
+                    future_concerts.append(concert)  # Incluir si no se puede parsear
+            else:
+                future_concerts.append(concert)  # Incluir si no hay fecha
+
+        # Filtrar por países del usuario
+        filtered_concerts = []
         if country_state_city:
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
-            all_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+            try:
+                extended_db = ArtistTrackerDatabaseExtended(db.db_path, country_state_city)
+                filtered_concerts = extended_db.filter_concerts_by_countries(future_concerts, user_countries)
+            except Exception as e:
+                logger.error(f"Error filtrando conciertos por países: {e}")
+                # Fallback a filtrado básico
+                for concert in future_concerts:
+                    concert_country = concert.get('country', '').upper()
+                    if not concert_country or concert_country in user_countries:
+                        filtered_concerts.append(concert)
+        else:
+            # Filtrado básico si no hay servicio de países
+            for concert in future_concerts:
+                concert_country = concert.get('country', '').upper()
+                if not concert_country or concert_country in user_countries:
+                    filtered_concerts.append(concert)
 
         # Agrupar conciertos por artista
         concerts_by_artist = {}
-        for concert in all_concerts:
+        for concert in filtered_concerts:
             artist_name = concert.get('artist_name', 'Artista desconocido')
             if artist_name not in concerts_by_artist:
                 concerts_by_artist[artist_name] = []
@@ -5826,22 +6342,24 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Actualizar mensaje de estado
         await status_message.edit_text(
-            f"✅ Búsqueda completada!\n"
-            f"📊 {len(concerts_by_artist)} artistas con conciertos\n"
-            f"🎵 {len(all_concerts)} conciertos en total\n"
-            f"🆕 {total_new_concerts} nuevos conciertos\n\n"
-            f"Enviando resultados por artista..."
+            f"✅ Procesamiento completado!\n"
+            f"🎵 {len(concerts_by_artist)} artistas con conciertos futuros\n"
+            f"📅 {len(filtered_concerts)} conciertos próximos\n"
+            f"🌍 Filtrados para: {countries_text}\n\n"
+            f"📤 Enviando resultados..."
         )
 
-        # Enviar un mensaje por cada artista con conciertos
+        # Enviar un mensaje por cada artista con conciertos futuros
         artists_with_concerts = 0
+        messages_sent = 0
+
         for artist_name, artist_concerts in concerts_by_artist.items():
-            if artist_concerts:  # Solo enviar si tiene conciertos
-                # Formatear mensaje del artista
+            if artist_concerts:  # Solo enviar si tiene conciertos futuros
+                # Formatear mensaje del artista (SIN mostrar estado de notificación)
                 message = format_single_artist_concerts_complete(
                     artist_concerts,
                     artist_name,
-                    show_notified=True
+                    show_notified=False  # No mostrar notificaciones en /search
                 )
 
                 # Dividir en chunks si es muy largo
@@ -5853,41 +6371,71 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             parse_mode='Markdown',
                             disable_web_page_preview=True
                         )
+                        messages_sent += 1
+                        # Pausa entre chunks del mismo artista
+                        if i < len(chunks) - 1:
+                            await asyncio.sleep(0.5)
                 else:
                     await update.message.reply_text(
                         message,
                         parse_mode='Markdown',
                         disable_web_page_preview=True
                     )
+                    messages_sent += 1
 
                 artists_with_concerts += 1
-                await asyncio.sleep(0.3)  # Pausa breve entre mensajes
+
+                # Pausa entre mensajes de diferentes artistas
+                await asyncio.sleep(1.0)
 
         # Mensaje final de resumen
         if artists_with_concerts == 0:
             await update.message.reply_text(
-                f"📭 No se encontraron conciertos en tus países configurados ({countries_text}).\n"
-                f"Prueba añadir más países con `/addcountry`"
+                f"📭 No se encontraron conciertos futuros en tus países configurados ({countries_text}).\n\n"
+                f"📊 Estadísticas:\n"
+                f"• Artistas seguidos: {len(followed_artists)}\n"
+                f"• Conciertos en BD: {len(all_concerts)}\n"
+                f"• Conciertos futuros: {len(future_concerts)}\n"
+                f"• En tus países: {len(filtered_concerts)}\n\n"
+                f"💡 Sugerencias:\n"
+                f"• Usa `/addcountry <país>` para añadir más países\n"
+                f"• Usa `/searchartist <nombre>` para buscar nuevos conciertos\n"
+                f"• Algunos conciertos pueden anunciarse más cerca de las fechas"
             )
         else:
             summary_message = (
-                f"🎉 *Búsqueda completada*\n\n"
-                f"📊 Artistas con conciertos: {artists_with_concerts}\n"
-                f"🎵 Total de conciertos: {len(all_concerts)}\n"
-                f"🆕 Nuevos conciertos encontrados: {total_new_concerts}\n"
+                f"🎉 *Resultados de búsqueda*\n\n"
+                f"📊 Artistas con conciertos futuros: {artists_with_concerts}\n"
+                f"📅 Total de conciertos próximos: {len(filtered_concerts)}\n"
+                f"📤 Mensajes enviados: {messages_sent}\n"
                 f"🌍 Países consultados: {countries_text}\n\n"
-                f"💡 Usa `/showartist <nombre>` para ver todos los conciertos de un artista específico"
+                f"💡 Comandos útiles:\n"
+                f"• `/showartist <nombre>` - Ver todos los conciertos de un artista\n"
+                f"• `/searchartist <nombre>` - Buscar nuevos conciertos\n"
+                f"• `/addcountry <país>` - Añadir más países"
             )
             await update.message.reply_text(
                 summary_message,
                 parse_mode='Markdown'
             )
 
+        # Actualizar mensaje de estado final
+        await status_message.edit_text(
+            f"✅ Búsqueda completada\n"
+            f"🎵 {artists_with_concerts} artistas con conciertos\n"
+            f"📅 {len(filtered_concerts)} conciertos futuros\n"
+            f"📤 {messages_sent} mensajes enviados"
+        )
+
     except Exception as e:
         logger.error(f"Error en comando search: {e}")
         await status_message.edit_text(
-            "❌ Error al buscar conciertos. Inténtalo de nuevo más tarde."
+            f"❌ Error al buscar conciertos. Inténtalo de nuevo más tarde.\n"
+            f"Error: {str(e)[:100]}..."
         )
+
+
+
 
 
 async def send_notifications():
@@ -6479,6 +7027,1033 @@ async def lastfm_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await show_lastfm_menu(fake_update, user, lastfm_user)
 
 
+# spotify handlers
+
+
+def process_authorization_code(self, user_id: int, authorization_code: str) -> tuple[bool, str, dict]:
+    """
+    Procesa el código de autorización y obtiene tokens
+    VERSIÓN MEJORADA con mejor manejo de errores
+
+    Args:
+        user_id: ID del usuario
+        authorization_code: Código recibido de Spotify
+
+    Returns:
+        Tupla (éxito, mensaje, user_info)
+    """
+    if not SPOTIPY_AVAILABLE:
+        return False, "Spotipy no disponible", {}
+
+    try:
+        logger.info(f"Procesando código para usuario {user_id}: {authorization_code[:10]}...")
+
+        # Cargar estado de autenticación
+        auth_data = self._load_auth_state(user_id)
+        if not auth_data:
+            logger.warning(f"No se encontró estado de auth para usuario {user_id}")
+            return False, "Sesión de autenticación expirada. Genera una nueva URL.", {}
+
+        # Crear OAuth manager
+        sp_oauth = SpotifyOAuth(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            redirect_uri=auth_data['redirect_uri'],
+            scope=auth_data['scope'],
+            show_dialog=False
+        )
+
+        logger.info(f"OAuth manager creado, intercambiando código...")
+
+        # Intercambiar código por tokens
+        try:
+            token_info = sp_oauth.get_access_token(authorization_code)
+        except Exception as oauth_error:
+            logger.error(f"Error en get_access_token: {oauth_error}")
+
+            # Intentar con diferentes métodos
+            try:
+                # Método alternativo: usar requests directamente
+                token_info = self._exchange_code_manually(authorization_code, auth_data)
+            except Exception as manual_error:
+                logger.error(f"Error en intercambio manual: {manual_error}")
+                return False, f"Código inválido o expirado. Error: {str(oauth_error)}", {}
+
+        if not token_info or 'access_token' not in token_info:
+            logger.error(f"Token info inválido: {token_info}")
+            return False, "No se pudieron obtener tokens. Verifica el código.", {}
+
+        logger.info("Tokens obtenidos correctamente, obteniendo perfil...")
+
+        # Crear cliente autenticado
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+
+        # Obtener información del usuario
+        try:
+            user_profile = sp.current_user()
+            logger.info(f"Perfil obtenido: {user_profile.get('id')}")
+
+            user_info = {
+                'spotify_id': user_profile.get('id'),
+                'display_name': user_profile.get('display_name', user_profile.get('id')),
+                'followers': user_profile.get('followers', {}).get('total', 0),
+                'email': user_profile.get('email', ''),
+                'country': user_profile.get('country', ''),
+                'product': user_profile.get('product', 'free')
+            }
+
+            # Obtener playlists
+            try:
+                playlists = sp.current_user_playlists(limit=1)
+                user_info['public_playlists'] = playlists.get('total', 0)
+            except Exception as playlist_error:
+                logger.warning(f"Error obteniendo playlists: {playlist_error}")
+                user_info['public_playlists'] = 0
+
+        except Exception as profile_error:
+            logger.error(f"Error obteniendo perfil: {profile_error}")
+            # Usar información básica si no se puede obtener el perfil completo
+            user_info = {
+                'spotify_id': 'unknown',
+                'display_name': 'Usuario Spotify',
+                'followers': 0,
+                'email': '',
+                'country': '',
+                'product': 'unknown',
+                'public_playlists': 0
+            }
+
+        # Guardar tokens para uso futuro
+        self._save_user_tokens(user_id, token_info, user_info)
+
+        # Limpiar estado de auth
+        auth_file = self.cache_dir / f"spotify_auth_{user_id}.json"
+        if auth_file.exists():
+            auth_file.unlink()
+
+        logger.info(f"Autenticación exitosa para usuario {user_id}")
+        return True, "Autenticación exitosa", user_info
+
+    except Exception as e:
+        logger.error(f"Error procesando código de autorización: {e}")
+        return False, f"Error en autenticación: {str(e)}", {}
+
+
+
+async def spotify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /spotify - gestión de sincronización con Spotify"""
+    if not spotify_service:
+        await update.message.reply_text(
+            "❌ Servicio de Spotify no disponible.\n"
+            "Contacta al administrador para configurar las credenciales."
+        )
+        return
+
+    chat_id = update.effective_chat.id
+
+    # Verificar que el usuario esté registrado
+    user = db.get_user_by_chat_id(chat_id)
+    if not user:
+        await update.message.reply_text(
+            "❌ Primero debes registrarte con `/adduser <tu_nombre>`"
+        )
+        return
+
+    # Verificar si ya tiene usuario de Spotify configurado
+    spotify_user = db.get_user_spotify(user['id'])
+
+    if not spotify_user:
+        # No tiene usuario configurado, pedirlo
+        context.user_data['waiting_for_spotify_user'] = user['id']
+        await show_spotify_setup(update, user, context)
+    else:
+        # Ya tiene usuario, mostrar menú principal
+        await show_spotify_menu(update, user, spotify_user)
+
+async def show_spotify_setup(update: Update, user: Dict, context: ContextTypes.DEFAULT_TYPE = None):
+    """Muestra el setup inicial de Spotify con autenticación OAuth"""
+    message = (
+        "🎵 *Configuración de Spotify*\n\n"
+        "Para acceder a tus artistas seguidos y poder seguir nuevos artistas, "
+        "necesitas autenticarte con tu cuenta de Spotify.\n\n"
+        "Selecciona cómo quieres proceder:"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("🔐 Autenticación completa", callback_data=f"spotify_auth_{user['id']}")],
+        [InlineKeyboardButton("👤 Solo nombre de usuario", callback_data=f"spotify_username_{user['id']}")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def show_spotify_menu(update: Update, user: Dict, spotify_user: Dict):
+    """Muestra el menú principal de Spotify con estado de autenticación"""
+    username = spotify_user['spotify_username']
+    display_name = spotify_user.get('spotify_display_name', username)
+    followers = spotify_user.get('spotify_followers', 0)
+    playlists = spotify_user.get('spotify_playlists', 0)
+    artists_limit = spotify_user.get('artists_limit', 20)
+
+    # Verificar estado del servicio
+    user_services = db.get_user_services(user['id'])
+    service_status = "✅ Activado" if user_services.get('spotify', True) else "❌ Desactivado"
+
+    # Verificar autenticación OAuth
+    is_authenticated = spotify_service.is_user_authenticated(user['id']) if spotify_service else False
+    auth_status = "🔐 Autenticado" if is_authenticated else "👤 Solo usuario"
+
+    message = (
+        f"🎵 *Spotify - {display_name}*\n\n"
+        f"👤 Usuario: @{username}\n"
+        f"👥 Seguidores: {followers:,}\n"
+        f"🎵 Playlists: {playlists}\n"
+        f"🔢 Límite de artistas: {artists_limit}\n"
+        f"⚙️ Estado del servicio: {service_status}\n"
+        f"🔐 Autenticación: {auth_status}\n\n"
+        f"Selecciona una opción:"
+    )
+
+    # Botones según el estado de autenticación
+    if is_authenticated:
+        keyboard = [
+            [
+                InlineKeyboardButton("🎵 Artistas seguidos", callback_data=f"spotify_real_artists_{user['id']}"),
+                InlineKeyboardButton("🔢 Cambiar cantidad", callback_data=f"spotify_limit_{user['id']}")
+            ],
+            [
+                InlineKeyboardButton("➕ Añadir artistas", callback_data=f"spotify_add_{user['id']}"),
+                InlineKeyboardButton("🔗 Seguir en Spotify", callback_data=f"spotify_follow_{user['id']}")
+            ],
+            [
+                InlineKeyboardButton("👤 Cambiar usuario", callback_data=f"spotify_changeuser_{user['id']}"),
+                InlineKeyboardButton("🚫 Revocar acceso", callback_data=f"spotify_revoke_{user['id']}")
+            ]
+        ]
+    else:
+        keyboard = [
+            [
+                InlineKeyboardButton("🔐 Autenticar cuenta", callback_data=f"spotify_auth_{user['id']}"),
+                InlineKeyboardButton("🎵 Ver simulación", callback_data=f"spotify_artists_{user['id']}")
+            ],
+            [
+                InlineKeyboardButton("🔢 Cambiar cantidad", callback_data=f"spotify_limit_{user['id']}"),
+                InlineKeyboardButton("👤 Cambiar usuario", callback_data=f"spotify_changeuser_{user['id']}")
+            ]
+        ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+async def handle_spotify_authentication(query, user: Dict):
+    """Inicia el proceso de autenticación OAuth"""
+    if not spotify_service:
+        await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+        return
+
+    try:
+        # Generar URL de autenticación
+        auth_url = spotify_service.generate_auth_url(user['id'])
+
+        if not auth_url:
+            await query.edit_message_text(
+                "❌ Error generando URL de autenticación.\n"
+                "Verifica que las credenciales de Spotify estén configuradas."
+            )
+            return
+
+        # Crear mensaje con instrucciones
+        message = (
+            "🔐 *Autenticación de Spotify*\n\n"
+            "Para conectar tu cuenta de Spotify:\n\n"
+            "1️⃣ Abre este enlace en tu navegador:\n"
+            f"[🔗 Autenticar con Spotify]({auth_url})\n\n"
+            "2️⃣ Inicia sesión con tu cuenta de Spotify\n\n"
+            "3️⃣ Acepta los permisos solicitados\n\n"
+            "4️⃣ Serás redirigido a una página. Copia el *código* que aparece en la URL "
+            "(el texto después de 'code=' y antes de '&') y envíamelo aquí.\n\n"
+            "⏰ *Tienes 30 minutos para completar este proceso.*"
+        )
+
+        keyboard = [
+            [InlineKeyboardButton("🔗 Abrir enlace", url=auth_url)],
+            [InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup,
+            disable_web_page_preview=False
+        )
+
+        # Marcar que estamos esperando el código
+        # Nota: Necesitarás acceso al context aquí, ver solución más abajo
+
+    except Exception as e:
+        logger.error(f"Error en autenticación Spotify: {e}")
+        await query.edit_message_text(
+            "❌ Error iniciando autenticación. Inténtalo de nuevo."
+        )
+
+async def handle_spotify_real_artists(query, user: Dict):
+    """Maneja mostrar artistas realmente seguidos (con OAuth)"""
+    if not spotify_service:
+        await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+        return
+
+    if not spotify_service.is_user_authenticated(user['id']):
+        await query.edit_message_text(
+            "❌ No estás autenticado. Usa la opción 'Autenticar cuenta' primero."
+        )
+        return
+
+    # Obtener configuración
+    spotify_user = db.get_user_spotify(user['id'])
+    if not spotify_user:
+        await query.edit_message_text("❌ No tienes usuario de Spotify configurado.")
+        return
+
+    artists_limit = spotify_user.get('artists_limit', 20)
+
+    # Mensaje de estado
+    await query.edit_message_text(
+        f"🔍 Obteniendo tus artistas seguidos en Spotify...\n"
+        f"Límite: {artists_limit} artistas"
+    )
+
+    try:
+        # Obtener artistas reales
+        artists, status_message = spotify_service.get_user_followed_artists_real(user['id'], artists_limit)
+
+        if not artists:
+            await query.edit_message_text(
+                f"📭 No se encontraron artistas seguidos.\n"
+                f"Estado: {status_message}"
+            )
+            return
+
+        # Guardar artistas pendientes
+        db.save_pending_spotify_artists(user['id'], artists)
+
+        # Mostrar primera página
+        await show_spotify_artists_page(query, user, artists, page=0, is_real=True)
+
+    except Exception as e:
+        logger.error(f"Error obteniendo artistas reales: {e}")
+        await query.edit_message_text(
+            f"❌ Error obteniendo tus artistas seguidos.\n"
+            f"Inténtalo de nuevo más tarde."
+        )
+
+async def handle_spotify_follow_real(query, user: Dict):
+    """Sigue en Spotify a los artistas que el usuario sigue para conciertos (OAuth)"""
+    if not spotify_service:
+        await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+        return
+
+    if not spotify_service.is_user_authenticated(user['id']):
+        await query.edit_message_text(
+            "❌ No estás autenticado. Usa la opción 'Autenticar cuenta' primero."
+        )
+        return
+
+    # Obtener artistas seguidos en el bot
+    followed_artists = db.get_user_followed_artists(user['id'])
+
+    if not followed_artists:
+        await query.edit_message_text(
+            "📭 No tienes artistas seguidos en el bot.\n"
+            "Usa `/addartist` para seguir algunos artistas primero."
+        )
+        return
+
+    # Mensaje de estado
+    await query.edit_message_text(
+        f"🔍 Buscando artistas en Spotify...\n"
+        f"Total artistas a procesar: {len(followed_artists)}"
+    )
+
+    try:
+        # Obtener IDs de Spotify para los artistas
+        spotify_artist_ids = []
+        not_found = []
+
+        for artist in followed_artists:
+            artist_name = artist['name']
+            spotify_id = spotify_service.get_artist_id_by_name(artist_name)
+
+            if spotify_id:
+                spotify_artist_ids.append(spotify_id)
+            else:
+                not_found.append(artist_name)
+
+            # Pausa breve
+            await asyncio.sleep(0.1)
+
+        if not spotify_artist_ids:
+            await query.edit_message_text(
+                "❌ No se encontraron artistas en Spotify para seguir."
+            )
+            return
+
+        # Seguir artistas en lotes
+        await query.edit_message_text(
+            f"🔗 Siguiendo {len(spotify_artist_ids)} artistas en Spotify..."
+        )
+
+        followed, errors, message = spotify_service.follow_artists_batch(user['id'], spotify_artist_ids)
+
+        # Resultado
+        result_message = (
+            f"✅ *Proceso completado*\n\n"
+            f"🔗 Artistas seguidos en Spotify: {followed}\n"
+            f"❌ Errores: {errors}\n"
+            f"🔍 No encontrados: {len(not_found)}\n"
+        )
+
+        if not_found and len(not_found) <= 5:
+            result_message += f"\n*No encontrados:* {', '.join(not_found)}"
+        elif not_found:
+            result_message += f"\n*{len(not_found)} artistas no encontrados en Spotify*"
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"spotify_menu_{user['id']}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            result_message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error siguiendo artistas: {e}")
+        await query.edit_message_text(
+            "❌ Error siguiendo artistas en Spotify. Inténtalo de nuevo."
+        )
+
+async def handle_spotify_revoke_auth(query, user: Dict):
+    """Revoca la autenticación OAuth del usuario"""
+    message = (
+        "🚫 *Revocar acceso a Spotify*\n\n"
+        "Esto eliminará tu autenticación y ya no podrás:\n"
+        "• Ver tus artistas realmente seguidos\n"
+        "• Seguir artistas automáticamente\n\n"
+        "¿Estás seguro?"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🚫 Sí, revocar", callback_data=f"spotify_confirm_revoke_{user['id']}"),
+            InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_menu_{user['id']}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def handle_spotify_confirm_revoke(query, user: Dict):
+    """Confirma la revocación de autenticación"""
+    if not spotify_service:
+        await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+        return
+
+    try:
+        success = spotify_service.revoke_user_authentication(user['id'])
+
+        if success:
+            message = (
+                "✅ *Acceso revocado correctamente*\n\n"
+                "Tu autenticación ha sido eliminada. "
+                "Puedes volver a autenticarte cuando quieras."
+            )
+        else:
+            message = "❌ Error revocando el acceso."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver", callback_data=f"spotify_menu_{user['id']}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error revocando autenticación: {e}")
+        await query.edit_message_text("❌ Error revocando el acceso.")
+
+
+async def spotify_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks de Spotify con OAuth"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Spotify callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) < 3 or parts[0] != "spotify":
+        return
+
+    action = parts[1]
+
+    # Obtener user_id del final
+    try:
+        user_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Error de usuario.")
+        return
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        if action == "cancel":
+            await query.edit_message_text("❌ Configuración de Spotify cancelada.")
+
+        elif action == "auth":
+            # Marcar que estamos esperando código OAuth
+            context.user_data['waiting_for_spotify_code'] = user['id']
+            await handle_spotify_authentication(query, user)
+
+        elif action == "username":
+            # Configuración solo con nombre de usuario (modo limitado)
+            context.user_data['waiting_for_spotify_user'] = user['id']
+            await show_spotify_username_setup(query, user)
+
+        elif action == "real" and parts[2] == "artists":
+            await handle_spotify_real_artists(query, user)
+
+        elif action == "artists":
+            await handle_spotify_show_artists(query, user)  # Función existente (simulación)
+
+        elif action == "page":
+            # Manejar paginación
+            page = int(parts[2])
+            await handle_spotify_artists_page(query, user, page)
+
+        elif action == "add":
+            await handle_spotify_add_artists(query, user)
+
+        elif action == "follow":
+            # Verificar si está autenticado para funcionalidad real
+            if spotify_service and spotify_service.is_user_authenticated(user['id']):
+                await handle_spotify_follow_real(query, user)
+            else:
+                await handle_spotify_follow_artists(query, user)  # Función existente (limitada)
+
+        elif action == "revoke":
+            await handle_spotify_revoke_auth(query, user)
+
+        elif action == "confirm" and parts[2] == "revoke":
+            await handle_spotify_confirm_revoke(query, user)
+
+        elif action == "limit":
+            await handle_spotify_change_limit(query, user, context)
+
+        elif action == "changeuser":
+            await handle_spotify_change_user(query, user, context)
+
+        elif action == "menu":
+            # Volver al menú principal
+            spotify_user = db.get_user_spotify(user['id'])
+            if spotify_user:
+                fake_update = type('obj', (object,), {'message': query.message})()
+                await show_spotify_menu(fake_update, user, spotify_user)
+            else:
+                await query.edit_message_text("❌ No tienes usuario de Spotify configurado.")
+
+        elif action == "real" and len(parts) >= 4 and parts[2] == "page":
+            # Paginación de artistas reales
+            page = int(parts[3])
+            await handle_spotify_real_artists_page(query, user, page)
+
+        else:
+            await query.edit_message_text("❌ Acción no reconocida.")
+
+    except Exception as e:
+        logger.error(f"Error en spotify_callback_handler: {e}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
+
+def extract_auth_code_from_input(user_input: str) -> str:
+    """
+    Extrae el código de autorización de diferentes formatos de entrada
+
+    Args:
+        user_input: Entrada del usuario (URL, código, o texto)
+
+    Returns:
+        Código de autorización extraído o cadena vacía
+    """
+    import re
+    from urllib.parse import parse_qs, urlparse
+
+    if not user_input:
+        return ""
+
+    user_input = user_input.strip()
+
+    # Método 1: URL completa con parámetros
+    if 'code=' in user_input:
+        try:
+            # Buscar patrón code=XXXXXXX
+            code_match = re.search(r'code=([^&\s]+)', user_input)
+            if code_match:
+                code = code_match.group(1)
+                # Decodificar URL si es necesario
+                code = unquote(code)
+                logger.info(f"Código extraído por regex: {code[:10]}...")
+                return code
+
+            # Método alternativo: parsear como URL
+            if user_input.startswith('http'):
+                parsed = urlparse(user_input)
+                params = parse_qs(parsed.query)
+                if 'code' in params:
+                    code = params['code'][0]
+                    logger.info(f"Código extraído por URL parse: {code[:10]}...")
+                    return code
+        except Exception as e:
+            logger.error(f"Error parseando URL: {e}")
+
+    # Método 2: Buscar en texto libre (para casos como "Authorization successful: ABC123")
+    auth_patterns = [
+        r'authorization\s+successful[:\s]+([a-zA-Z0-9_-]+)',
+        r'code[:\s]+([a-zA-Z0-9_-]+)',
+        r'token[:\s]+([a-zA-Z0-9_-]+)',
+    ]
+
+    for pattern in auth_patterns:
+        match = re.search(pattern, user_input, re.IGNORECASE)
+        if match:
+            code = match.group(1)
+            if len(code) > 10:  # Los códigos suelen ser largos
+                logger.info(f"Código extraído por patrón: {code[:10]}...")
+                return code
+
+    # Método 3: Si parece ser solo el código (string largo sin espacios)
+    if (len(user_input) > 20 and
+        not ' ' in user_input and
+        not user_input.startswith('http') and
+        re.match(r'^[a-zA-Z0-9_-]+$', user_input)):
+        logger.info(f"Asumiendo que es código directo: {user_input[:10]}...")
+        return user_input
+
+    # Método 4: Buscar cualquier string alfanumérico largo
+    long_strings = re.findall(r'[a-zA-Z0-9_-]{20,}', user_input)
+    if long_strings:
+        code = long_strings[0]
+        logger.info(f"Código extraído como string largo: {code[:10]}...")
+        return code
+
+    logger.warning(f"No se pudo extraer código de: {user_input[:50]}...")
+    return ""
+
+async def show_spotify_username_setup(query, user: Dict):
+    """Muestra setup solo para nombre de usuario (modo limitado)"""
+    message = (
+        "👤 *Configuración básica de Spotify*\n\n"
+        "Este modo te permite ver artistas simulados y configuración básica, "
+        "pero no podrás acceder a tus artistas realmente seguidos.\n\n"
+        "Envía tu nombre de usuario de Spotify:"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("🔐 Mejor usar autenticación completa", callback_data=f"spotify_auth_{user['id']}")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+
+
+async def handle_spotify_show_artists(query, user: Dict):
+    """Maneja mostrar artistas seguidos de Spotify"""
+    if not spotify_service:
+        await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+        return
+
+    # Obtener usuario de Spotify
+    spotify_user = db.get_user_spotify(user['id'])
+    if not spotify_user:
+        await query.edit_message_text("❌ No tienes usuario de Spotify configurado.")
+        return
+
+    username = spotify_user['spotify_username']
+    artists_limit = spotify_user.get('artists_limit', 20)
+
+    # Mensaje de estado
+    await query.edit_message_text(
+        f"🔍 Obteniendo artistas seguidos de {username}...\n"
+        f"Esto puede tardar un momento."
+    )
+
+    try:
+        # Obtener artistas de Spotify (simulados por ahora)
+        artists, status_message = spotify_service.search_and_get_followed_artists_simulation(username, artists_limit)
+
+        if not artists:
+            await query.edit_message_text(
+                f"📭 No se encontraron artistas para {username}.\n"
+                f"Estado: {status_message}"
+            )
+            return
+
+        # Guardar artistas pendientes
+        db.save_pending_spotify_artists(user['id'], artists)
+
+        # Mostrar primera página
+        await show_spotify_artists_page(query, user, artists, page=0)
+
+    except Exception as e:
+        logger.error(f"Error obteniendo artistas de Spotify: {e}")
+        await query.edit_message_text(
+            f"❌ Error obteniendo artistas de {username}.\n"
+            f"Inténtalo de nuevo más tarde."
+        )
+
+async def show_spotify_artists_page(query, user: Dict, artists: List[Dict], page: int = 0, is_real: bool = False):
+    """Muestra una página de artistas de Spotify con paginación"""
+    artists_per_page = 15
+    total_pages = (len(artists) + artists_per_page - 1) // artists_per_page
+
+    if page >= total_pages:
+        page = total_pages - 1
+    elif page < 0:
+        page = 0
+
+    start_idx = page * artists_per_page
+    end_idx = min(start_idx + artists_per_page, len(artists))
+    page_artists = artists[start_idx:end_idx]
+
+    # Obtener usuario de Spotify
+    spotify_user = db.get_user_spotify(user['id'])
+    username = spotify_user['spotify_username']
+
+    # Título según el tipo
+    title = "🎵 *Tus artistas seguidos en Spotify*" if is_real else "🎵 *Artistas populares (simulación)*"
+
+    # Construir texto
+    message_lines = [
+        f"{title}",
+        f"👤 Usuario: {username}",
+        f"🔢 Total: {len(artists)} artistas",
+        f"📄 Página {page + 1} de {total_pages}\n"
+    ]
+
+    if not is_real:
+        message_lines.append("⚠️ *Estos son artistas populares, no tus seguidos reales.*")
+        message_lines.append("🔐 *Usa autenticación completa para ver tus artistas reales.*\n")
+
+    for i, artist in enumerate(page_artists, start_idx + 1):
+        name = artist.get("name", "Nombre desconocido")
+        followers = artist.get("followers", 0)
+        popularity = artist.get("popularity", 0)
+
+        # Escapar caracteres especiales para Markdown
+        safe_name = name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
+
+        line = f"{i}. *{safe_name}*"
+
+        # Añadir información
+        if followers > 0:
+            line += f" ({followers:,} seguidores)"
+
+        if popularity > 0:
+            line += f" - {popularity}% popularidad"
+
+        # Añadir géneros si están disponibles
+        genres = artist.get("genres", [])
+        if genres:
+            genre_text = ", ".join(genres[:2])
+            line += f" _{genre_text}_"
+
+        message_lines.append(line)
+
+    # Crear botones de navegación
+    keyboard = []
+    nav_buttons = []
+
+    # Botón anterior
+    if page > 0:
+        callback_prefix = "spotify_real_page" if is_real else "spotify_page"
+        nav_buttons.append(
+            InlineKeyboardButton("⬅️ Anterior", callback_data=f"{callback_prefix}_{page-1}_{user['id']}")
+        )
+
+    # Botón de página actual
+    nav_buttons.append(
+        InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="current_spotify_page")
+    )
+
+    # Botón siguiente
+    if page < total_pages - 1:
+        callback_prefix = "spotify_real_page" if is_real else "spotify_page"
+        nav_buttons.append(
+            InlineKeyboardButton("Siguiente ➡️", callback_data=f"{callback_prefix}_{page+1}_{user['id']}")
+        )
+
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    # Botones de acción
+    action_buttons = []
+    action_buttons.append(InlineKeyboardButton("➕ Añadir todos", callback_data=f"spotify_add_{user['id']}"))
+
+    if is_real:
+        action_buttons.append(InlineKeyboardButton("🔗 Seguir en Spotify", callback_data=f"spotify_follow_{user['id']}"))
+    else:
+        action_buttons.append(InlineKeyboardButton("🔐 Autenticar para más", callback_data=f"spotify_auth_{user['id']}"))
+
+    keyboard.append(action_buttons)
+
+    # Botón para volver
+    keyboard.append([
+        InlineKeyboardButton("🔙 Volver", callback_data=f"spotify_menu_{user['id']}")
+    ])
+
+    message = "\n".join(message_lines)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def handle_spotify_real_artists_page(query, user: Dict, page: int):
+    """Maneja la paginación de artistas reales de Spotify"""
+    # Obtener artistas pendientes
+    artists = db.get_pending_spotify_artists(user['id'])
+    if not artists:
+        await query.edit_message_text("❌ No hay datos de artistas disponibles.")
+        return
+
+    await show_spotify_artists_page(query, user, artists, page, is_real=True)
+
+
+async def handle_spotify_artists_page(query, user: Dict, page: int):
+    """Maneja la paginación de artistas de Spotify"""
+    # Obtener artistas pendientes
+    artists = db.get_pending_spotify_artists(user['id'])
+    if not artists:
+        await query.edit_message_text("❌ No hay datos de artistas disponibles.")
+        return
+
+    await show_spotify_artists_page(query, user, artists, page)
+
+async def handle_spotify_add_artists(query, user: Dict):
+    """Añade los artistas de Spotify a la base de datos para seguimiento de conciertos"""
+    # Obtener artistas pendientes
+    artists = db.get_pending_spotify_artists(user['id'])
+    if not artists:
+        await query.edit_message_text("❌ No hay artistas para añadir.")
+        return
+
+    # Mensaje de estado
+    await query.edit_message_text(
+        f"⏳ Añadiendo {len(artists)} artistas de Spotify...\n"
+        f"Esto puede tardar un momento."
+    )
+
+    try:
+        added_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        total_artists = len(artists)
+        processed = 0
+
+        for artist_data in artists:
+            artist_name = artist_data.get('name', '')
+            spotify_id = artist_data.get('id', '')
+
+            processed += 1
+
+            # Actualizar mensaje de progreso cada 5 artistas
+            if processed % 5 == 0 or processed == total_artists:
+                progress_msg = (
+                    f"⏳ Añadiendo {total_artists} artistas de Spotify...\n"
+                    f"Progreso: {processed}/{total_artists}\n"
+                    f"✅ Añadidos: {added_count} | ⏭️ Ya seguidos: {skipped_count} | ❌ Errores: {error_count}"
+                )
+                try:
+                    await query.edit_message_text(progress_msg)
+                except:
+                    pass  # Ignorar errores de edición
+
+            if not artist_name:
+                error_count += 1
+                continue
+
+            try:
+                # Buscar candidatos en MusicBrainz
+                candidates = db.search_artist_candidates(artist_name)
+
+                if not candidates:
+                    skipped_count += 1
+                    continue
+
+                # Usar el mejor candidato
+                best_candidate = candidates[0]
+                artist_id = db.create_artist_from_candidate(best_candidate)
+
+                if not artist_id:
+                    error_count += 1
+                    continue
+
+                # Añadir a seguimiento
+                was_new = db.add_followed_artist(user['id'], artist_id)
+
+                if was_new:
+                    added_count += 1
+                else:
+                    skipped_count += 1
+
+                # Pausa breve
+                await asyncio.sleep(0.1)
+
+            except Exception as e:
+                logger.error(f"Error procesando artista {artist_name}: {e}")
+                error_count += 1
+                continue
+
+        # Limpiar artistas pendientes
+        db.clear_pending_spotify_artists(user['id'])
+
+        # Mensaje de resultado
+        message = (
+            f"✅ *Sincronización de Spotify completada*\n\n"
+            f"➕ Artistas añadidos: {added_count}\n"
+            f"⏭️ Ya seguidos: {skipped_count}\n"
+        )
+
+        if error_count > 0:
+            message += f"❌ Errores: {error_count}\n"
+
+        # Calcular porcentaje de éxito
+        success_rate = ((added_count + skipped_count) / total_artists) * 100 if total_artists > 0 else 0
+        message += f"📈 Tasa de éxito: {success_rate:.1f}%\n"
+
+        message += f"\nUsa `/list` para ver todos tus artistas seguidos."
+
+        keyboard = [[InlineKeyboardButton("🔙 Volver a Spotify", callback_data=f"spotify_menu_{user['id']}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
+    except Exception as e:
+        logger.error(f"Error en añadir artistas de Spotify: {e}")
+        await query.edit_message_text("❌ Error durante la sincronización. Inténtalo de nuevo.")
+
+async def handle_spotify_follow_artists(query, user: Dict):
+    """Sigue en Spotify a los artistas que el usuario sigue para conciertos"""
+    await query.edit_message_text(
+        "⚠️ *Función no disponible*\n\n"
+        "Para seguir artistas en Spotify se requiere autenticación completa del usuario, "
+        "que no está disponible en este modo del bot.\n\n"
+        "Puedes seguir manualmente a los artistas en la aplicación de Spotify.",
+        parse_mode='Markdown',
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Volver", callback_data=f"spotify_menu_{user['id']}")
+        ]])
+    )
+
+async def handle_spotify_change_limit(query, user: Dict, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el cambio de límite de artistas"""
+    message = (
+        "🔢 *Cambiar cantidad de artistas*\n\n"
+        "Envía el número de artistas que quieres mostrar.\n"
+        "Rango permitido: 5-100 artistas\n\n"
+        "Ejemplo: 30"
+    )
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Marcar que estamos esperando el límite
+    context.user_data['waiting_for_spotify_limit'] = user['id']
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def handle_spotify_change_user(query, user: Dict, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja el cambio de usuario de Spotify"""
+    message = (
+        "👤 *Cambiar usuario de Spotify*\n\n"
+        "Envía tu nuevo nombre de usuario de Spotify:"
+    )
+
+    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Marcar que estamos esperando el nuevo usuario
+    context.user_data['waiting_for_spotify_change_user'] = user['id']
+
+    await query.edit_message_text(
+        message,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
+    )
+
+async def spotify_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Vuelve al menú principal de Spotify"""
+    query = update.callback_query
+    await query.answer()
+
+    user_id = int(query.data.split("_")[-1])
+    user = db.get_user_by_chat_id(query.message.chat_id)
+
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    spotify_user = db.get_user_spotify(user['id'])
+    if not spotify_user:
+        await query.edit_message_text("❌ No tienes usuario de Spotify configurado.")
+        return
+
+    # Mostrar menú principal
+    fake_update = type('obj', (object,), {'message': query.message})()
+    await show_spotify_menu(fake_update, user, spotify_user)
+
+
+
 
 def main():
     """Función principal MODIFICADA para incluir sistema de países"""
@@ -6556,6 +8131,10 @@ def main():
     # Handler de Last.fm
     application.add_handler(CommandHandler("lastfm", lastfm_command))
 
+    # Handler de Spotify
+    application.add_handler(CommandHandler("spotify", spotify_command))
+
+
     # IMPORTANTE: Los handlers de callback deben ir en orden específico para evitar conflictos
 
     # Handlers específicos de Last.fm (DEBEN IR ANTES que los genéricos)
@@ -6568,6 +8147,11 @@ def main():
     application.add_handler(CallbackQueryHandler(expand_concerts_callback, pattern="^(expand_all_|back_to_search_)"))
     application.add_handler(CallbackQueryHandler(show_artist_concerts_callback, pattern="^show_artist_concerts_"))
     application.add_handler(CallbackQueryHandler(back_to_summary_callback, pattern="^back_to_summary_"))
+
+    # Handlers específicos de Spotify (DEBEN IR ANTES que los genéricos)
+    application.add_handler(CallbackQueryHandler(spotify_callback_handler, pattern="^spotify_"))
+    application.add_handler(CallbackQueryHandler(spotify_menu_callback, pattern="^spotify_menu_"))
+
 
     # Handler genérico de configuración (DEBE IR AL FINAL de los callbacks)
     application.add_handler(CallbackQueryHandler(config_callback_handler, pattern="^(config_|notif_|country_|service_|artist_)"))
