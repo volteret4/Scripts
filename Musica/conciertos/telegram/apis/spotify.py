@@ -4,10 +4,19 @@ import time
 import base64
 import requests
 import re
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 import urllib.parse
+from typing import Dict
+
+# Configuración de logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 try:
     import spotipy
@@ -171,6 +180,372 @@ class SpotifyService:
 
         # Intentar cargar token guardado
         self._load_saved_token()
+
+
+    def process_authorization_code(self, user_id: int, authorization_code: str) -> tuple[bool, str, dict]:
+        """
+        Procesa el código de autorización y obtiene tokens
+        VERSIÓN MEJORADA con mejor manejo de errores
+
+        Args:
+            user_id: ID del usuario
+            authorization_code: Código recibido de Spotify
+
+        Returns:
+            Tupla (éxito, mensaje, user_info)
+        """
+        if not SPOTIPY_AVAILABLE:
+            return False, "Spotipy no disponible", {}
+
+        try:
+            logger.info(f"Procesando código para usuario {user_id}: {authorization_code[:10]}...")
+
+            # Cargar estado de autenticación
+            auth_data = self._load_auth_state(user_id)
+            if not auth_data:
+                logger.warning(f"No se encontró estado de auth para usuario {user_id}")
+                return False, "Sesión de autenticación expirada. Genera una nueva URL.", {}
+
+            # Crear OAuth manager
+            sp_oauth = SpotifyOAuth(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=auth_data['redirect_uri'],
+                scope=auth_data['scope'],
+                show_dialog=False
+            )
+
+            logger.info(f"OAuth manager creado, intercambiando código...")
+
+            # Intercambiar código por tokens
+            try:
+                token_info = sp_oauth.get_access_token(authorization_code)
+            except Exception as oauth_error:
+                logger.error(f"Error en get_access_token: {oauth_error}")
+
+                # Intentar con diferentes métodos
+                try:
+                    # Método alternativo: usar requests directamente
+                    token_info = self._exchange_code_manually(authorization_code, auth_data)
+                except Exception as manual_error:
+                    logger.error(f"Error en intercambio manual: {manual_error}")
+                    return False, f"Código inválido o expirado. Error: {str(oauth_error)}", {}
+
+            if not token_info or 'access_token' not in token_info:
+                logger.error(f"Token info inválido: {token_info}")
+                return False, "No se pudieron obtener tokens. Verifica el código.", {}
+
+            logger.info("Tokens obtenidos correctamente, obteniendo perfil...")
+
+            # Crear cliente autenticado
+            sp = spotipy.Spotify(auth=token_info['access_token'])
+
+            # Obtener información del usuario
+            try:
+                user_profile = sp.current_user()
+                logger.info(f"Perfil obtenido: {user_profile.get('id')}")
+
+                user_info = {
+                    'spotify_id': user_profile.get('id'),
+                    'display_name': user_profile.get('display_name', user_profile.get('id')),
+                    'followers': user_profile.get('followers', {}).get('total', 0),
+                    'email': user_profile.get('email', ''),
+                    'country': user_profile.get('country', ''),
+                    'product': user_profile.get('product', 'free')
+                }
+
+                # Obtener playlists
+                try:
+                    playlists = sp.current_user_playlists(limit=1)
+                    user_info['public_playlists'] = playlists.get('total', 0)
+                except Exception as playlist_error:
+                    logger.warning(f"Error obteniendo playlists: {playlist_error}")
+                    user_info['public_playlists'] = 0
+
+            except Exception as profile_error:
+                logger.error(f"Error obteniendo perfil: {profile_error}")
+                # Usar información básica si no se puede obtener el perfil completo
+                user_info = {
+                    'spotify_id': 'unknown',
+                    'display_name': 'Usuario Spotify',
+                    'followers': 0,
+                    'email': '',
+                    'country': '',
+                    'product': 'unknown',
+                    'public_playlists': 0
+                }
+
+            # Guardar tokens para uso futuro
+            self._save_user_tokens(user_id, token_info, user_info)
+
+            # Limpiar estado de auth
+            auth_file = self.cache_dir / f"spotify_auth_{user_id}.json"
+            if auth_file.exists():
+                auth_file.unlink()
+
+            logger.info(f"Autenticación exitosa para usuario {user_id}")
+            return True, "Autenticación exitosa", user_info
+
+        except Exception as e:
+            logger.error(f"Error procesando código de autorización: {e}")
+            return False, f"Error en autenticación: {str(e)}", {}
+
+
+
+    def _save_user_tokens(self, user_id: int, token_info: dict, user_info: dict):
+        """Guarda los tokens del usuario autenticado"""
+        try:
+            tokens_file = self.cache_dir / f"spotify_tokens_{user_id}.json"
+
+            tokens_data = {
+                'access_token': token_info.get('access_token'),
+                'refresh_token': token_info.get('refresh_token'),
+                'expires_at': token_info.get('expires_at'),
+                'scope': token_info.get('scope'),
+                'user_info': user_info,
+                'saved_at': time.time()
+            }
+
+            with open(tokens_file, 'w') as f:
+                json.dump(tokens_data, f)
+
+        except Exception as e:
+            print(f"⚠️ Error guardando tokens: {e}")
+
+    def _load_user_tokens(self, user_id: int) -> dict:
+        """Carga los tokens guardados del usuario"""
+        try:
+            tokens_file = self.cache_dir / f"spotify_tokens_{user_id}.json"
+
+            if not tokens_file.exists():
+                return {}
+
+            with open(tokens_file, 'r') as f:
+                return json.load(f)
+
+        except Exception as e:
+            print(f"⚠️ Error cargando tokens: {e}")
+            return {}
+
+    def _refresh_user_token(self, user_id: int) -> bool:
+        """Refresca el token de acceso si es necesario"""
+        try:
+            tokens_data = self._load_user_tokens(user_id)
+            if not tokens_data:
+                return False
+
+            # Verificar si necesita refresh
+            expires_at = tokens_data.get('expires_at', 0)
+            if time.time() < expires_at - 300:  # 5 minutos de margen
+                return True
+
+            if not tokens_data.get('refresh_token'):
+                return False
+
+            # Crear OAuth para refresh
+            sp_oauth = SpotifyOAuth(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=self.redirect_uri
+            )
+
+            # Refrescar token
+            new_token_info = sp_oauth.refresh_access_token(tokens_data['refresh_token'])
+
+            if new_token_info:
+                # Actualizar tokens guardados
+                tokens_data.update({
+                    'access_token': new_token_info.get('access_token'),
+                    'expires_at': new_token_info.get('expires_at'),
+                    'refreshed_at': time.time()
+                })
+
+                # Si viene nuevo refresh token, actualizarlo
+                if 'refresh_token' in new_token_info:
+                    tokens_data['refresh_token'] = new_token_info['refresh_token']
+
+                self._save_user_tokens(user_id, tokens_data, tokens_data.get('user_info', {}))
+                return True
+
+            return False
+
+        except Exception as e:
+            print(f"❌ Error refrescando token: {e}")
+            return False
+
+    def get_authenticated_client(self, user_id: int):
+        """
+        Obtiene un cliente de Spotify autenticado para un usuario
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Cliente de Spotify autenticado o None
+        """
+        if not SPOTIPY_AVAILABLE:
+            return None
+
+        try:
+            # Cargar tokens
+            tokens_data = self._load_user_tokens(user_id)
+            if not tokens_data:
+                return None
+
+            # Refrescar token si es necesario
+            if not self._refresh_user_token(user_id):
+                return None
+
+            # Recargar tokens actualizados
+            tokens_data = self._load_user_tokens(user_id)
+            access_token = tokens_data.get('access_token')
+
+            if not access_token:
+                return None
+
+            # Crear cliente autenticado
+            return spotipy.Spotify(auth=access_token)
+
+        except Exception as e:
+            print(f"❌ Error obteniendo cliente autenticado: {e}")
+            return None
+
+    def get_user_followed_artists_real(self, user_id: int, limit: int = 50) -> tuple[list, str]:
+        """
+        Obtiene los artistas realmente seguidos por el usuario autenticado
+
+        Args:
+            user_id: ID del usuario
+            limit: Límite de artistas a obtener
+
+        Returns:
+            Tupla (lista_artistas, mensaje_estado)
+        """
+        try:
+            sp = self.get_authenticated_client(user_id)
+            if not sp:
+                return [], "Usuario no autenticado. Usa el comando de autenticación."
+
+            artists = []
+            after = None
+            total_fetched = 0
+
+            # Spotify limita a 50 por request para followed artists
+            while total_fetched < limit:
+                batch_limit = min(50, limit - total_fetched)
+
+                try:
+                    response = sp.current_user_followed_artists(
+                        limit=batch_limit,
+                        after=after
+                    )
+
+                    artist_items = response.get('artists', {}).get('items', [])
+
+                    if not artist_items:
+                        break
+
+                    for artist in artist_items:
+                        artists.append({
+                            'id': artist.get('id'),
+                            'name': artist.get('name'),
+                            'followers': artist.get('followers', {}).get('total', 0),
+                            'popularity': artist.get('popularity', 0),
+                            'genres': artist.get('genres', []),
+                            'external_urls': artist.get('external_urls', {}),
+                            'images': artist.get('images', [])
+                        })
+
+                        total_fetched += 1
+                        if total_fetched >= limit:
+                            break
+
+                    # Preparar para siguiente batch
+                    cursors = response.get('artists', {}).get('cursors', {})
+                    after = cursors.get('after')
+
+                    if not after:
+                        break
+
+                except Exception as e:
+                    print(f"❌ Error en batch de artistas: {e}")
+                    break
+
+            return artists, f"Se obtuvieron {len(artists)} artistas seguidos"
+
+        except Exception as e:
+            print(f"❌ Error obteniendo artistas seguidos: {e}")
+            return [], f"Error: {str(e)}"
+
+    def follow_artists_batch(self, user_id: int, artist_ids: list) -> tuple[int, int, str]:
+        """
+        Sigue una lista de artistas en Spotify
+
+        Args:
+            user_id: ID del usuario
+            artist_ids: Lista de IDs de artistas de Spotify
+
+        Returns:
+            Tupla (seguidos_exitosos, errores, mensaje)
+        """
+        try:
+            sp = self.get_authenticated_client(user_id)
+            if not sp:
+                return 0, len(artist_ids), "Usuario no autenticado"
+
+            followed = 0
+            errors = 0
+
+            # Procesar en lotes de 50 (límite de Spotify)
+            for i in range(0, len(artist_ids), 50):
+                batch = artist_ids[i:i+50]
+
+                try:
+                    sp.user_follow_artists(batch)
+                    followed += len(batch)
+                    time.sleep(0.1)  # Pausa breve
+
+                except Exception as e:
+                    print(f"❌ Error siguiendo lote: {e}")
+                    errors += len(batch)
+
+            return followed, errors, f"Seguidos: {followed}, Errores: {errors}"
+
+        except Exception as e:
+            print(f"❌ Error en follow_artists_batch: {e}")
+            return 0, len(artist_ids), f"Error: {str(e)}"
+
+    def is_user_authenticated(self, user_id: int) -> bool:
+        """Verifica si un usuario tiene autenticación válida"""
+        tokens_data = self._load_user_tokens(user_id)
+        if not tokens_data:
+            return False
+
+        # Verificar si el token no ha expirado
+        expires_at = tokens_data.get('expires_at', 0)
+        if time.time() >= expires_at:
+            # Intentar refresh
+            return self._refresh_user_token(user_id)
+
+        return True
+
+    def revoke_user_authentication(self, user_id: int) -> bool:
+        """Revoca la autenticación de un usuario (elimina tokens)"""
+        try:
+            tokens_file = self.cache_dir / f"spotify_tokens_{user_id}.json"
+            if tokens_file.exists():
+                tokens_file.unlink()
+
+            auth_file = self.cache_dir / f"spotify_auth_{user_id}.json"
+            if auth_file.exists():
+                auth_file.unlink()
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Error revocando autenticación: {e}")
+            return False
+
 
     def setup(self):
         """Configurar y autenticar con Spotify"""
@@ -1043,3 +1418,180 @@ class SpotifyService:
         else:
             for file in self.cache_dir.glob("spotify_*.json"):
                 file.unlink()
+
+    async def handle_spotify_authentication(query, user: Dict):
+        """
+        Inicia el proceso de autenticación OAuth
+        VERSIÓN MEJORADA con mejores instrucciones
+        """
+        if not spotify_service:
+            await query.edit_message_text("❌ Servicio de Spotify no disponible.")
+            return
+
+        try:
+            # Generar URL de autenticación
+            auth_url = spotify_service.generate_auth_url(user['id'])
+
+            if not auth_url:
+                await query.edit_message_text(
+                    "❌ Error generando URL de autenticación.\n"
+                    "Verifica que las credenciales de Spotify estén configuradas."
+                )
+                return
+
+            # Crear mensaje con instrucciones mejoradas
+            message = (
+                "🔐 *Autenticación de Spotify*\n\n"
+                "**Pasos para conectar tu cuenta:**\n\n"
+
+                "1️⃣ **Abre el enlace** (clic en el botón de abajo)\n\n"
+
+                "2️⃣ **Inicia sesión** con tu cuenta de Spotify\n\n"
+
+                "3️⃣ **Acepta los permisos** solicitados\n\n"
+
+                "4️⃣ **Copia el código:**\n"
+                "   • La página mostrará un código o dirá 'Authorization successful'\n"
+                "   • Si ves una URL larga, copia toda la URL\n"
+                "   • Si ves solo un código, copia solo el código\n\n"
+
+                "5️⃣ **Pégalo aquí** en el chat\n\n"
+
+                "⏰ *Tienes 10 minutos para completar este proceso.*\n"
+                "❓ Si tienes problemas, genera una nueva URL."
+            )
+
+            keyboard = [
+                [InlineKeyboardButton("🔗 Abrir enlace de Spotify", url=auth_url)],
+                [InlineKeyboardButton("❓ ¿Problemas?", callback_data=f"spotify_auth_help_{user['id']}")],
+                [InlineKeyboardButton("❌ Cancelar", callback_data=f"spotify_cancel_{user['id']}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                message,
+                parse_mode='Markdown',
+                reply_markup=reply_markup,
+                disable_web_page_preview=False
+            )
+
+            # Marcar que estamos esperando el código
+            # Esto se debe hacer en el callback handler donde tengas acceso a context
+
+        except Exception as e:
+            logger.error(f"Error en autenticación Spotify: {e}")
+            await query.edit_message_text(
+                "❌ Error iniciando autenticación. Inténtalo de nuevo."
+            )
+
+    def generate_auth_url(self, user_id: int) -> str:
+        """
+        Genera URL de autorización de Spotify para un usuario específico
+        VERSIÓN MEJORADA
+
+        Args:
+            user_id: ID del usuario del bot
+
+        Returns:
+            URL de autorización de Spotify
+        """
+        if not SPOTIPY_AVAILABLE:
+            return ""
+
+        try:
+            # Usar user_id como state para asociar la respuesta
+            state = f"user_{user_id}_{int(time.time())}"
+
+            # Crear OAuth manager con scopes específicos
+            scope = "user-follow-read user-follow-modify playlist-read-private user-read-email user-read-private"
+
+            sp_oauth = SpotifyOAuth(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=self.redirect_uri,
+                scope=scope,
+                state=state,
+                show_dialog=True  # Fuerza mostrar diálogo de login
+            )
+
+            auth_url = sp_oauth.get_authorize_url()
+
+            # Guardar el state temporalmente para validar después
+            self._save_auth_state(user_id, state, sp_oauth)
+
+            logger.info(f"URL de autorización generada para usuario {user_id}")
+            logger.info(f"Redirect URI configurado: {self.redirect_uri}")
+
+            return auth_url
+
+        except Exception as e:
+            logger.error(f"Error generando URL de autorización: {e}")
+            return ""
+
+
+    def _save_auth_state(self, user_id: int, state: str, sp_oauth):
+        """Guarda el estado de autenticación temporalmente"""
+        try:
+            auth_file = self.cache_dir / f"spotify_auth_{user_id}.json"
+
+            auth_data = {
+                'state': state,
+                'timestamp': time.time(),
+                'redirect_uri': self.redirect_uri,
+                'scope': sp_oauth.scope
+            }
+
+            with open(auth_file, 'w') as f:
+                json.dump(auth_data, f)
+
+        except Exception as e:
+            print(f"⚠️ Error guardando estado de auth: {e}")
+
+    def _load_auth_state(self, user_id: int) -> dict:
+        """Carga el estado de autenticación guardado"""
+        try:
+            auth_file = self.cache_dir / f"spotify_auth_{user_id}.json"
+
+            if not auth_file.exists():
+                return {}
+
+            with open(auth_file, 'r') as f:
+                auth_data = json.load(f)
+
+            # Verificar que no haya expirado (30 minutos)
+            if time.time() - auth_data.get('timestamp', 0) > 1800:
+                auth_file.unlink()  # Eliminar archivo expirado
+                return {}
+
+            return auth_data
+
+        except Exception as e:
+            print(f"⚠️ Error cargando estado de auth: {e}")
+            return {}
+
+def _exchange_code_manually(self, authorization_code: str, auth_data: dict) -> dict:
+    """
+    Intercambia código por tokens usando requests directamente
+    """
+    import requests
+    import base64
+
+    # Preparar datos para el intercambio
+    auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
+
+    headers = {
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": authorization_code,
+        "redirect_uri": auth_data['redirect_uri']
+    }
+
+    response = requests.post("https://accounts.spotify.com/api/token",
+                           headers=headers, data=data, timeout=10)
+    response.raise_for_status()
+
+    return response.json()
