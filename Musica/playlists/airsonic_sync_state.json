@@ -8,9 +8,9 @@
       "tracks_total": 10
     },
     "6_house": {
-      "hash": "25d0a0d5d333552a26b7f934ea87eb51",
+      "hash": "0c3aa92569b88d84e8b39109cb0d8a63",
       "airsonic_id": "7",
-      "last_sync": "2025-06-28T23:47:36.880737",
+      "last_sync": "2025-07-31T01:10:02.536483",
       "tracks_found": 15,
       "tracks_total": 47
     },
@@ -29,11 +29,11 @@
       "tracks_total": 3
     },
     "Pop": {
-      "hash": "0ca9c236e51c6b5789a01277498e8585",
+      "hash": "89c22061226467b812c736cb8ca7cc0f",
       "airsonic_id": "10",
-      "last_sync": "2025-06-28T23:48:00.340039",
+      "last_sync": "2025-07-31T01:10:09.261697",
       "tracks_found": 30,
-      "tracks_total": 49
+      "tracks_total": 50
     },
     "ambient": {
       "hash": "b3edaf638f7f1771cf284172c38425eb",
@@ -50,9 +50,9 @@
       "tracks_total": 49
     },
     "deep": {
-      "hash": "4f253533305f38ea272033a87622fbc8",
+      "hash": "4031c90b910d49a3b0557eba271f7f3c",
       "airsonic_id": "13",
-      "last_sync": "2025-06-28T23:49:43.053266",
+      "last_sync": "2025-07-31T01:10:44.282857",
       "tracks_found": 70,
       "tracks_total": 214
     },
@@ -64,9 +64,9 @@
       "tracks_total": 20
     },
     "flamenco": {
-      "hash": "9f5838367344cdd5d0897ffc0c05d5cd",
+      "hash": "63749030e35692d2cdf5a1a18d6f0e30",
       "airsonic_id": "15",
-      "last_sync": "2025-06-28T23:49:51.431896",
+      "last_sync": "2025-07-31T01:10:44.952811",
       "tracks_found": 7,
       "tracks_total": 8
     },
@@ -78,9 +78,9 @@
       "tracks_total": 31
     },
     "idm": {
-      "hash": "01bc001bcd1804b754c4ada531ee75ed",
+      "hash": "24a3c204913d99573f4f5381e6508bdc",
       "airsonic_id": "17",
-      "last_sync": "2025-06-28T23:50:12.338930",
+      "last_sync": "2025-07-31T01:10:51.086379",
       "tracks_found": 23,
       "tracks_total": 45
     },
@@ -113,30 +113,30 @@
       "tracks_total": 4
     },
     "rock_metal": {
-      "hash": "a0913c2b56e2ca565a02d28201583488",
+      "hash": "2954311d275b1b073f8a3cc6f97802e5",
       "airsonic_id": "22",
-      "last_sync": "2025-06-28T23:51:18.797198",
+      "last_sync": "2025-07-31T01:10:55.943018",
       "tracks_found": 36,
       "tracks_total": 45
     },
     "shoegaze": {
-      "hash": "802ddd202e4113176c8e5c97a71495ff",
+      "hash": "c493ea565b9cfe77ac7861f28d09e090",
       "airsonic_id": "23",
-      "last_sync": "2025-06-28T23:51:19.522283",
+      "last_sync": "2025-07-31T01:10:56.190745",
       "tracks_found": 1,
-      "tracks_total": 2
+      "tracks_total": 1
     },
     "soul-funk": {
-      "hash": "d26349e84679e8729830c9dbf16ec63f",
+      "hash": "631905dab8c8e44094f9812587764b35",
       "airsonic_id": "24",
-      "last_sync": "2025-06-28T23:51:27.068746",
+      "last_sync": "2025-07-31T01:10:59.983408",
       "tracks_found": 14,
       "tracks_total": 26
     },
     "techno": {
-      "hash": "7f89c9bee9099c1a78fc409c75e41794",
+      "hash": "2fe19a3e5413db13e1996b3975dc2b28",
       "airsonic_id": "25",
-      "last_sync": "2025-06-28T23:51:57.710999",
+      "last_sync": "2025-07-31T01:11:18.179300",
       "tracks_found": 41,
       "tracks_total": 114
     },
@@ -155,5 +155,5 @@
       "tracks_total": 47
     }
   },
-  "last_sync": "2025-06-28T23:52:26.586831"
+  "last_sync": "2025-07-31T01:11:18.179315"
 }

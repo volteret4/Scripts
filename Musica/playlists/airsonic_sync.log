@@ -1463,3 +1463,749 @@
 2025-06-28 23:52:26,587 - WARNING -   - Barbara Mason - I Am Your Woman, She Is Your Wife
 2025-06-28 23:52:26,587 - WARNING -   ... y 4 más
 2025-06-28 23:52:26,587 - INFO - Sincronización completada: 22/28 playlists
+2025-07-31 00:58:04,147 - INFO - Conectado a Airsonic: http://192.168.1.133:4040
+2025-07-31 00:58:04,765 - INFO - Cache de canciones cargado: 120999 entradas
+2025-07-31 00:58:04,766 - INFO - Inicializado - Cache obsoleto (>24h)
+2025-07-31 00:58:04,766 - INFO - Reconstruyendo cache de canciones
+2025-07-31 00:58:04,766 - INFO - Construyendo cache de canciones de Airsonic...
+2025-07-31 01:09:51,122 - INFO - Cache construido: 32561 canciones indexadas con 121725 claves de búsqueda
+2025-07-31 01:09:53,070 - INFO - Cache guardado: 121725 entradas
+2025-07-31 01:09:53,107 - INFO - No hay cambios en .old, omitiendo sincronización
+2025-07-31 01:09:53,107 - INFO - Iniciando sincronización de .playlists
+2025-07-31 01:09:53,107 - INFO - Encontradas 0 canciones en el archivo M3U
+2025-07-31 01:09:53,107 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:09:53,108 - INFO - Iniciando sincronización de 1_djtools
+2025-07-31 01:09:53,108 - WARNING - No se pudo parsear: 1_djtools/01 Party Down Pt.1.flac
+2025-07-31 01:09:53,108 - INFO - Encontradas 3 canciones en el archivo M3U
+2025-07-31 01:09:53,108 - INFO - Procesando 1/3: Kerri Chandler - Dub Life
+2025-07-31 01:09:53,321 - INFO - Procesando 2/3: Slam Mode - Nebula
+2025-07-31 01:09:53,535 - INFO - Procesando 3/3: Ingleton Falls - It's Just A Hobby (Edgar Allen Poe Mix)
+2025-07-31 01:09:53,778 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:09:53,778 - INFO - Iniciando sincronización de 2_Felices
+2025-07-31 01:09:53,778 - WARNING - No se pudo parsear: 2_Felices/04 - Once In A Lifetime.flac
+2025-07-31 01:09:53,778 - WARNING - No se pudo parsear: 2_Felices/01 - Born Under Punches (The Heat Goes On).flac
+2025-07-31 01:09:53,778 - WARNING - No se pudo parsear: 2_Felices/07 - Waterboy.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 2_Felices/06 Jens Lekman - Wedding in Finistère.flac
+2025-07-31 01:09:53,779 - INFO - Encontradas 0 canciones en el archivo M3U
+2025-07-31 01:09:53,779 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:09:53,779 - INFO - Iniciando sincronización de 3_Cantadas
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/06 - The World Turns All Around Her.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/10 - Wait and See.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/01 - Sgt. Pepper's Lonely Hearts Club Band.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/02 - With A Little Help From My Friends.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/04 - Getting Better.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/12 - Sgt. Pepper's Lonely Hearts Club Band (Reprise).flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/1.02 - THINGS BEHIND THINGS BEHIND THINGS.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/01 - More Than A Feeling.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/04 - Pyramid of Health.flac
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 3_Cantadas/03 - Monsoons.flac
+2025-07-31 01:09:53,779 - INFO - Encontradas 0 canciones en el archivo M3U
+2025-07-31 01:09:53,779 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:09:53,779 - INFO - Iniciando sincronización de 6_house
+2025-07-31 01:09:53,779 - WARNING - No se pudo parsear: 6_house/Romy - Weightless (2023 - Mid Air).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/Los Hermanos - Birth Of 3000 (2004 - On Another Level).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/John Tejada - Simulacrum (2023 - Resound).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/Stardust - Music Sounds Better With You (2019-06-28 - Music Sounds Better With You).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/Kerri Chandler - Disko Satisfaction (2002 - Digitalsoul (Session Four)).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/Los Hermanos - In Deeper Presence (2004 - On Another Level).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/Adam Port, Monolink -  Point Of No Return (Extended Mix).flac
+2025-07-31 01:09:53,780 - WARNING - No se pudo parsear: 6_house/14 - Aruna.flac
+2025-07-31 01:09:53,780 - INFO - Encontradas 47 canciones en el archivo M3U
+2025-07-31 01:09:53,780 - INFO - Procesando 1/47: Mr. Fingers - Ammnesia
+2025-07-31 01:09:54,044 - INFO - Procesando 2/47: Ichisan - Planica
+2025-07-31 01:09:54,095 - INFO - Procesando 3/47: Blue Boy - Remember Me (Deep Zone Club Mix)
+2025-07-31 01:09:54,328 - INFO - Procesando 4/47: Ichisan - Metamundus
+2025-07-31 01:09:54,517 - INFO - Procesando 5/47: Kerri Chandler - Cobal (Version 1)
+2025-07-31 01:09:54,781 - INFO - Procesando 6/47: Kerri Chandler - The Phone Call
+2025-07-31 01:09:55,008 - INFO - Procesando 7/47: Prins Thomas - Traæns 4
+2025-07-31 01:09:55,271 - INFO - Procesando 8/47: Kerri Chandler - In Search Of Mr. Ford
+2025-07-31 01:09:55,590 - INFO - Procesando 9/47: Me & You - Sneaker Thief
+2025-07-31 01:09:55,794 - INFO - Procesando 10/47: Modjo - Lady (Hear Me Tonight)
+2025-07-31 01:09:56,095 - INFO - Procesando 11/47: Moloko - Sing It Back (Boris Musical mix)
+2025-07-31 01:09:56,403 - INFO - Procesando 12/47: Moloko - The Time Is Now
+2025-07-31 01:09:56,611 - INFO - Procesando 13/47: Soul II Soul - Back to Life (However Do You Want Me)
+2025-07-31 01:09:56,823 - INFO - Procesando 14/47: St. Germain - Rose Rouge
+2025-07-31 01:09:57,123 - INFO - Procesando 15/47: Octave One - Untold
+2025-07-31 01:09:57,174 - INFO - Procesando 16/47: Andrea Bratten - Libra
+2025-07-31 01:09:57,226 - INFO - Procesando 17/47: Overmono - Good Lies
+2025-07-31 01:09:57,404 - INFO - Procesando 18/47: Paul Johnson - Better Than This (Soul Talk mix)
+2025-07-31 01:09:57,610 - INFO - Procesando 19/47: Étienne de Crécy - Scratched
+2025-07-31 01:09:57,809 - INFO - Procesando 20/47: Space Ghost - Back To The Source
+2025-07-31 01:09:57,860 - INFO - Procesando 21/47: paris match - Family Affair (M‐Swift remix)
+2025-07-31 01:09:58,358 - INFO - Procesando 22/47: Steve Bug presents Superlova - Something On My Mind (Vincenzo's Extended Clubmix)
+2025-07-31 01:09:58,584 - INFO - Procesando 23/47: 6th Borough Project - Just A Memory
+2025-07-31 01:09:58,834 - INFO - Procesando 24/47: Folamour - These Are Just Places to Me Now
+2025-07-31 01:09:58,886 - INFO - Procesando 25/47: International Pony - Leaving Home
+2025-07-31 01:09:58,937 - INFO - Procesando 26/47: Soichi Terada - Saturday Love Sunday
+2025-07-31 01:09:59,143 - INFO - Procesando 27/47: Kevin Yost - One Starry Night
+2025-07-31 01:09:59,377 - INFO - Procesando 28/47: Kevin Yost - Hypnotic Progressions (Part II)
+2025-07-31 01:09:59,577 - INFO - Procesando 29/47: Omma - 1905
+2025-07-31 01:09:59,723 - INFO - Procesando 30/47: Omma - Vmeste
+2025-07-31 01:09:59,885 - INFO - Procesando 31/47: Moon Boots - Manitou
+2025-07-31 01:10:00,191 - INFO - Procesando 32/47: Kiasmos - Burst
+2025-07-31 01:10:00,342 - INFO - Procesando 33/47: Pacific Coliseum - Ocean City
+2025-07-31 01:10:00,521 - INFO - Procesando 34/47: Joe Goddard - Moments Die
+2025-07-31 01:10:00,572 - INFO - Procesando 35/47: Joe Goddard - Destiny
+2025-07-31 01:10:00,624 - INFO - Procesando 36/47: Teen Daze - Persona
+2025-07-31 01:10:00,676 - INFO - Procesando 37/47: Aleksandir - Turtle Dance
+2025-07-31 01:10:00,728 - INFO - Procesando 38/47: Art Crime - Release
+2025-07-31 01:10:00,780 - INFO - Procesando 39/47: Ashley Beedle presents The London Heavy Disco Revue - Riot On Broadway
+2025-07-31 01:10:00,832 - INFO - Procesando 40/47: Caribou - Home
+2025-07-31 01:10:00,883 - INFO - Procesando 41/47: Bicep & Hammer - Dahlia
+2025-07-31 01:10:00,935 - INFO - Procesando 42/47: Lil' Louis & the World - I Called U
+2025-07-31 01:10:01,215 - INFO - Procesando 43/47: Overmono - So U Kno
+2025-07-31 01:10:01,423 - INFO - Procesando 44/47: Faul & Wad; Pnau - Changes (Original Mix)
+2025-07-31 01:10:01,626 - INFO - Procesando 45/47: Kiko - Italomatic
+2025-07-31 01:10:01,820 - INFO - Procesando 46/47: Ichisan - Barbarossa
+2025-07-31 01:10:01,977 - INFO - Procesando 47/47: Marshall Jefferson - Move Your Body (Original Mix)
+2025-07-31 01:10:02,536 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:02,545 - INFO - ✅ Sincronización completada: 15/47 canciones (31.9%)
+2025-07-31 01:10:02,545 - WARNING - ❌ Canciones no encontradas (32):
+2025-07-31 01:10:02,545 - WARNING -   - Mr. Fingers - Ammnesia
+2025-07-31 01:10:02,545 - WARNING -   - Blue Boy - Remember Me (Deep Zone Club Mix)
+2025-07-31 01:10:02,545 - WARNING -   - Ichisan - Metamundus
+2025-07-31 01:10:02,545 - WARNING -   - Kerri Chandler - Cobal (Version 1)
+2025-07-31 01:10:02,545 - WARNING -   - Kerri Chandler - The Phone Call
+2025-07-31 01:10:02,545 - WARNING -   ... y 27 más
+2025-07-31 01:10:02,546 - INFO - No hay cambios en 9_polladas, omitiendo sincronización
+2025-07-31 01:10:02,546 - INFO - No hay cambios en N_DnB, omitiendo sincronización
+2025-07-31 01:10:02,546 - INFO - Iniciando sincronización de Pop
+2025-07-31 01:10:02,546 - WARNING - No se pudo parsear: Pop/Saint Etienne - Only Love Can Break Your Heart [2009 - Foxbase Alpha [Deluxe Edition - Disc 1]].flac
+2025-07-31 01:10:02,546 - WARNING - No se pudo parsear: Pop/02 - Aerial Troubles.flac
+2025-07-31 01:10:02,546 - INFO - Encontradas 50 canciones en el archivo M3U
+2025-07-31 01:10:02,546 - INFO - Procesando 1/50: The System - Almost Grown
+2025-07-31 01:10:02,597 - INFO - Procesando 2/50: Sixth June - Drowning
+2025-07-31 01:10:02,649 - INFO - Procesando 3/50: Pet Shop Boys - Being Boring
+2025-07-31 01:10:02,701 - INFO - Procesando 4/50: Dip In The Pool - On Retinae (West Version)
+2025-07-31 01:10:02,964 - INFO - Procesando 5/50: Bleu Toucan - Hanoï Café
+2025-07-31 01:10:03,016 - INFO - Procesando 6/50: Madness - Our House
+2025-07-31 01:10:03,304 - INFO - Procesando 7/50: Chris Rea - Josephine
+2025-07-31 01:10:03,355 - INFO - Procesando 8/50: Umberto Tozzi - Gloria
+2025-07-31 01:10:03,635 - INFO - Procesando 9/50: Baxter Dury - I'm Not Your Dog
+2025-07-31 01:10:03,687 - INFO - Procesando 10/50: Guus Meeuwis & Vagant - Het Is Een Nacht (Levensecht) (Live)
+2025-07-31 01:10:03,980 - INFO - Procesando 11/50: Tom Jones - It's Not Unusual
+2025-07-31 01:10:04,031 - INFO - Procesando 12/50: Cyndi Lauper - Girls Just Want To Have Fun
+2025-07-31 01:10:04,289 - INFO - Procesando 13/50: Little Peggy March - I Will Follow Him
+2025-07-31 01:10:04,499 - INFO - Procesando 14/50: Jeanette - Porque Te Vas
+2025-07-31 01:10:04,711 - INFO - Procesando 15/50: Miriam Makeba - Pata Pata
+2025-07-31 01:10:04,863 - INFO - Procesando 16/50: Brittany Howard - What Now
+2025-07-31 01:10:04,914 - INFO - Procesando 17/50: Future Islands - King of Sweden
+2025-07-31 01:10:04,966 - INFO - Procesando 18/50: Helado Negro - Best For You and Me
+2025-07-31 01:10:05,017 - INFO - Procesando 19/50: Helado Negro - I Just Want To Wake Up With You
+2025-07-31 01:10:05,069 - INFO - Procesando 20/50: King Gizzard & The Lizard Wizard - Yours
+2025-07-31 01:10:05,120 - INFO - Procesando 21/50: Koop - Come to Me
+2025-07-31 01:10:05,172 - INFO - Procesando 22/50: Koop - Drum Rhythm A (Music for Ballet Exercises)
+2025-07-31 01:10:05,223 - INFO - Procesando 23/50: MGMT - Electric Feel
+2025-07-31 01:10:05,275 - INFO - Procesando 24/50: MGMT - Kids
+2025-07-31 01:10:05,326 - INFO - Procesando 25/50: MGMT - Little Dark Age
+2025-07-31 01:10:05,377 - INFO - Procesando 26/50: Mop Mop - Kamakumba
+2025-07-31 01:10:05,528 - INFO - Procesando 27/50: Peter Cat Recording Co. - Floated By
+2025-07-31 01:10:05,579 - INFO - Procesando 28/50: Peter Cat Recording Co. - Memory Box
+2025-07-31 01:10:05,631 - INFO - Procesando 29/50: Rhye - Open
+2025-07-31 01:10:05,684 - INFO - Procesando 30/50: Rhye - Taste
+2025-07-31 01:10:05,736 - INFO - Procesando 31/50: Rhye - The Fall
+2025-07-31 01:10:05,787 - INFO - Procesando 32/50: Róisín Murphy - CooCool
+2025-07-31 01:10:05,839 - INFO - Procesando 33/50: Sault - Bitter Streets
+2025-07-31 01:10:05,890 - INFO - Procesando 34/50: Toto - Georgy Porgy
+2025-07-31 01:10:06,229 - INFO - Procesando 35/50: Warhaus - Leave with Me
+2025-07-31 01:10:06,281 - INFO - Procesando 36/50: Warhaus - Open Window
+2025-07-31 01:10:06,332 - INFO - Procesando 37/50: Warhaus - Sylvie Kreusch - Popcorn (feat. Sylvie Kreusch)
+2025-07-31 01:10:06,547 - INFO - Procesando 38/50: Paradis - Garde Le Pour Toi
+2025-07-31 01:10:06,743 - INFO - Procesando 39/50: Bel - Ready to Die (Mudd's Extended Mix- Blank & Jones Edit)
+2025-07-31 01:10:06,794 - INFO - Procesando 40/50: Eyes of Others - Escalation
+2025-07-31 01:10:07,162 - INFO - Procesando 41/50: Agar Agar - Fangs Out
+2025-07-31 01:10:07,213 - INFO - Procesando 42/50: Blue Hawaii - I Felt Love
+2025-07-31 01:10:07,265 - INFO - Procesando 43/50: Javiera Mena - Otra Era
+2025-07-31 01:10:07,589 - INFO - Procesando 44/50: Remi Wolf - Slay Bitch
+2025-07-31 01:10:07,770 - INFO - Procesando 45/50: Stella - Détends-toi
+2025-07-31 01:10:07,940 - INFO - Procesando 46/50: Danny L Harle - Broken Flowers
+2025-07-31 01:10:08,282 - INFO - Procesando 47/50: Danny L Harle - Forever
+2025-07-31 01:10:08,334 - INFO - Procesando 48/50: Fishbach - Un autre que moi
+2025-07-31 01:10:08,548 - INFO - Procesando 49/50: Lewis OfMan - Flowers In The Car
+2025-07-31 01:10:08,784 - INFO - Procesando 50/50: L'Impératrice - Sonate pacifique
+2025-07-31 01:10:09,261 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:09,262 - INFO - ✅ Sincronización completada: 30/50 canciones (60.0%)
+2025-07-31 01:10:09,262 - WARNING - ❌ Canciones no encontradas (20):
+2025-07-31 01:10:09,262 - WARNING -   - Dip In The Pool - On Retinae (West Version)
+2025-07-31 01:10:09,262 - WARNING -   - Madness - Our House
+2025-07-31 01:10:09,262 - WARNING -   - Umberto Tozzi - Gloria
+2025-07-31 01:10:09,262 - WARNING -   - Guus Meeuwis & Vagant - Het Is Een Nacht (Levensecht) (Live)
+2025-07-31 01:10:09,262 - WARNING -   - Cyndi Lauper - Girls Just Want To Have Fun
+2025-07-31 01:10:09,262 - WARNING -   ... y 15 más
+2025-07-31 01:10:09,267 - INFO - No hay cambios en ambient, omitiendo sincronización
+2025-07-31 01:10:09,268 - INFO - No hay cambios en b_dub, omitiendo sincronización
+2025-07-31 01:10:09,268 - INFO - Iniciando sincronización de corre
+2025-07-31 01:10:09,268 - WARNING - No se pudo parsear: corre/Ichisan - Fantazija [2015 - Mambo [EP]].flac
+2025-07-31 01:10:09,268 - INFO - Encontradas 2 canciones en el archivo M3U
+2025-07-31 01:10:09,268 - INFO - Procesando 1/2: Vince Clarke - Plazma Force
+2025-07-31 01:10:09,591 - INFO - Procesando 2/2: Ilya Santana - Midnight Driver
+2025-07-31 01:10:09,754 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:10:09,760 - INFO - Iniciando sincronización de deep
+2025-07-31 01:10:09,760 - WARNING - No se pudo parsear: deep/02 - Miss You.mp3
+2025-07-31 01:10:09,760 - WARNING - No se pudo parsear: deep/08 I'll Never.flac
+2025-07-31 01:10:09,760 - WARNING - No se pudo parsear: deep/06. pq cq.flac
+2025-07-31 01:10:09,760 - WARNING - No se pudo parsear: deep/05 - Tu Dime Cuando (feat. Ada & Sofia Kourtesis).flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/Daniel Avery - Hazel and Gold.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/09 - Street Wave.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/04 - Believe.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/Dusky - Hildegard.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/01. Better Than This  (Dego & Kaidi mix).flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/01. New World (Flow).flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/Dusky - Take Me High.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/11 - For That Beautiful Feeling.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/10 What About This Love.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/04 - Glancing At The Moon.flac
+2025-07-31 01:10:09,761 - WARNING - No se pudo parsear: deep/Dusky - Lift.flac
+2025-07-31 01:10:09,762 - INFO - Encontradas 214 canciones en el archivo M3U
+2025-07-31 01:10:09,762 - INFO - Procesando 1/214: Sade - Hang On To Your Love (U.S. Remix)
+2025-07-31 01:10:09,966 - INFO - Procesando 2/214: Fatima Yamaha - What's a Girl to Do
+2025-07-31 01:10:10,160 - INFO - Procesando 3/214: Stella - Détends-toi
+2025-07-31 01:10:10,322 - INFO - Procesando 4/214: Servicio al Cliente - Lengua de arena
+2025-07-31 01:10:10,596 - INFO - Procesando 5/214: Girls of the Internet, Tableland - There's A Place For Us (Extended)
+2025-07-31 01:10:10,786 - INFO - Procesando 6/214: Mr. Fingers - Electrostatic Levitation
+2025-07-31 01:10:10,958 - INFO - Procesando 7/214: Nuron - Holowell
+2025-07-31 01:10:11,143 - INFO - Procesando 8/214: Bot1500 - P8.10
+2025-07-31 01:10:11,371 - INFO - Procesando 9/214: Quiroga - Martinica Feelings
+2025-07-31 01:10:11,571 - INFO - Procesando 10/214: Quiroga - Amori Proibiti
+2025-07-31 01:10:11,713 - INFO - Procesando 11/214: Gold Suite - Hideaway
+2025-07-31 01:10:11,766 - INFO - Procesando 12/214: Sade - Paradise (extended Remix)
+2025-07-31 01:10:11,970 - INFO - Procesando 13/214: Servicio al Cliente - El tarot con Delfina Guido
+2025-07-31 01:10:12,194 - INFO - Procesando 14/214: Two Lone Swordsmen - Sex Beat (remix instrumental)
+2025-07-31 01:10:12,245 - INFO - Procesando 15/214: 9th House - Ara
+2025-07-31 01:10:12,453 - INFO - Procesando 16/214: AL - 90 - Experienced Girl
+2025-07-31 01:10:12,646 - INFO - Procesando 17/214: Dusky - Lift
+2025-07-31 01:10:12,698 - INFO - Procesando 18/214: Larry Heard - Flashback
+2025-07-31 01:10:12,749 - INFO - Procesando 19/214: Harvey Sutherland - Q3
+2025-07-31 01:10:12,987 - INFO - Procesando 20/214: Macroblank - ステップバイステップ
+2025-07-31 01:10:13,146 - INFO - Procesando 21/214: As One - Goodbye Mr Schulze
+2025-07-31 01:10:13,197 - INFO - Procesando 22/214: Harvey Sutherland - Nexus
+2025-07-31 01:10:13,499 - INFO - Procesando 23/214: Shubostar - Mindroid
+2025-07-31 01:10:13,639 - INFO - Procesando 24/214: Those Guys - Tonite (Original Colored Girls Mix)
+2025-07-31 01:10:13,859 - INFO - Procesando 25/214: Z@PZ@p - A-Rhythm
+2025-07-31 01:10:14,124 - INFO - Procesando 26/214: Dos Palos - Lady Of The Westway
+2025-07-31 01:10:14,175 - INFO - Procesando 27/214: Natasha Bai - Romantiko
+2025-07-31 01:10:14,228 - INFO - Procesando 28/214: D - PULSE - EUPHORIA
+2025-07-31 01:10:14,434 - INFO - Procesando 29/214: Citizens Of Vice - Seven Seas
+2025-07-31 01:10:14,634 - INFO - Procesando 30/214: Chromatics - Lady (original version)
+2025-07-31 01:10:14,850 - INFO - Procesando 31/214: Alan Braxe + Fred Falke - You'll Stay In My Heart (Instrumental) (Remastered 2023)
+2025-07-31 01:10:15,137 - INFO - Procesando 32/214: Muriel Dacq - Tropique
+2025-07-31 01:10:15,276 - INFO - Procesando 33/214: Cacao - Children
+2025-07-31 01:10:15,328 - INFO - Procesando 34/214: The Chemical Brothers - Goodbye
+2025-07-31 01:10:15,379 - INFO - Procesando 35/214: Burial + Four Tet - Moth
+2025-07-31 01:10:15,430 - INFO - Procesando 36/214: BOM - The Day (Black Cat Bones Remix)
+2025-07-31 01:10:15,633 - INFO - Procesando 37/214: Donny Benét - Passenger
+2025-07-31 01:10:15,798 - INFO - Procesando 38/214: Shinichi Atobe - Regret
+2025-07-31 01:10:15,962 - INFO - Procesando 39/214: DJ Rasoul - Let Me Love You
+2025-07-31 01:10:16,014 - INFO - Procesando 40/214: Metro Area - Nerves
+2025-07-31 01:10:16,174 - INFO - Procesando 41/214: Nuron - La Source
+2025-07-31 01:10:16,478 - INFO - Procesando 42/214: Basement Jaxx - Being With U
+2025-07-31 01:10:16,687 - INFO - Procesando 43/214: Calm - Liminal Moment - 目を閉じて見えるもの
+2025-07-31 01:10:16,738 - INFO - Procesando 44/214: JKriv - Within
+2025-07-31 01:10:16,790 - INFO - Procesando 45/214: Underworld - Cups
+2025-07-31 01:10:16,842 - INFO - Procesando 46/214: Coastlines - Waves And Rays
+2025-07-31 01:10:17,091 - INFO - Procesando 47/214: Annwn Skyline - 1 - 4 Eyesore
+2025-07-31 01:10:17,396 - INFO - Procesando 48/214: Bicep - Sundial
+2025-07-31 01:10:17,447 - INFO - Procesando 49/214: Mr. Fingers - Aether
+2025-07-31 01:10:17,616 - INFO - Procesando 50/214: Disco Rogues - Italia Slo Mo Disco Mix
+2025-07-31 01:10:17,668 - INFO - Procesando 51/214: Daniel Avery - Lone Swordsman
+2025-07-31 01:10:17,719 - INFO - Procesando 52/214: Dream 2 Science - Mystery Of Love
+2025-07-31 01:10:17,770 - INFO - Procesando 53/214: D.K. - Mystery Dub
+2025-07-31 01:10:17,935 - INFO - Procesando 54/214: Chicken Lips - Goldenlips
+2025-07-31 01:10:18,113 - INFO - Procesando 55/214: Uf0 - Still Here
+2025-07-31 01:10:18,165 - INFO - Procesando 56/214: Checkpoint - I Send You All My Love
+2025-07-31 01:10:18,360 - INFO - Procesando 57/214: Underground Solution - Deep in My Mind
+2025-07-31 01:10:18,554 - INFO - Procesando 58/214: Uf0 - Viewpoint of Cala Llonga
+2025-07-31 01:10:18,789 - INFO - Procesando 59/214: Larry Heard - Guidance (Original Mix)
+2025-07-31 01:10:18,958 - INFO - Procesando 60/214: SIRS - The Who - Eminence Front - SIRS CUT
+2025-07-31 01:10:19,010 - INFO - Procesando 61/214: As One - Light
+2025-07-31 01:10:19,062 - INFO - Procesando 62/214: Nuron - La Source (As One Remix)
+2025-07-31 01:10:19,340 - INFO - Procesando 63/214: Cacao - Lambada
+2025-07-31 01:10:19,391 - INFO - Procesando 64/214: Bauri - Purple Nights
+2025-07-31 01:10:19,555 - INFO - Procesando 65/214: Ce Ce Rogers - Someday (Club Mix)
+2025-07-31 01:10:19,752 - INFO - Procesando 66/214: Servicio al Cliente - Sensual esperpento
+2025-07-31 01:10:19,946 - INFO - Procesando 67/214: Bicep - Apricots
+2025-07-31 01:10:19,997 - INFO - Procesando 68/214: Loosefingers - When Summer Comes
+2025-07-31 01:10:20,263 - INFO - Procesando 69/214: Elegia - Grid One
+2025-07-31 01:10:20,569 - INFO - Procesando 70/214: Quiroga - Got Your Love
+2025-07-31 01:10:20,780 - INFO - Procesando 71/214: A Man Called Adam - AMFP (AMCA Dub Mix)
+2025-07-31 01:10:21,083 - INFO - Procesando 72/214: A Man Called Adam - Barefoot in the Head (The Head Mix)
+2025-07-31 01:10:21,296 - INFO - Procesando 73/214: Bicep - Winter
+2025-07-31 01:10:21,348 - INFO - Procesando 74/214: Bicep - Darwin (Original Mix)
+2025-07-31 01:10:21,592 - INFO - Procesando 75/214: Roland Tings - In a Cloud
+2025-07-31 01:10:21,790 - INFO - Procesando 76/214: Bicep - Glue
+2025-07-31 01:10:21,950 - INFO - Procesando 77/214: Dream 2 Science - My Love Turns To Liquid
+2025-07-31 01:10:22,212 - INFO - Procesando 78/214: Move D & Benjamin Brunn - Love The One You're With
+2025-07-31 01:10:22,516 - INFO - Procesando 79/214: Dream 2 Science - How Do I Love Thee
+2025-07-31 01:10:22,720 - INFO - Procesando 80/214: Nuron - Slipstream
+2025-07-31 01:10:22,772 - INFO - Procesando 81/214: Space Ghost - Emerald Pools
+2025-07-31 01:10:23,028 - INFO - Procesando 82/214: Citizens Of Vice - Red Days
+2025-07-31 01:10:23,334 - INFO - Procesando 83/214: Loosefingers - Transmission X
+2025-07-31 01:10:23,551 - INFO - Procesando 84/214: Map.Ache - Uralub
+2025-07-31 01:10:23,722 - INFO - Procesando 85/214: Mr. Fingers - Outer Acid
+2025-07-31 01:10:23,953 - INFO - Procesando 86/214: Loosefingers - Glancing At The Moon
+2025-07-31 01:10:24,262 - INFO - Procesando 87/214: Scott McGregor Moore - So Good When It Comes
+2025-07-31 01:10:24,465 - INFO - Procesando 88/214: Elegia - From Nowhere With Love
+2025-07-31 01:10:24,656 - INFO - Procesando 89/214: Bicep - NRG106
+2025-07-31 01:10:24,809 - INFO - Procesando 90/214: SIRS - G.A.N.G. - KKK -SIRS Cut
+2025-07-31 01:10:24,861 - INFO - Procesando 91/214: A Man Called Adam - Remind Me (The Pikes Instrumental Edit)
+2025-07-31 01:10:25,041 - INFO - Procesando 92/214: David Holmes feat. Raven Violet - It's Over, If We Run Out Of Love
+2025-07-31 01:10:25,092 - INFO - Procesando 93/214: Photay - The People (Ensemble Entendu Remix)
+2025-07-31 01:10:25,288 - INFO - Procesando 94/214: Il Quadro di Troisi - Beata
+2025-07-31 01:10:25,340 - INFO - Procesando 95/214: The Cactus Rose Project - Jelly
+2025-07-31 01:10:25,391 - INFO - Procesando 96/214: Uf0 - Hide Moon
+2025-07-31 01:10:25,554 - INFO - Procesando 97/214: Calm - I Love You - 月がきれいですね
+2025-07-31 01:10:25,605 - INFO - Procesando 98/214: El Columpio Asesino - MDMA
+2025-07-31 01:10:25,750 - INFO - Procesando 99/214: eclectics - Statues - Rotunda
+2025-07-31 01:10:25,993 - INFO - Procesando 100/214: Linkwood Family - Miles Away
+2025-07-31 01:10:26,046 - INFO - Procesando 101/214: Metro Area - Atmosphrique
+2025-07-31 01:10:26,301 - INFO - Procesando 102/214: AL - 90 - Vectornaya eyforia
+2025-07-31 01:10:26,481 - INFO - Procesando 103/214: Ron Trent - It's Hot '1983'
+2025-07-31 01:10:26,659 - INFO - Procesando 104/214: Mr. Fingers - Qwazars
+2025-07-31 01:10:26,835 - INFO - Procesando 105/214: Odyssey - Who
+2025-07-31 01:10:27,038 - INFO - Procesando 106/214: Ron Trent - Welcome '1984'
+2025-07-31 01:10:27,217 - INFO - Procesando 107/214: Roland Tings - Sun Drops Behind the Hill
+2025-07-31 01:10:27,404 - INFO - Procesando 108/214: Code 718 - Equinox Henrik Schwarz Remix - Dixon Edit
+2025-07-31 01:10:27,579 - INFO - Procesando 109/214: BOT1500 - Neon
+2025-07-31 01:10:27,780 - INFO - Procesando 110/214: Larry Heard - Glancing At The Moon
+2025-07-31 01:10:27,967 - INFO - Procesando 111/214: Bonobo - Rosewood
+2025-07-31 01:10:28,018 - INFO - Procesando 112/214: The Chemical Brothers - The Darkness That You Fear (Harvest Mix)
+2025-07-31 01:10:28,070 - INFO - Procesando 113/214: Paul Johnson - Better Than This (Frankie Knuckles director cut classic soul mix)
+2025-07-31 01:10:28,355 - INFO - Procesando 114/214: Mr. Fingers - Sands of Aruba
+2025-07-31 01:10:28,560 - INFO - Procesando 115/214: Mr. Fingers - Cerebral Hemispheres
+2025-07-31 01:10:28,725 - INFO - Procesando 116/214: Mr. Fingers - Nodyahed
+2025-07-31 01:10:28,959 - INFO - Procesando 117/214: Larry Heard - Riverside Drive
+2025-07-31 01:10:29,117 - INFO - Procesando 118/214: Mr. Fingers - Qwazars
+2025-07-31 01:10:29,281 - INFO - Procesando 119/214: Mr. Fingers feat. Nicole Wray - Praise to the Vibes
+2025-07-31 01:10:29,518 - INFO - Procesando 120/214: Larry Heard - Crystal Fantasy
+2025-07-31 01:10:29,684 - INFO - Procesando 121/214: Larry Heard - Dew Drops
+2025-07-31 01:10:29,847 - INFO - Procesando 122/214: Larry Heard - Time
+2025-07-31 01:10:29,899 - INFO - Procesando 123/214: Prins Thomas - I Love U
+2025-07-31 01:10:29,950 - INFO - Procesando 124/214: Prins Thomas - Film 006
+2025-07-31 01:10:30,001 - INFO - Procesando 125/214: Prins Thomas - Åpne Slusa
+2025-07-31 01:10:30,053 - INFO - Procesando 126/214: Model 500 - Starlight
+2025-07-31 01:10:30,218 - INFO - Procesando 127/214: Andrew Weatherall - The Moton 5
+2025-07-31 01:10:30,503 - INFO - Procesando 128/214: UNKLE - Days and Nights - Reprise (Rōnin Re-Edit) (feat. Dhani Harrison)
+2025-07-31 01:10:30,725 - INFO - Procesando 129/214: Larry Heard - Techno-Centric
+2025-07-31 01:10:30,877 - INFO - Procesando 130/214: Larry Heard - In Early May
+2025-07-31 01:10:31,117 - INFO - Procesando 131/214: Prins Thomas - Evig Ung
+2025-07-31 01:10:31,168 - INFO - Procesando 132/214: Vince Watson - Spaceclouds
+2025-07-31 01:10:31,327 - INFO - Procesando 133/214: DJ Python - Todo Era Azul (Versión Afuera)
+2025-07-31 01:10:31,379 - INFO - Procesando 134/214: Joe Goddard - Lose Your Love (EDIT)
+2025-07-31 01:10:31,430 - INFO - Procesando 135/214: Cantoma - The Mountain (Coyote Remix)
+2025-07-31 01:10:31,482 - INFO - Procesando 136/214: Young Marco - The Best I Could Do (With What I Had)
+2025-07-31 01:10:31,693 - INFO - Procesando 137/214: Young Marco - Later Than U Think
+2025-07-31 01:10:31,935 - INFO - Procesando 138/214: Young Marco - Biology Theme (Original Mix)
+2025-07-31 01:10:32,241 - INFO - Procesando 139/214: Kerri Chandler - Track 1
+2025-07-31 01:10:32,293 - INFO - Procesando 140/214: Young Marco - Suzaku (Original Mix)
+2025-07-31 01:10:32,558 - INFO - Procesando 141/214: Model 500 - Starlight (Moritz Mix)
+2025-07-31 01:10:32,727 - INFO - Procesando 142/214: Underworld - Beautiful Burnout
+2025-07-31 01:10:32,778 - INFO - Procesando 143/214: Uf0 - Lunar Voices
+2025-07-31 01:10:33,068 - INFO - Procesando 144/214: Electribe 101 - Talking With Myself (12 Frankie Knuckles Mix)
+2025-07-31 01:10:33,261 - INFO - Procesando 145/214: Dusky - Hildegard
+2025-07-31 01:10:33,312 - INFO - Procesando 146/214: Dusky - Take Me High
+2025-07-31 01:10:33,364 - INFO - Procesando 147/214: artist artist - title
+2025-07-31 01:10:33,551 - INFO - Procesando 148/214: Modeselektor - Tacken (EXTLP Version)
+2025-07-31 01:10:33,747 - INFO - Procesando 149/214: Young Marco - Video Days
+2025-07-31 01:10:34,183 - INFO - Procesando 150/214: The Chemical Brothers feat. Halo Maud - For That Beautiful Feeling
+2025-07-31 01:10:34,235 - INFO - Procesando 151/214: Portable - Guiding Me
+2025-07-31 01:10:34,503 - INFO - Procesando 152/214: Portable - The Self Assembling
+2025-07-31 01:10:34,662 - INFO - Procesando 153/214: Portable - The Spacetime Curvature
+2025-07-31 01:10:34,823 - INFO - Procesando 154/214: Portable - I Feel Stronger Now
+2025-07-31 01:10:35,116 - INFO - Procesando 155/214: L.B. Dub Corp - Only The Good Times
+2025-07-31 01:10:35,423 - INFO - Procesando 156/214: Kavinsky - Nightcall
+2025-07-31 01:10:35,596 - INFO - Procesando 157/214: Prins Thomas - Kjære Mamma
+2025-07-31 01:10:35,648 - INFO - Procesando 158/214: Marcellus Pittman - Come See
+2025-07-31 01:10:35,699 - INFO - Procesando 159/214: Prins Thomas - Feel the Love
+2025-07-31 01:10:35,751 - INFO - Procesando 160/214: The True Underground Sound Of Rome - Milky Way
+2025-07-31 01:10:35,957 - INFO - Procesando 161/214: Deichkind - Autonom (Dixon Edit)
+2025-07-31 01:10:36,239 - INFO - Procesando 162/214: Feel Fly - Il Teorema Del Delirio
+2025-07-31 01:10:36,291 - INFO - Procesando 163/214: Joe Goddard & Fiorious - New World (Flow)
+2025-07-31 01:10:36,342 - INFO - Procesando 164/214: Ilya Santana - Moon Road
+2025-07-31 01:10:36,597 - INFO - Procesando 165/214: Clive Stevens & Brainchild - Mystery Man (Velvet Season & The Hearts of Gold Special Disco Mix)
+2025-07-31 01:10:36,801 - INFO - Procesando 166/214: Fila Brazillia - Bumblehaun
+2025-07-31 01:10:36,949 - INFO - Procesando 167/214: Ichisan - Camp - Fiesa - 1984
+2025-07-31 01:10:37,254 - INFO - Procesando 168/214: Lord Of The Isles - Let Me Feel This Way
+2025-07-31 01:10:37,468 - INFO - Procesando 169/214: Ichisan - Luisa
+2025-07-31 01:10:37,520 - INFO - Procesando 170/214: Ichisan - Fantasound
+2025-07-31 01:10:37,571 - INFO - Procesando 171/214: CHANDLER, Kerri - My Love My Life
+2025-07-31 01:10:37,785 - INFO - Procesando 172/214: artist - title
+2025-07-31 01:10:37,837 - INFO - Procesando 173/214: Long Island Sound - Photos
+2025-07-31 01:10:38,011 - INFO - Procesando 174/214: Kerri Chandler - House Is House
+2025-07-31 01:10:38,200 - INFO - Procesando 175/214: Kerri Chandler - To Cry
+2025-07-31 01:10:38,400 - INFO - Procesando 176/214: Daft Punk - Doin' It Right
+2025-07-31 01:10:38,451 - INFO - Procesando 177/214: Daft Punk - Giorgio by Moroder
+2025-07-31 01:10:38,503 - INFO - Procesando 178/214: Daft Punk - Give Life Back to Music
+2025-07-31 01:10:38,554 - INFO - Procesando 179/214: Daft Punk - Lose Yourself to Dance
+2025-07-31 01:10:38,606 - INFO - Procesando 180/214: Daft Punk - Something About Us
+2025-07-31 01:10:38,657 - INFO - Procesando 181/214: Daniel Melero & Gustavo Cerati - Vuelta Por El Universo
+2025-07-31 01:10:38,709 - INFO - Procesando 182/214: Metro Area - Dance Reaction
+2025-07-31 01:10:38,917 - INFO - Procesando 183/214: Larry Heard - Change Your Mind
+2025-07-31 01:10:38,968 - INFO - Procesando 184/214: DJ Seinfeld - These Things Will Come To Be
+2025-07-31 01:10:39,019 - INFO - Procesando 185/214: DJ Seinfeld & Teira - U Already Know
+2025-07-31 01:10:39,070 - INFO - Procesando 186/214: Lawrence - Five Leaves
+2025-07-31 01:10:39,304 - INFO - Procesando 187/214: Elastic Reality - Cassa de X (Deep Dish Does X)
+2025-07-31 01:10:39,606 - INFO - Procesando 188/214: Donato Dozzy & Tin Man - Test 7
+2025-07-31 01:10:39,658 - INFO - Procesando 189/214: Alan Braxe + Annie - Never Coming Back
+2025-07-31 01:10:39,842 - INFO - Procesando 190/214: Bottin & Rodion - Galli (Give It Up)
+2025-07-31 01:10:40,026 - INFO - Procesando 191/214: Clive Stevens & Brainchild - Mystery Man (Disco Mix)
+2025-07-31 01:10:40,330 - INFO - Procesando 192/214: The Countach - Aqua Marina (Paradise Mix)
+2025-07-31 01:10:40,504 - INFO - Procesando 193/214: Ashley Beedle presents The London Heavy Disco Revue - Magic Sky (Riccioni mix)
+2025-07-31 01:10:40,556 - INFO - Procesando 194/214: As One - Goodbye Mr Schulze
+2025-07-31 01:10:40,607 - INFO - Procesando 195/214: Larry Heard - Change Your Mind
+2025-07-31 01:10:40,659 - INFO - Procesando 196/214: AL - 90 - Experienced Girl
+2025-07-31 01:10:40,843 - INFO - Procesando 197/214: AL - 90 - Vectornaya eyforia
+2025-07-31 01:10:41,049 - INFO - Procesando 198/214: Model 500 - Starlight
+2025-07-31 01:10:41,247 - INFO - Procesando 199/214: Paul Johnson - Better Than This (Frankie Knuckles director cut classic soul mix)
+2025-07-31 01:10:41,569 - INFO - Procesando 200/214: Joy Orbison - sparko
+2025-07-31 01:10:41,621 - INFO - Procesando 201/214: Larry Heard - Techno-Centric
+2025-07-31 01:10:41,805 - INFO - Procesando 202/214: A Man Called Adam - Remind Me (The Pikes Instrumental Edit)
+2025-07-31 01:10:41,993 - INFO - Procesando 203/214: The Chemical Brothers - The Darkness That You Fear (Harvest Mix)
+2025-07-31 01:10:42,045 - INFO - Procesando 204/214: Larry Heard - Flashback
+2025-07-31 01:10:42,096 - INFO - Procesando 205/214: A Man Called Adam - AMFP (AMCA Dub Mix)
+2025-07-31 01:10:42,381 - INFO - Procesando 206/214: Larry Heard - In Early May
+2025-07-31 01:10:42,560 - INFO - Procesando 207/214: Larry Heard - Crystal Fantasy
+2025-07-31 01:10:42,753 - INFO - Procesando 208/214: Odyssey - Who
+2025-07-31 01:10:42,934 - INFO - Procesando 209/214: JKriv - Within
+2025-07-31 01:10:42,986 - INFO - Procesando 210/214: Modeselektor - Tacken (EXTLP Version)
+2025-07-31 01:10:43,147 - INFO - Procesando 211/214: A Man Called Adam - Barefoot in the Head (The Head Mix)
+2025-07-31 01:10:43,410 - INFO - Procesando 212/214: Gaussian Curve - Winter Sun
+2025-07-31 01:10:43,461 - INFO - Procesando 213/214: Till von Sein - Junjung
+2025-07-31 01:10:43,630 - INFO - Procesando 214/214: Till von Sein - La Boum
+2025-07-31 01:10:44,282 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:44,283 - INFO - ✅ Sincronización completada: 70/214 canciones (32.7%)
+2025-07-31 01:10:44,283 - WARNING - ❌ Canciones no encontradas (139):
+2025-07-31 01:10:44,283 - WARNING -   - Sade - Hang On To Your Love (U.S. Remix)
+2025-07-31 01:10:44,283 - WARNING -   - Fatima Yamaha - What's a Girl to Do
+2025-07-31 01:10:44,283 - WARNING -   - Stella - Détends-toi
+2025-07-31 01:10:44,283 - WARNING -   - Servicio al Cliente - Lengua de arena
+2025-07-31 01:10:44,283 - WARNING -   - Girls of the Internet, Tableland - There's A Place For Us (Extended)
+2025-07-31 01:10:44,283 - WARNING -   ... y 134 más
+2025-07-31 01:10:44,288 - INFO - No hay cambios en electro, omitiendo sincronización
+2025-07-31 01:10:44,288 - INFO - Iniciando sincronización de flamenco
+2025-07-31 01:10:44,289 - WARNING - No se pudo parsear: flamenco/05. Jam.flac
+2025-07-31 01:10:44,289 - WARNING - No se pudo parsear: flamenco/01 - That Lady, Parts 1 & 2.flac
+2025-07-31 01:10:44,289 - INFO - Encontradas 8 canciones en el archivo M3U
+2025-07-31 01:10:44,289 - INFO - Procesando 1/8: Enrique Morente - El pequeño reloj
+2025-07-31 01:10:44,340 - INFO - Procesando 2/8: Enrique Morente - Reloj molesto
+2025-07-31 01:10:44,391 - INFO - Procesando 3/8: Exquirla - Destruidnos juntos
+2025-07-31 01:10:44,443 - INFO - Procesando 4/8: Millie Jackson - Keep the Home Fire Burnin'
+2025-07-31 01:10:44,494 - INFO - Procesando 5/8: Morente & Lagartija Nick - Aleluya
+2025-07-31 01:10:44,546 - INFO - Procesando 6/8: Morente & Lagartija Nick - Manhattan
+2025-07-31 01:10:44,597 - INFO - Procesando 7/8: Morente & Lagartija Nick - Sacerdotes
+2025-07-31 01:10:44,649 - INFO - Procesando 8/8: Morente + Lagartija Nick - Aleluya
+2025-07-31 01:10:44,952 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:44,953 - INFO - ✅ Sincronización completada: 7/8 canciones (87.5%)
+2025-07-31 01:10:44,958 - INFO - No hay cambios en hip-hop, omitiendo sincronización
+2025-07-31 01:10:44,959 - INFO - Iniciando sincronización de idm
+2025-07-31 01:10:44,959 - WARNING - No se pudo parsear: idm/04 - Unbank.flac
+2025-07-31 01:10:44,959 - WARNING - No se pudo parsear: idm/10. In a Trance.flac
+2025-07-31 01:10:44,959 - INFO - Encontradas 45 canciones en el archivo M3U
+2025-07-31 01:10:44,959 - INFO - Procesando 1/45: Uf0 - Julia
+2025-07-31 01:10:45,010 - INFO - Procesando 2/45: Young Marco - I'm Still Mellow
+2025-07-31 01:10:45,250 - INFO - Procesando 3/45: Gimmik - Walking on Wheels
+2025-07-31 01:10:45,597 - INFO - Procesando 4/45: Gimmik - Short Wave Memories
+2025-07-31 01:10:45,773 - INFO - Procesando 5/45: Gimmik - Meadows
+2025-07-31 01:10:45,824 - INFO - Procesando 6/45: Portable - The Color of Static
+2025-07-31 01:10:46,077 - INFO - Procesando 7/45: Lord of the Isles - Offline
+2025-07-31 01:10:46,129 - INFO - Procesando 8/45: Gimmik - Liquid Reality (Part I+II)
+2025-07-31 01:10:46,180 - INFO - Procesando 9/45: Minimal Vision - Cyclops
+2025-07-31 01:10:46,376 - INFO - Procesando 10/45: Ingleton Falls - It's Just A Hobby
+2025-07-31 01:10:46,607 - INFO - Procesando 11/45: Moritz - Flying Saucer
+2025-07-31 01:10:46,805 - INFO - Procesando 12/45: Amount - In den Tropen
+2025-07-31 01:10:47,004 - INFO - Procesando 13/45: Storken & Jstraaf - Tunghugg
+2025-07-31 01:10:47,156 - INFO - Procesando 14/45: Archie Ward - Pizza Girl
+2025-07-31 01:10:47,401 - INFO - Procesando 15/45: Lord of the Isles & Ellen Renton - My Noise Is Nothing
+2025-07-31 01:10:47,453 - INFO - Procesando 16/45: Lord of the Isles - Skylark
+2025-07-31 01:10:47,504 - INFO - Procesando 17/45: Lord Of The Isles - Searching
+2025-07-31 01:10:47,556 - INFO - Procesando 18/45: Lord Of The Isles - Forkx
+2025-07-31 01:10:47,607 - INFO - Procesando 19/45: Prins Thomas - Cala Llonga
+2025-07-31 01:10:47,658 - INFO - Procesando 20/45: Long Island Sound - Ataria
+2025-07-31 01:10:47,710 - INFO - Procesando 21/45: Charli XCX - c2.0
+2025-07-31 01:10:47,761 - INFO - Procesando 22/45: Long Island Sound - Every Time I See Your Face
+2025-07-31 01:10:47,813 - INFO - Procesando 23/45: Brain Machine - Traces (Harmonious Thelonious Remix)
+2025-07-31 01:10:47,864 - INFO - Procesando 24/45: Roman Flügel - Jocks and Freaks
+2025-07-31 01:10:48,076 - INFO - Procesando 25/45: Funki Porcini - Take Me To It
+2025-07-31 01:10:48,128 - INFO - Procesando 26/45: Charli XCX - enemy
+2025-07-31 01:10:48,179 - INFO - Procesando 27/45: Charli XCX - i finally understand
+2025-07-31 01:10:48,230 - INFO - Procesando 28/45: Floating Points - Last Bloom
+2025-07-31 01:10:48,282 - INFO - Procesando 29/45: Four Tet - Love Salad
+2025-07-31 01:10:48,333 - INFO - Procesando 30/45: Kangding Ray - Pruitt Igoe (OR version)
+2025-07-31 01:10:48,384 - INFO - Procesando 31/45: Kettel - Alacasa
+2025-07-31 01:10:48,525 - INFO - Procesando 32/45: Kettel - Follow Me!
+2025-07-31 01:10:48,733 - INFO - Procesando 33/45: Kettel - Her Thin Voice
+2025-07-31 01:10:48,954 - INFO - Procesando 34/45: Kettel - Mauerbrecher
+2025-07-31 01:10:49,091 - INFO - Procesando 35/45: Microlith - Acid in a Church
+2025-07-31 01:10:49,142 - INFO - Procesando 36/45: Microlith - Dance With Me
+2025-07-31 01:10:49,194 - INFO - Procesando 37/45: Mrs Jynx - Dusty
+2025-07-31 01:10:49,245 - INFO - Procesando 38/45: Nuron - Stavelot
+2025-07-31 01:10:49,296 - INFO - Procesando 39/45: The Future Sound of London - We Have Explosive (remixed by King Roc)
+2025-07-31 01:10:49,511 - INFO - Procesando 40/45: Uf0 - Respect IDM Piece of Shit
+2025-07-31 01:10:49,689 - INFO - Procesando 41/45: Avalon Emerson - Natural Impasse
+2025-07-31 01:10:49,898 - INFO - Procesando 42/45: Roland Tings feat. Mild Minds - Always Rushing
+2025-07-31 01:10:50,162 - INFO - Procesando 43/45: Nuron - Eau Rouge
+2025-07-31 01:10:50,409 - INFO - Procesando 44/45: User364304579 - Lipid Funk
+2025-07-31 01:10:50,637 - INFO - Procesando 45/45: Cignol - Fell Off The Bed
+2025-07-31 01:10:51,086 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:51,086 - INFO - ✅ Sincronización completada: 23/45 canciones (51.1%)
+2025-07-31 01:10:51,086 - WARNING - ❌ Canciones no encontradas (22):
+2025-07-31 01:10:51,087 - WARNING -   - Young Marco - I'm Still Mellow
+2025-07-31 01:10:51,087 - WARNING -   - Gimmik - Walking on Wheels
+2025-07-31 01:10:51,087 - WARNING -   - Gimmik - Short Wave Memories
+2025-07-31 01:10:51,087 - WARNING -   - Portable - The Color of Static
+2025-07-31 01:10:51,087 - WARNING -   - Minimal Vision - Cyclops
+2025-07-31 01:10:51,087 - WARNING -   ... y 17 más
+2025-07-31 01:10:51,092 - INFO - No hay cambios en jazz, omitiendo sincronización
+2025-07-31 01:10:51,092 - INFO - No hay cambios en keet, omitiendo sincronización
+2025-07-31 01:10:51,092 - INFO - No hay cambios en musica_disco, omitiendo sincronización
+2025-07-31 01:10:51,092 - INFO - Iniciando sincronización de old_deep
+2025-07-31 01:10:51,093 - INFO - Encontradas 0 canciones en el archivo M3U
+2025-07-31 01:10:51,093 - WARNING - No se encontraron canciones válidas para sincronizar
+2025-07-31 01:10:51,093 - INFO - No hay cambios en opiates, omitiendo sincronización
+2025-07-31 01:10:51,093 - INFO - Iniciando sincronización de rock_metal
+2025-07-31 01:10:51,093 - WARNING - No se pudo parsear: rock_metal/09 - You N33d Me.flac
+2025-07-31 01:10:51,093 - WARNING - No se pudo parsear: rock_metal/1.01 - Two Weeks in Spain.flac
+2025-07-31 01:10:51,093 - WARNING - No se pudo parsear: rock_metal/02 - Soul Kitchen.flac
+2025-07-31 01:10:51,093 - WARNING - No se pudo parsear: rock_metal/01 - Break On Through (To The Other Side).flac
+2025-07-31 01:10:51,093 - INFO - Encontradas 45 canciones en el archivo M3U
+2025-07-31 01:10:51,093 - INFO - Procesando 1/45: Flowered Up - Weekender
+2025-07-31 01:10:51,311 - INFO - Procesando 2/45: Aphrodite's Child - The Four Horsemen
+2025-07-31 01:10:51,642 - INFO - Procesando 3/45: Big Thief - Not
+2025-07-31 01:10:51,693 - INFO - Procesando 4/45: Big Thief - UFOF
+2025-07-31 01:10:51,745 - INFO - Procesando 5/45: Blind Guardian - Mirror Mirror
+2025-07-31 01:10:51,797 - INFO - Procesando 6/45: Chelsea Wolfe - Feral Love
+2025-07-31 01:10:51,848 - INFO - Procesando 7/45: Cream - Sunshine of Your Love
+2025-07-31 01:10:51,900 - INFO - Procesando 8/45: Cult Of Luna - The Silent Man
+2025-07-31 01:10:52,212 - INFO - Procesando 9/45: DEADLETTER - Binge
+2025-07-31 01:10:52,511 - INFO - Procesando 10/45: DEADLETTER - Weights
+2025-07-31 01:10:52,657 - INFO - Procesando 11/45: Deafheaven - Dream House
+2025-07-31 01:10:52,708 - INFO - Procesando 12/45: El Columpio Asesino - Toro
+2025-07-31 01:10:52,853 - INFO - Procesando 13/45: Elvis Costello & The Attractions - (Yo No Quiero Ir A) Chelsea ((I Don't Want To Go To) Chelsea) (feat. Raquel Sofía & Fuego)
+2025-07-31 01:10:53,151 - INFO - Procesando 14/45: Elvis Costello & The Attractions - No Action (feat. Nina Diaz)
+2025-07-31 01:10:53,440 - INFO - Procesando 15/45: Elvis Costello & The Attractions - Yo Te Vi (The Beat) (feat. Draco Rosa)
+2025-07-31 01:10:53,662 - INFO - Procesando 16/45: Ezra Furman - Suck the Blood From My Wound
+2025-07-31 01:10:53,713 - INFO - Procesando 17/45: Helloween - Eagle Fly Free
+2025-07-31 01:10:53,764 - INFO - Procesando 18/45: IDLES - Romantic Gestures
+2025-07-31 01:10:53,816 - INFO - Procesando 19/45: Iggy Pop - Lust for Life
+2025-07-31 01:10:54,053 - INFO - Procesando 20/45: Isis - So Did We
+2025-07-31 01:10:54,104 - INFO - Procesando 21/45: Julien Baker - Hardline
+2025-07-31 01:10:54,268 - INFO - Procesando 22/45: L7 - Andres
+2025-07-31 01:10:54,320 - INFO - Procesando 23/45: Morphine - Cure for Pain
+2025-07-31 01:10:54,372 - INFO - Procesando 24/45: Neu! - Für immer (forever)
+2025-07-31 01:10:54,423 - INFO - Procesando 25/45: PJ Harvey - 50ft Queenie
+2025-07-31 01:10:54,475 - INFO - Procesando 26/45: PJ Harvey - Rid of Me
+2025-07-31 01:10:54,526 - INFO - Procesando 27/45: PUP - Morbid Stuff
+2025-07-31 01:10:54,577 - INFO - Procesando 28/45: Parquet Courts - Walking at a Downtown Pace
+2025-07-31 01:10:54,629 - INFO - Procesando 29/45: Pink Floyd - Another Brick in the Wall, Part 2
+2025-07-31 01:10:54,680 - INFO - Procesando 30/45: Pink Turns Blue - Walking on Both Sides
+2025-07-31 01:10:54,732 - INFO - Procesando 31/45: Placebo - Brick Shithouse
+2025-07-31 01:10:54,783 - INFO - Procesando 32/45: Placebo - Every You Every Me
+2025-07-31 01:10:54,835 - INFO - Procesando 33/45: Placebo - Post Blue
+2025-07-31 01:10:54,886 - INFO - Procesando 34/45: Placebo - Pure Morning
+2025-07-31 01:10:54,938 - INFO - Procesando 35/45: Placebo - Song to Say Goodbye
+2025-07-31 01:10:54,989 - INFO - Procesando 36/45: Placebo feat. Alison Mosshart - Meds
+2025-07-31 01:10:55,041 - INFO - Procesando 37/45: Psychic Ills - One More Time
+2025-07-31 01:10:55,092 - INFO - Procesando 38/45: Queens of the Stone Age - Sick, Sick, Sick
+2025-07-31 01:10:55,144 - INFO - Procesando 39/45: The Hair & Skin Trading Company - Elevenate
+2025-07-31 01:10:55,195 - INFO - Procesando 40/45: The Mars Volta - Inertiatic ESP
+2025-07-31 01:10:55,247 - INFO - Procesando 41/45: Torres - Collect
+2025-07-31 01:10:55,488 - INFO - Procesando 42/45: Fontaines D.C. - How Cold Love Is
+2025-07-31 01:10:55,539 - INFO - Procesando 43/45: Viagra Boys - Punk Rock Loser
+2025-07-31 01:10:55,590 - INFO - Procesando 44/45: Fontaines D.C. - I Love You
+2025-07-31 01:10:55,642 - INFO - Procesando 45/45: Fontaines D.C. - Jackie Down The Line
+2025-07-31 01:10:55,942 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:55,943 - INFO - ✅ Sincronización completada: 36/45 canciones (80.0%)
+2025-07-31 01:10:55,943 - WARNING - ❌ Canciones no encontradas (9):
+2025-07-31 01:10:55,943 - WARNING -   - Flowered Up - Weekender
+2025-07-31 01:10:55,943 - WARNING -   - Aphrodite's Child - The Four Horsemen
+2025-07-31 01:10:55,943 - WARNING -   - Cult Of Luna - The Silent Man
+2025-07-31 01:10:55,943 - WARNING -   - DEADLETTER - Binge
+2025-07-31 01:10:55,943 - WARNING -   - DEADLETTER - Weights
+2025-07-31 01:10:55,943 - WARNING -   ... y 4 más
+2025-07-31 01:10:55,948 - INFO - Iniciando sincronización de shoegaze
+2025-07-31 01:10:55,949 - INFO - Encontradas 1 canciones en el archivo M3U
+2025-07-31 01:10:55,949 - INFO - Procesando 1/1: No Joy - E
+2025-07-31 01:10:56,190 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:56,191 - INFO - ✅ Sincronización completada: 1/1 canciones (100.0%)
+2025-07-31 01:10:56,196 - INFO - Iniciando sincronización de soul-funk
+2025-07-31 01:10:56,196 - WARNING - No se pudo parsear: soul-funk/Jungle - Candle Flame.flac
+2025-07-31 01:10:56,196 - WARNING - No se pudo parsear: soul-funk/Margaret Singana - Miles Away- One - 11 Why Did You Do It.flac
+2025-07-31 01:10:56,196 - WARNING - No se pudo parsear: soul-funk/05. Jam.flac
+2025-07-31 01:10:56,196 - INFO - Encontradas 26 canciones en el archivo M3U
+2025-07-31 01:10:56,196 - INFO - Procesando 1/26: Jungle - Every Night
+2025-07-31 01:10:56,247 - INFO - Procesando 2/26: Jungle - Us Against the World
+2025-07-31 01:10:56,299 - INFO - Procesando 3/26: Jungle & Erick the Architect - Candle Flame
+2025-07-31 01:10:56,351 - INFO - Procesando 4/26: Billy Bruner - Amazing
+2025-07-31 01:10:56,402 - INFO - Procesando 5/26: Jungle - Back on 74
+2025-07-31 01:10:56,454 - INFO - Procesando 6/26: Billy Bruner - Tulsa Song
+2025-07-31 01:10:56,505 - INFO - Procesando 7/26: Jungle - Dominoes
+2025-07-31 01:10:56,556 - INFO - Procesando 8/26: Commodores - Nightshift
+2025-07-31 01:10:56,717 - INFO - Procesando 9/26: Funkadelic - Cosmic Slop
+2025-07-31 01:10:56,934 - INFO - Procesando 10/26: LaBelle - Are You Lonely
+2025-07-31 01:10:56,986 - INFO - Procesando 11/26: Maceo Parker - Soul Power 74
+2025-07-31 01:10:57,229 - INFO - Procesando 12/26: Manu Dibango - Soul Makossa
+2025-07-31 01:10:57,281 - INFO - Procesando 13/26: Menahan Street Band - Make the Road by Walking
+2025-07-31 01:10:57,332 - INFO - Procesando 14/26: Millie Jackson - I Ain't Giving Up
+2025-07-31 01:10:57,384 - INFO - Procesando 15/26: Millie Jackson - It's All Over but the Shouting
+2025-07-31 01:10:57,435 - INFO - Procesando 16/26: Millie Jackson - This Is It
+2025-07-31 01:10:57,487 - INFO - Procesando 17/26: Nubia - The Time Is Right
+2025-07-31 01:10:57,684 - INFO - Procesando 18/26: Shuggie Otis - Inspiration Information
+2025-07-31 01:10:57,736 - INFO - Procesando 19/26: The Meters - What'cha Say
+2025-07-31 01:10:57,893 - INFO - Procesando 20/26: Charles Bradley - The World (Is Going Up in Flames)
+2025-07-31 01:10:58,355 - INFO - Procesando 21/26: Darondo - Didn't I
+2025-07-31 01:10:58,596 - INFO - Procesando 22/26: Gabriels - Love and Hate in a Different Time
+2025-07-31 01:10:58,781 - INFO - Procesando 23/26: Gil Scott - Heron - The Revolution Will Not Be Televised
+2025-07-31 01:10:59,072 - INFO - Procesando 24/26: Leon Haywood - I Want'a Do Something Freaky to You
+2025-07-31 01:10:59,384 - INFO - Procesando 25/26: Lafayette Afro Rock Band - Darkest Light (Remastered)
+2025-07-31 01:10:59,594 - INFO - Procesando 26/26: Bobby Womack - I Can Understand It
+2025-07-31 01:10:59,983 - INFO - No hay cambios que sincronizar
+2025-07-31 01:10:59,983 - INFO - ✅ Sincronización completada: 14/26 canciones (53.8%)
+2025-07-31 01:10:59,983 - WARNING - ❌ Canciones no encontradas (12):
+2025-07-31 01:10:59,983 - WARNING -   - Commodores - Nightshift
+2025-07-31 01:10:59,984 - WARNING -   - Funkadelic - Cosmic Slop
+2025-07-31 01:10:59,984 - WARNING -   - Maceo Parker - Soul Power 74
+2025-07-31 01:10:59,984 - WARNING -   - Nubia - The Time Is Right
+2025-07-31 01:10:59,984 - WARNING -   - The Meters - What'cha Say
+2025-07-31 01:10:59,984 - WARNING -   ... y 7 más
+2025-07-31 01:10:59,989 - INFO - Iniciando sincronización de techno
+2025-07-31 01:10:59,989 - WARNING - No se pudo parsear: techno/Hans Bouffmyhre - Damage Limitation [date - [PRRUKD038] Damage Limitation EP].mp3
+2025-07-31 01:10:59,989 - WARNING - No se pudo parsear: techno/Emmanuel- Nu Trance.flac
+2025-07-31 01:10:59,989 - WARNING - No se pudo parsear: techno/John Tejada - Simulacrum (2023 - Resound).flac
+2025-07-31 01:10:59,989 - WARNING - No se pudo parsear: techno/A Farley 'Jackmaster' Funk & Jessie Saunders - Love Can't Turn Around (feat. Darryl Pandy).flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/Obscure Shape & SHDW - Himmel Und Erde.mp3
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/STP - The fall.mp3
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/AceMo - Chords (2024 - Save the World).flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/AceMo - An Epic (2024 - Save the World).flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/Vince Watson - Mystical Rhythm (Lush mix) (2002 - Moments in Time).flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/Vince Watson - Bubbles (1999 - Biologique).flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/04 - Katharsis.flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/09. Pearls Ver2.flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/01. Tales From The Real World (Vocal Version) feat Alan Watts.flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/01 - Animatronic.flac
+2025-07-31 01:10:59,990 - WARNING - No se pudo parsear: techno/05 Slamuel Bepys.flac
+2025-07-31 01:10:59,990 - INFO - Encontradas 114 canciones en el archivo M3U
+2025-07-31 01:10:59,990 - INFO - Procesando 1/114: Vince Watson - Biologique
+2025-07-31 01:11:00,192 - INFO - Procesando 2/114: Bicep - Atlas
+2025-07-31 01:11:00,244 - INFO - Procesando 3/114: Uf0 - 2000 EM
+2025-07-31 01:11:00,463 - INFO - Procesando 4/114: Schwefelgelb - Wie Viel Haut
+2025-07-31 01:11:00,612 - INFO - Procesando 5/114: Sleaford Mods - Force 10 From Navarone
+2025-07-31 01:11:00,663 - INFO - Procesando 6/114: Yan Cook - Silk
+2025-07-31 01:11:00,714 - INFO - Procesando 7/114: Yan Cook - Naked
+2025-07-31 01:11:00,766 - INFO - Procesando 8/114: Yan Cook - Sanctuary
+2025-07-31 01:11:00,818 - INFO - Procesando 9/114: Yan Cook - Reg Giant
+2025-07-31 01:11:00,870 - INFO - Procesando 10/114: Bicep - Meli (II)
+2025-07-31 01:11:00,921 - INFO - Procesando 11/114: MRD - Oslo
+2025-07-31 01:11:01,063 - INFO - Procesando 12/114: The Rurals - Lush
+2025-07-31 01:11:01,114 - INFO - Procesando 13/114: Subjected - Steel
+2025-07-31 01:11:01,166 - INFO - Procesando 14/114: Underworld - S T A R
+2025-07-31 01:11:01,217 - INFO - Procesando 15/114: Tin Tama - Lavender
+2025-07-31 01:11:01,269 - INFO - Procesando 16/114: Blawan - Why They Hide Their Bodies Under My Garage
+2025-07-31 01:11:01,532 - INFO - Procesando 17/114: Ariees - DJ Snowman - Waves (Electrance Mix)
+2025-07-31 01:11:01,584 - INFO - Procesando 18/114: Ariees - Tony Faline - Without Em
+2025-07-31 01:11:01,635 - INFO - Procesando 19/114: Annie Hall - Natron
+2025-07-31 01:11:01,800 - INFO - Procesando 20/114: Mike Dehnert - Einklang
+2025-07-31 01:11:01,958 - INFO - Procesando 21/114: Möd3rn - Mö 13
+2025-07-31 01:11:02,261 - INFO - Procesando 22/114: Phase Fatale - Forward Chrome
+2025-07-31 01:11:02,313 - INFO - Procesando 23/114: Mall Grab - Feel U
+2025-07-31 01:11:02,552 - INFO - Procesando 24/114: Mano Le Tough - I See Myself in You
+2025-07-31 01:11:02,732 - INFO - Procesando 25/114: Karizma - Work It Out
+2025-07-31 01:11:02,980 - INFO - Procesando 26/114: Marcel Vogel - I Got Jesus
+2025-07-31 01:11:03,169 - INFO - Procesando 27/114: Marek Hemmann - Venice
+2025-07-31 01:11:03,372 - INFO - Procesando 28/114: Markus Nikolai - Shake!
+2025-07-31 01:11:03,423 - INFO - Procesando 29/114: Markus Nikolai - Superstar
+2025-07-31 01:11:03,475 - INFO - Procesando 30/114: artist - title
+2025-07-31 01:11:03,527 - INFO - Procesando 31/114: Massimiliano Pagliara - Harmonize
+2025-07-31 01:11:03,785 - INFO - Procesando 32/114: Jerome Sydenham And Kerry Chandler - Candela
+2025-07-31 01:11:03,837 - INFO - Procesando 33/114: Jerome Sydenham And Kerry Chandler - Ko Ko (Vocal)
+2025-07-31 01:11:04,197 - INFO - Procesando 34/114: Sandwell District - Immolare
+2025-07-31 01:11:04,249 - INFO - Procesando 35/114: Morph - Stormwatch
+2025-07-31 01:11:04,547 - INFO - Procesando 36/114: MRD - Lost Friends
+2025-07-31 01:11:04,809 - INFO - Procesando 37/114: Octave One - Blackwater (String radio edit)
+2025-07-31 01:11:05,019 - INFO - Procesando 38/114: Peggy Gou - It Makes You Forget (Itgehane)
+2025-07-31 01:11:05,442 - INFO - Procesando 39/114: Bjarki - I Wanna Go Bang
+2025-07-31 01:11:05,635 - INFO - Procesando 40/114: Jack J - Thirstin'
+2025-07-31 01:11:05,837 - INFO - Procesando 41/114: Yan Cook - Exhale
+2025-07-31 01:11:05,888 - INFO - Procesando 42/114: SHDW, Obscure Shape - Die_Augen_des_Teufels_Original_Mix
+2025-07-31 01:11:06,136 - INFO - Procesando 43/114: SHDW, Obscure Shape - Wachter_der_Nacht_Original_Mix
+2025-07-31 01:11:06,449 - INFO - Procesando 44/114: Tin Tama - Designed 4da Mind
+2025-07-31 01:11:06,672 - INFO - Procesando 45/114: Surgeon - Atol
+2025-07-31 01:11:06,832 - INFO - Procesando 46/114: Sawf - Rota
+2025-07-31 01:11:07,020 - INFO - Procesando 47/114: SHDW, Obscure Shape - Die_Prophezeiung_Original_Mix
+2025-07-31 01:11:07,181 - INFO - Procesando 48/114: Hollis P. Monroe - I'm Lonely (Original Radio Edit)
+2025-07-31 01:11:07,479 - INFO - Procesando 49/114: Tin Tama - Wave of Nostalgia
+2025-07-31 01:11:07,653 - INFO - Procesando 50/114: Frankie Knuckles - Your Love
+2025-07-31 01:11:07,705 - INFO - Procesando 51/114: Kiwi - Cormorant
+2025-07-31 01:11:07,850 - INFO - Procesando 52/114: African Head Charge - Heading to Glory
+2025-07-31 01:11:08,187 - INFO - Procesando 53/114: Payfone - We Are Chains
+2025-07-31 01:11:08,504 - INFO - Procesando 54/114: Oscar Mulero - Ataraxia
+2025-07-31 01:11:08,664 - INFO - Procesando 55/114: Regis - 
+2025-07-31 01:11:08,716 - INFO - Procesando 56/114: Mr. Fingers - Electronic Debris
+2025-07-31 01:11:08,998 - INFO - Procesando 57/114: Route 8 - This Raw Feeling
+2025-07-31 01:11:09,416 - INFO - Procesando 58/114: Route 8 - It Doesn't Matter Anymore
+2025-07-31 01:11:09,592 - INFO - Procesando 59/114: Phase Fatale - Binding by Oath
+2025-07-31 01:11:09,643 - INFO - Procesando 60/114: The Grid - Floatation (Wow And Flutter Remix)
+2025-07-31 01:11:09,823 - INFO - Procesando 61/114: Neil Landstrumm - Squeeze
+2025-07-31 01:11:09,987 - INFO - Procesando 62/114: Underground Solution - Luv Dancin' (In Deep Mix)
+2025-07-31 01:11:10,211 - INFO - Procesando 63/114: Underground Solution - Luv Dancin' (Egotrip Mix)
+2025-07-31 01:11:10,432 - INFO - Procesando 64/114: Gilad Kahana - Africa Sheli
+2025-07-31 01:11:10,603 - INFO - Procesando 65/114: Larry Heard - Can U Feel It (vocal)
+2025-07-31 01:11:10,809 - INFO - Procesando 66/114: Frankie Knuckles Presents Marshall Jefferson - Move Your Body (Original Version)
+2025-07-31 01:11:11,062 - INFO - Procesando 67/114: Leandro Gamez - Qssett_Critical_Version (Original Mix)
+2025-07-31 01:11:11,234 - INFO - Procesando 68/114: Jürgen Paape - So weit wie noch nie (radio edit)
+2025-07-31 01:11:11,460 - INFO - Procesando 69/114: Underworld - This Must Be Drum Street
+2025-07-31 01:11:11,511 - INFO - Procesando 70/114: Tuff City Kids - SFS
+2025-07-31 01:11:11,562 - INFO - Procesando 71/114: Underworld & Ø [Phase] - Border Country
+2025-07-31 01:11:11,614 - INFO - Procesando 72/114: Kerri Chandler - All The Downloads
+2025-07-31 01:11:11,797 - INFO - Procesando 73/114: Kerri Chandler - All The Downloads (BW Vocal)
+2025-07-31 01:11:12,076 - INFO - Procesando 74/114: Orphx - La Nebuleuse
+2025-07-31 01:11:12,262 - INFO - Procesando 75/114: Joey Beltram - Energy Flash
+2025-07-31 01:11:12,460 - INFO - Procesando 76/114: Underworld - Cowgirl
+2025-07-31 01:11:12,511 - INFO - Procesando 77/114: Voltage Control - Apocalypse (12 mix)
+2025-07-31 01:11:12,796 - INFO - Procesando 78/114: Underground Resistance - Electronic Warfare (vocal)
+2025-07-31 01:11:12,959 - INFO - Procesando 79/114: Floating Points - Birth4000
+2025-07-31 01:11:13,010 - INFO - Procesando 80/114: Underworld - Push Upstairs
+2025-07-31 01:11:13,062 - INFO - Procesando 81/114: Koenig Cylinders - Carousel
+2025-07-31 01:11:13,237 - INFO - Procesando 82/114: Evian Christ - Yxguden
+2025-07-31 01:11:13,288 - INFO - Procesando 83/114: Underworld - Universe of Can When Back
+2025-07-31 01:11:13,340 - INFO - Procesando 84/114: Evian Christ - Nobody Else
+2025-07-31 01:11:13,391 - INFO - Procesando 85/114: Long Island Sound - Turbulence
+2025-07-31 01:11:13,443 - INFO - Procesando 86/114: Overmono & The Streets - Turn The Page
+2025-07-31 01:11:13,620 - INFO - Procesando 87/114: Portable - Fractal Distortion
+2025-07-31 01:11:13,809 - INFO - Procesando 88/114: Legowelt - Enchantress 1200
+2025-07-31 01:11:13,955 - INFO - Procesando 89/114: Seth Troxler - Lumartes
+2025-07-31 01:11:14,116 - INFO - Procesando 90/114: A Homeboy, A Hippie & A Funki Dredd - Here We Go Again (extended mix)
+2025-07-31 01:11:14,168 - INFO - Procesando 91/114: Imre Kiss - Never
+2025-07-31 01:11:14,220 - INFO - Procesando 92/114: Laurent Garnier - The Man With the Red Face
+2025-07-31 01:11:14,271 - INFO - Procesando 93/114: Kirk DeGiorgio Presents As One - Rumours
+2025-07-31 01:11:14,537 - INFO - Procesando 94/114: Larry Heard - Time
+2025-07-31 01:11:14,588 - INFO - Procesando 95/114: nthng - It Never Ends
+2025-07-31 01:11:14,769 - INFO - Procesando 96/114: SHDW & Obscure Shape - Die Weiße Rose
+2025-07-31 01:11:14,951 - INFO - Procesando 97/114: Phase Fatale - Steel
+2025-07-31 01:11:15,003 - INFO - Procesando 98/114: Two Lone Swordsmen - Gay Spunk
+2025-07-31 01:11:15,252 - INFO - Procesando 99/114: Tuff City Kids - SFS
+2025-07-31 01:11:15,303 - INFO - Procesando 100/114: Esplendor Geométrico - Japo
+2025-07-31 01:11:15,454 - INFO - Procesando 101/114: Filmmaker - The Love Market
+2025-07-31 01:11:15,667 - INFO - Procesando 102/114: Two Lone Swordsmen - Sticky
+2025-07-31 01:11:15,719 - INFO - Procesando 103/114: Karenn - Crush the Mushrooms
+2025-07-31 01:11:15,882 - INFO - Procesando 104/114: Nihiloxica - Endongo
+2025-07-31 01:11:15,934 - INFO - Procesando 105/114: Seba + Paradox - Volt
+2025-07-31 01:11:16,167 - INFO - Procesando 106/114: CJ Bolland - The Prophet (Original Mix)
+2025-07-31 01:11:16,484 - INFO - Procesando 107/114: CJ Bolland - Camargue
+2025-07-31 01:11:16,632 - INFO - Procesando 108/114: Giant Swan - The Rest of His Voice
+2025-07-31 01:11:16,864 - INFO - Procesando 109/114: Introversion - Unmarried Old Man
+2025-07-31 01:11:17,103 - INFO - Procesando 110/114: I Hate Models - Daydream
+2025-07-31 01:11:17,155 - INFO - Procesando 111/114: Talaboman - Loser's Hymn
+2025-07-31 01:11:17,316 - INFO - Procesando 112/114: Sofia Kourtesis - Si Te Portas Bonito
+2025-07-31 01:11:17,609 - INFO - Procesando 113/114: Traumprinz - There Will Be XTC
+2025-07-31 01:11:17,660 - INFO - Procesando 114/114: Vril - Saturn Is A Supercomputer
+2025-07-31 01:11:18,179 - INFO - No hay cambios que sincronizar
+2025-07-31 01:11:18,187 - INFO - ✅ Sincronización completada: 41/114 canciones (36.0%)
+2025-07-31 01:11:18,187 - WARNING - ❌ Canciones no encontradas (71):
+2025-07-31 01:11:18,188 - WARNING -   - Vince Watson - Biologique
+2025-07-31 01:11:18,188 - WARNING -   - Uf0 - 2000 EM
+2025-07-31 01:11:18,188 - WARNING -   - Schwefelgelb - Wie Viel Haut
+2025-07-31 01:11:18,188 - WARNING -   - MRD - Oslo
+2025-07-31 01:11:18,188 - WARNING -   - Blawan - Why They Hide Their Bodies Under My Garage
+2025-07-31 01:11:18,188 - WARNING -   ... y 66 más
+2025-07-31 01:11:18,193 - INFO - No hay cambios en verano, omitiendo sincronización
+2025-07-31 01:11:18,193 - INFO - No hay cambios en w_awakenings, omitiendo sincronización
+2025-07-31 01:11:18,193 - INFO - Sincronización completada: 22/28 playlists
