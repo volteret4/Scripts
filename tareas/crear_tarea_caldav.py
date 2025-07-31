@@ -53,6 +53,10 @@ MARKDOWN_FILES = [
         "title": "web_mfuzzy"
     },
     {
+        "path": "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/Mihitas/Notas.md",
+        "title": "Notas"
+    },
+    {
         "path": "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/Tumtumpa/Blog Tumtumpá.md",
         "title": "tumtumpa"
     }
