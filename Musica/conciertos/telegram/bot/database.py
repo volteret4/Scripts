@@ -1865,3 +1865,357 @@ class ArtistTrackerDatabase:
             return None
         finally:
             conn.close()
+
+
+
+    def init_muspy_tables(self):
+        """Inicializa las tablas específicas de Muspy"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Verificar si las nuevas columnas de Muspy existen en users
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [col[1] for col in cursor.fetchall()]
+
+            if 'muspy_email' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN muspy_email TEXT")
+                logger.info("Columna muspy_email añadida a users")
+
+            if 'muspy_password' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN muspy_password TEXT")
+                logger.info("Columna muspy_password añadida a users")
+
+            if 'muspy_userid' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN muspy_userid TEXT")
+                logger.info("Columna muspy_userid añadida a users")
+
+            # Verificar si la columna muspy existe en user_followed_artists
+            cursor.execute("PRAGMA table_info(user_followed_artists)")
+            columns = [col[1] for col in cursor.fetchall()]
+
+            if 'muspy' not in columns:
+                cursor.execute("ALTER TABLE user_followed_artists ADD COLUMN muspy BOOLEAN DEFAULT 0")
+                logger.info("Columna muspy añadida a user_followed_artists")
+
+            # Crear tabla para artistas de Muspy si no existe
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS muspy_artists_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    artist_mbid TEXT NOT NULL,
+                    artist_name TEXT NOT NULL,
+                    disambiguation TEXT DEFAULT '',
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id, artist_mbid)
+                )
+            """)
+
+            # Índices para optimización
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_muspy_cache_user ON muspy_artists_cache(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_muspy_cache_mbid ON muspy_artists_cache(artist_mbid)")
+
+            conn.commit()
+            logger.info("Tablas de Muspy inicializadas correctamente")
+
+        except sqlite3.Error as e:
+            logger.error(f"Error al inicializar tablas de Muspy: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+
+    # ======================
+    # FUNCIONES DE MUSPY
+    # ======================
+
+    def save_muspy_credentials(self, user_id: int, email: str, password: str, userid: str) -> bool:
+        """
+        Guarda las credenciales de Muspy para un usuario
+
+        Args:
+            user_id: ID del usuario
+            email: Email de Muspy
+            password: Contraseña de Muspy
+            userid: User ID de Muspy
+
+        Returns:
+            True si se guardó correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE users
+                SET muspy_email = ?, muspy_password = ?, muspy_userid = ?
+                WHERE id = ?
+            """, (email, password, userid, user_id))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error guardando credenciales Muspy: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_muspy_credentials(self, user_id: int) -> Optional[Tuple[str, str, str]]:
+        """
+        Obtiene las credenciales de Muspy de un usuario
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Tupla (email, password, userid) o None si no existen
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT muspy_email, muspy_password, muspy_userid
+                FROM users WHERE id = ?
+            """, (user_id,))
+
+            result = cursor.fetchone()
+
+            if result and all(result):
+                return result
+            return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo credenciales Muspy: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def update_muspy_status_for_artists(self, user_id: int, artist_ids: List[int], muspy_status: bool) -> bool:
+        """
+        Actualiza el estado de muspy para una lista de artistas
+
+        Args:
+            user_id: ID del usuario
+            artist_ids: Lista de IDs de artistas
+            muspy_status: True/False para estado de Muspy
+
+        Returns:
+            True si se actualizó correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            for artist_id in artist_ids:
+                cursor.execute("""
+                    UPDATE user_followed_artists
+                    SET muspy = ?
+                    WHERE user_id = ? AND artist_id = ?
+                """, (muspy_status, user_id, artist_id))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error actualizando estado Muspy: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_user_followed_artists_muspy_status(self, user_id: int, muspy_only: bool = False) -> List[Dict]:
+        """
+        Obtiene artistas seguidos con información de estado Muspy
+
+        Args:
+            user_id: ID del usuario
+            muspy_only: Si True, solo artistas marcados como de Muspy
+
+        Returns:
+            Lista de artistas con estado Muspy
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            query = """
+                SELECT a.*, ufa.followed_at, ufa.muspy
+                FROM artists a
+                JOIN user_followed_artists ufa ON a.id = ufa.artist_id
+                WHERE ufa.user_id = ?
+            """
+
+            if muspy_only:
+                query += " AND ufa.muspy = 1"
+
+            query += " ORDER BY ufa.followed_at DESC"
+
+            cursor.execute(query, (user_id,))
+            rows = cursor.fetchall()
+
+            artists = []
+            for row in rows:
+                artist_dict = dict(row)
+                artist_dict['muspy'] = bool(artist_dict['muspy'])
+                artists.append(artist_dict)
+
+            return artists
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo artistas con estado Muspy: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def add_user_followed_artist_muspy(self, user_id: int, artist_id: int, muspy: bool = False) -> bool:
+        """
+        Añade un artista seguido con estado de Muspy
+
+        Args:
+            user_id: ID del usuario
+            artist_id: ID del artista
+            muspy: Estado de Muspy
+
+        Returns:
+            True si se añadió o ya existía
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Verificar si ya existe la relación
+            cursor.execute("""
+                SELECT id FROM user_followed_artists
+                WHERE user_id = ? AND artist_id = ?
+            """, (user_id, artist_id))
+
+            if cursor.fetchone():
+                # Actualizar el estado de muspy si es necesario
+                if muspy:
+                    cursor.execute("""
+                        UPDATE user_followed_artists SET muspy = 1
+                        WHERE user_id = ? AND artist_id = ?
+                    """, (user_id, artist_id))
+            else:
+                # Crear nueva relación
+                cursor.execute("""
+                    INSERT INTO user_followed_artists (user_id, artist_id, muspy)
+                    VALUES (?, ?, ?)
+                """, (user_id, artist_id, muspy))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error añadiendo artista con estado Muspy: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def cache_muspy_artists(self, user_id: int, muspy_artists: List[Dict]) -> bool:
+        """
+        Almacena en caché los artistas de Muspy para un usuario
+
+        Args:
+            user_id: ID del usuario
+            muspy_artists: Lista de artistas de Muspy
+
+        Returns:
+            True si se guardó correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Limpiar caché anterior
+            cursor.execute("DELETE FROM muspy_artists_cache WHERE user_id = ?", (user_id,))
+
+            # Insertar nuevos artistas
+            for artist in muspy_artists:
+                cursor.execute("""
+                    INSERT INTO muspy_artists_cache
+                    (user_id, artist_mbid, artist_name, disambiguation)
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    user_id,
+                    artist.get('mbid', ''),
+                    artist.get('name', ''),
+                    artist.get('disambiguation', '')
+                ))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error guardando caché de Muspy: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    def get_cached_muspy_artists(self, user_id: int) -> List[Dict]:
+        """
+        Obtiene artistas de Muspy desde el caché
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Lista de artistas desde caché
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT artist_mbid, artist_name, disambiguation, last_updated
+                FROM muspy_artists_cache
+                WHERE user_id = ?
+                ORDER BY artist_name
+            """, (user_id,))
+
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+        except sqlite3.Error as e:
+            logger.error(f"Error obteniendo caché de Muspy: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def clear_muspy_credentials(self, user_id: int) -> bool:
+        """
+        Limpia las credenciales de Muspy de un usuario
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            True si se limpió correctamente
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE users
+                SET muspy_email = NULL, muspy_password = NULL, muspy_userid = NULL
+                WHERE id = ?
+            """, (user_id,))
+
+            # También limpiar caché
+            cursor.execute("DELETE FROM muspy_artists_cache WHERE user_id = ?", (user_id,))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error limpiando credenciales Muspy: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
