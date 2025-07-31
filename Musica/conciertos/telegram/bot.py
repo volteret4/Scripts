@@ -3981,7 +3981,7 @@ def escape_markdown_v2(text):
     return text
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /list mejorado con enlaces de MusicBrainz"""
+    """Comando /list mejorado con paginación automática"""
     chat_id = update.effective_chat.id
 
     # Determinar qué usuario consultar
@@ -4021,7 +4021,16 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Formatear la lista usando Markdown normal en lugar de MarkdownV2
+    # Si hay 15 o menos artistas, mostrar sin paginación (comportamiento original)
+    if len(followed_artists) <= 15:
+        await show_artists_without_pagination(update, followed_artists, display_name)
+    else:
+        # Guardar datos para paginación y mostrar primera página
+        await save_list_data_and_show_page(update, user_id, followed_artists, display_name, page=0)
+
+async def show_artists_without_pagination(update: Update, followed_artists: List[Dict], display_name: str):
+    """Muestra artistas sin paginación (comportamiento original para listas pequeñas)"""
+    # Formatear la lista usando Markdown normal
     message_lines = [f"🎵 *Artistas seguidos por {display_name}:*\n"]
 
     for i, artist in enumerate(followed_artists, 1):
@@ -4058,37 +4067,283 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.reply_text(
             response,
-            parse_mode='Markdown',  # Usar Markdown normal en lugar de MarkdownV2
+            parse_mode='Markdown',
             disable_web_page_preview=True
         )
     except Exception as e:
         # Si hay error con Markdown, enviar sin formato
-        logger.warning(f"Error con Markdown, enviando texto plano: {e}")
-        # Crear versión sin formato
-        plain_lines = []
-        for i, artist in enumerate(followed_artists, 1):
-            line = f"{i}. {artist['name']}"
+        logger.warning(f"Error con Markdown en list, enviando texto plano: {e}")
+        await send_artists_plain_text(update, followed_artists, display_name)
 
-            details = []
-            if artist['country']:
-                details.append(f"🌍 {artist['country']}")
-            if artist['formed_year']:
-                details.append(f"📅 {artist['formed_year']}")
-            if artist['total_works'] and artist['total_works'] > 0:
-                details.append(f"📝 {artist['total_works']} obras")
-            if artist['artist_type']:
-                details.append(f"🎭 {artist['artist_type'].title()}")
+async def save_list_data_and_show_page(update: Update, user_id: int, followed_artists: List[Dict], display_name: str, page: int = 0):
+    """Guarda datos de artistas y muestra página específica con paginación"""
+    # Guardar datos temporalmente en la base de datos
+    save_list_pagination_data(user_id, followed_artists, display_name)
 
-            if details:
-                line += f" ({', '.join(details)})"
+    # Mostrar página específica
+    await show_artists_page(update, user_id, followed_artists, display_name, page, edit_message=False)
 
-            if artist['musicbrainz_url']:
-                line += f"\n   🔗 {artist['musicbrainz_url']}"
 
-            plain_lines.append(line)
+def save_list_pagination_data(user_id: int, artists_data: List[Dict], display_name: str):
+    """Guarda datos de artistas para paginación temporal"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
 
-        plain_response = f"🎵 Artistas seguidos por {display_name}:\n\n" + "\n\n".join(plain_lines) + f"\n\n📊 Total: {len(followed_artists)} artistas"
+    try:
+        # Limpiar datos anteriores del usuario
+        cursor.execute("DELETE FROM user_search_cache WHERE user_id = ? AND search_type LIKE 'list_%'", (user_id,))
+
+        # Guardar nuevos datos
+        data_to_save = {
+            'artists': artists_data,
+            'display_name': display_name
+        }
+
+        cursor.execute("""
+            INSERT INTO user_search_cache (user_id, search_type, search_data)
+            VALUES (?, ?, ?)
+        """, (user_id, "list_pagination", json.dumps(data_to_save)))
+
+        conn.commit()
+        logger.info(f"Datos de lista guardados para usuario {user_id}")
+
+    except sqlite3.Error as e:
+        logger.error(f"Error guardando datos de lista: {e}")
+    finally:
+        conn.close()
+
+
+def get_list_pagination_data(user_id: int) -> Optional[Tuple[List[Dict], str]]:
+    """Obtiene datos de artistas del caché temporal"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Limpiar caché antiguo (más de 1 hora)
+        cursor.execute("""
+            DELETE FROM user_search_cache
+            WHERE created_at < datetime('now', '-1 hour')
+        """)
+
+        # Obtener datos del usuario
+        cursor.execute("""
+            SELECT search_data
+            FROM user_search_cache
+            WHERE user_id = ? AND search_type = 'list_pagination'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id,))
+
+        row = cursor.fetchone()
+        if row:
+            data = json.loads(row[0])
+            return data['artists'], data['display_name']
+
+        return None
+
+    except (sqlite3.Error, json.JSONDecodeError) as e:
+        logger.error(f"Error obteniendo datos de lista: {e}")
+        return None
+    finally:
+        conn.close()
+
+async def send_artists_plain_text(update: Update, followed_artists: List[Dict], display_name: str):
+    """Envía lista de artistas en texto plano (fallback)"""
+    plain_lines = []
+    for i, artist in enumerate(followed_artists, 1):
+        line = f"{i}. {artist['name']}"
+
+        details = []
+        if artist['country']:
+            details.append(f"🌍 {artist['country']}")
+        if artist['formed_year']:
+            details.append(f"📅 {artist['formed_year']}")
+        if artist['total_works'] and artist['total_works'] > 0:
+            details.append(f"📝 {artist['total_works']} obras")
+        if artist['artist_type']:
+            details.append(f"🎭 {artist['artist_type'].title()}")
+
+        if details:
+            line += f" ({', '.join(details)})"
+
+        if artist['musicbrainz_url']:
+            line += f"\n   🔗 {artist['musicbrainz_url']}"
+
+        plain_lines.append(line)
+
+    plain_response = f"🎵 Artistas seguidos por {display_name}:\n\n" + "\n\n".join(plain_lines) + f"\n\n📊 Total: {len(followed_artists)} artistas"
+    await update.message.reply_text(plain_response)
+
+
+async def send_artists_page_plain_text(update: Update, page_artists: List[Dict], display_name: str, page: int, total_pages: int, total_artists: int, edit_message: bool):
+    """Envía página de artistas en texto plano (fallback)"""
+    plain_lines = [f"🎵 Artistas seguidos por {display_name}"]
+    plain_lines.append(f"📄 Página {page + 1} de {total_pages} | Total: {total_artists} artistas\n")
+
+    start_idx = page * 15
+    for i, artist in enumerate(page_artists, start_idx + 1):
+        line = f"{i}. {artist['name']}"
+
+        details = []
+        if artist['country']:
+            details.append(f"🌍 {artist['country']}")
+        if artist['formed_year']:
+            details.append(f"📅 {artist['formed_year']}")
+        if artist['total_works'] and artist['total_works'] > 0:
+            details.append(f"📝 {artist['total_works']} obras")
+        if artist['artist_type']:
+            details.append(f"🎭 {artist['artist_type'].title()}")
+
+        if details:
+            line += f" ({', '.join(details)})"
+
+        if artist['musicbrainz_url']:
+            line += f"\n   🔗 {artist['musicbrainz_url']}"
+
+        plain_lines.append(line)
+
+    plain_response = "\n".join(plain_lines)
+
+    if edit_message and hasattr(update, 'callback_query'):
+        await update.callback_query.edit_message_text(plain_response)
+    else:
         await update.message.reply_text(plain_response)
+
+
+async def list_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja la navegación de páginas en el comando /list"""
+    query = update.callback_query
+    await query.answer()
+
+    # Parsear callback data: list_page_PAGE_USERID
+    try:
+        parts = query.data.split("_")
+        if len(parts) != 4 or parts[0] != "list" or parts[1] != "page":
+            return
+
+        page = int(parts[2])
+        user_id = int(parts[3])
+
+        # Obtener datos de la paginación
+        pagination_data = get_list_pagination_data(user_id)
+        if not pagination_data:
+            await query.edit_message_text(
+                "❌ Los datos han expirado. Usa `/list` de nuevo."
+            )
+            return
+
+        followed_artists, display_name = pagination_data
+
+        # Mostrar página solicitada
+        fake_update = type('obj', (object,), {'callback_query': query, 'message': query.message})()
+        await show_artists_page(fake_update, user_id, followed_artists, display_name, page, edit_message=True)
+
+    except (ValueError, IndexError) as e:
+        logger.error(f"Error en callback de paginación: {e}")
+        await query.edit_message_text(
+            "❌ Error en la navegación. Usa `/list` de nuevo."
+        )
+
+
+async def show_artists_page(update: Update, user_id: int, followed_artists: List[Dict], display_name: str, page: int = 0, edit_message: bool = True):
+    """Muestra una página específica de artistas con navegación"""
+    artists_per_page = 15
+    total_pages = (len(followed_artists) + artists_per_page - 1) // artists_per_page
+
+    # Validar página
+    if page >= total_pages:
+        page = total_pages - 1
+    elif page < 0:
+        page = 0
+
+    start_idx = page * artists_per_page
+    end_idx = min(start_idx + artists_per_page, len(followed_artists))
+    page_artists = followed_artists[start_idx:end_idx]
+
+    # Construir mensaje
+    message_lines = [
+        f"🎵 *Artistas seguidos por {display_name}*",
+        f"📄 Página {page + 1} de {total_pages} | Total: {len(followed_artists)} artistas\n"
+    ]
+
+    for i, artist in enumerate(page_artists, start_idx + 1):
+        # Nombre del artista
+        artist_name = artist['name']
+
+        # Crear línea con enlace si está disponible
+        if artist['musicbrainz_url']:
+            line = f"{i}. [{artist_name}]({artist['musicbrainz_url']})"
+        else:
+            line = f"{i}. *{artist_name}*"
+
+        # Añadir información adicional si está disponible
+        details = []
+        if artist['country']:
+            details.append(f"🌍 {artist['country']}")
+        if artist['formed_year']:
+            details.append(f"📅 {artist['formed_year']}")
+        if artist['total_works'] and artist['total_works'] > 0:
+            details.append(f"📝 {artist['total_works']} obras")
+        if artist['artist_type']:
+            details.append(f"🎭 {artist['artist_type'].title()}")
+
+        if details:
+            line += f" ({', '.join(details)})"
+
+        message_lines.append(line)
+
+    response = "\n".join(message_lines)
+
+    # Crear botones de navegación
+    keyboard = []
+    nav_buttons = []
+
+    # Botón anterior
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton("⬅️ Anterior", callback_data=f"list_page_{page-1}_{user_id}")
+        )
+
+    # Botón de página actual
+    nav_buttons.append(
+        InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="current_list_page")
+    )
+
+    # Botón siguiente
+    if page < total_pages - 1:
+        nav_buttons.append(
+            InlineKeyboardButton("Siguiente ➡️", callback_data=f"list_page_{page+1}_{user_id}")
+        )
+
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+
+    try:
+        if edit_message and hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                response,
+                parse_mode='Markdown',
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                response,
+                parse_mode='Markdown',
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
+            )
+    except Exception as e:
+        # Si hay error con Markdown, enviar sin formato
+        logger.warning(f"Error con Markdown en página de artistas: {e}")
+        await send_artists_page_plain_text(update, page_artists, display_name, page, total_pages, len(followed_artists), edit_message)
+
+
+
+
+
 
 async def remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /remove"""
@@ -5372,7 +5627,7 @@ async def show_config_menu(update: Update, user: Dict, edit_message: bool = Fals
 
 # HANDLER PRINCIPAL - Este maneja TODOS los callbacks de configuración
 async def config_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja todos los callbacks del sistema de configuración"""
+    """Maneja todos los callbacks del sistema de configuración - VERSIÓN CORREGIDA"""
     query = update.callback_query
     await query.answer()
 
@@ -5385,7 +5640,7 @@ async def config_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text("❌ Error en el callback.")
         return
 
-    prefix = parts[0]  # 'config', 'notif', 'country', 'service', etc.
+    prefix = parts[0]  # 'config', 'notif', 'country', 'service', 'artist'
     action = parts[1]
 
     # Obtener user_id del final
@@ -5426,6 +5681,10 @@ async def config_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
         elif prefix == "service":
             await handle_service_callback(query, action, user_id, parts)
+
+        elif prefix == "artist":
+            # AÑADIDO: Manejar callbacks de artistas
+            await artist_action_handler(update, context)
 
         else:
             await query.edit_message_text("❌ Acción no reconocida.")
@@ -6166,8 +6425,8 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             limit = int(limit_text)
 
-            if limit < 5 or limit > 200:
-                await update.message.reply_text("❌ El límite debe estar entre 5 y 200 artistas.")
+            if limit < 5 or limit > 10000:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 10000 artistas.")
                 del context.user_data['waiting_for_lastfm_limit']
                 return
 
@@ -6189,7 +6448,6 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # PRIORIDAD 6: Añadir artista
     elif 'waiting_for_artist_add' in context.user_data:
-        # Procesar añadir artista
         user_id = context.user_data['waiting_for_artist_add']
         artist_name = update.message.text.strip()
 
@@ -6209,11 +6467,13 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'message': update.message
         })()
 
+        # Limpiar el estado antes de llamar a addartist
+        del context.user_data['waiting_for_artist_add']
+
         # Llamar al comando addartist existente
         await addartist_command(fake_update, fake_context)
-
-        del context.user_data['waiting_for_artist_add']
         return
+
 
 # PRIORIDAD: Usuario de Spotify
     elif 'waiting_for_spotify_user' in context.user_data:
@@ -6341,15 +6601,14 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # PRIORIDAD: Límite de Spotify
     elif 'waiting_for_spotify_limit' in context.user_data:
-        # Procesar nuevo límite de Spotify
         user_id = context.user_data['waiting_for_spotify_limit']
         limit_text = update.message.text.strip()
 
         try:
             limit = int(limit_text)
 
-            if limit < 5 or limit > 1000:
-                await update.message.reply_text("❌ El límite debe estar entre 5 y 1000 artistas.")
+            if limit < 5 or limit > 10000:
+                await update.message.reply_text("❌ El límite debe estar entre 5 y 10000 artistas.")
                 del context.user_data['waiting_for_spotify_limit']
                 return
 
@@ -6370,258 +6629,8 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-
-
     # PRIORIDAD MÁXIMA: Código de autorización OAuth de Spotify
     elif 'waiting_for_spotify_code' in context.user_data:
-        # Procesar código de autorización OAuth
-        user_id = context.user_data['waiting_for_spotify_code']
-        authorization_code = update.message.text.strip()
-
-        logger.info(f"DEBUG: Procesando código OAuth: {authorization_code[:10]}...")
-
-        if not authorization_code:
-            await update.message.reply_text("❌ Código de autorización no válido.")
-            del context.user_data['waiting_for_spotify_code']
-            return
-
-        # Verificar que el servicio esté disponible
-        if not spotify_service:
-            await update.message.reply_text("❌ Servicio de Spotify no disponible.")
-            del context.user_data['waiting_for_spotify_code']
-            return
-
-        # Procesar código de autorización
-        status_message = await update.message.reply_text("🔄 Procesando código de autorización...")
-
-        try:
-            success, message_text, user_info = spotify_service.process_authorization_code(user_id, authorization_code)
-
-            if success:
-                # Actualizar información en base de datos
-                spotify_username = user_info.get('spotify_id', 'unknown')
-                db.set_user_spotify(user_id, spotify_username, user_info)
-
-                success_message = (
-                    f"✅ *¡Autenticación exitosa!*\n\n"
-                    f"👤 Usuario: {user_info.get('display_name', spotify_username)}\n"
-                    f"🆔 ID: {spotify_username}\n"
-                    f"👥 Seguidores: {user_info.get('followers', 0):,}\n"
-                    f"🎵 Playlists: {user_info.get('public_playlists', 0)}\n"
-                    f"🌍 País: {user_info.get('country', 'No especificado')}\n"
-                    f"💎 Tipo: {user_info.get('product', 'free').title()}\n\n"
-                    f"Ahora puedes acceder a todas las funciones de Spotify."
-                )
-
-                await status_message.edit_text(
-                    success_message,
-                    parse_mode='Markdown',
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🎵 Abrir Spotify", callback_data=f"spotify_menu_{user_id}")
-                    ]])
-                )
-            else:
-                await status_message.edit_text(
-                    f"❌ Error en autenticación:\n{message_text}\n\n"
-                    f"Inténtalo de nuevo con `/spotify`"
-                )
-
-        except Exception as e:
-            logger.error(f"Error procesando código OAuth: {e}")
-            await status_message.edit_text(
-                "❌ Error procesando el código. Verifica que sea correcto e inténtalo de nuevo."
-            )
-
-        del context.user_data['waiting_for_spotify_code']
-        return
-
-
-
-
-async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja la entrada de texto cuando se espera configuración"""
-    print(f"DEBUG: handle_text_input llamado con user_data: {context.user_data}")  # DEBUG temporal
-
-    if 'waiting_for_lastfm_user' in context.user_data:
-        # Procesar nuevo usuario de Last.fm
-        user_id = context.user_data['waiting_for_lastfm_user']
-        lastfm_username = update.message.text.strip()
-
-        print(f"DEBUG: Procesando usuario Last.fm: {lastfm_username}")  # DEBUG temporal
-
-        if not lastfm_username:
-            await update.message.reply_text("❌ Nombre de usuario no válido.")
-            del context.user_data['waiting_for_lastfm_user']
-            return
-
-        # Verificar que el servicio esté disponible
-        if not lastfm_service:
-            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
-            del context.user_data['waiting_for_lastfm_user']
-            return
-
-        # Verificar que el usuario existe en Last.fm
-        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
-
-        try:
-            if not lastfm_service.check_user_exists(lastfm_username):
-                await status_message.edit_text(
-                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
-                    f"Verifica el nombre e inténtalo de nuevo."
-                )
-                del context.user_data['waiting_for_lastfm_user']
-                return
-
-            # Obtener información del usuario
-            user_info = lastfm_service.get_user_info(lastfm_username)
-
-            # Guardar en base de datos
-            if db.set_user_lastfm(user_id, lastfm_username, user_info):
-                message = f"✅ Usuario de Last.fm configurado: {lastfm_username}"
-                if user_info and user_info.get('playcount', 0) > 0:
-                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
-
-                await status_message.edit_text(
-                    message,
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🎵 Abrir Last.fm", callback_data=f"lastfm_menu_{user_id}")
-                    ]])
-                )
-            else:
-                await status_message.edit_text("❌ Error al configurar el usuario de Last.fm.")
-
-        except Exception as e:
-            logger.error(f"Error configurando usuario Last.fm: {e}")
-            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
-
-        del context.user_data['waiting_for_lastfm_user']
-        return
-
-    elif 'waiting_for_lastfm_limit' in context.user_data:
-        # Procesar nuevo límite de Last.fm
-        user_id = context.user_data['waiting_for_lastfm_limit']
-        limit_text = update.message.text.strip()
-
-        try:
-            limit = int(limit_text)
-
-            if limit < 5 or limit > 200:
-                await update.message.reply_text("❌ El límite debe estar entre 5 y 200 artistas.")
-                del context.user_data['waiting_for_lastfm_limit']
-                return
-
-            if db.set_lastfm_sync_limit(user_id, limit):
-                await update.message.reply_text(
-                    f"✅ Límite de sincronización establecido a {limit} artistas.",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
-                    ]])
-                )
-            else:
-                await update.message.reply_text("❌ Error al establecer el límite.")
-
-        except ValueError:
-            await update.message.reply_text("❌ Debes enviar un número válido.")
-
-        del context.user_data['waiting_for_lastfm_limit']
-        return
-
-    elif 'waiting_for_lastfm_change_user' in context.user_data:
-        # Procesar cambio de usuario de Last.fm
-        user_id = context.user_data['waiting_for_lastfm_change_user']
-        lastfm_username = update.message.text.strip()
-
-        if not lastfm_username:
-            await update.message.reply_text("❌ Nombre de usuario no válido.")
-            del context.user_data['waiting_for_lastfm_change_user']
-            return
-
-        if not lastfm_service:
-            await update.message.reply_text("❌ Servicio de Last.fm no disponible.")
-            del context.user_data['waiting_for_lastfm_change_user']
-            return
-
-        # Verificar usuario
-        status_message = await update.message.reply_text(f"🔍 Verificando usuario '{lastfm_username}'...")
-
-        try:
-            if not lastfm_service.check_user_exists(lastfm_username):
-                await status_message.edit_text(
-                    f"❌ El usuario '{lastfm_username}' no existe en Last.fm.\n"
-                    f"Verifica el nombre e inténtalo de nuevo."
-                )
-                del context.user_data['waiting_for_lastfm_change_user']
-                return
-
-            # Obtener información y actualizar
-            user_info = lastfm_service.get_user_info(lastfm_username)
-
-            if db.set_user_lastfm(user_id, lastfm_username, user_info):
-                message = f"✅ Usuario de Last.fm actualizado: {lastfm_username}"
-                if user_info and user_info.get('playcount', 0) > 0:
-                    message += f"\n📊 Reproducciones: {user_info['playcount']:,}"
-
-                await status_message.edit_text(
-                    message,
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Volver a Last.fm", callback_data=f"lastfm_menu_{user_id}")
-                    ]])
-                )
-            else:
-                await status_message.edit_text("❌ Error al actualizar el usuario de Last.fm.")
-
-        except Exception as e:
-            logger.error(f"Error actualizando usuario Last.fm: {e}")
-            await status_message.edit_text("❌ Error verificando el usuario. Inténtalo de nuevo.")
-
-        del context.user_data['waiting_for_lastfm_change_user']
-        return
-
-    # Resto de handlers de texto existentes (notificaciones, países, etc.)
-    elif 'waiting_for_time' in context.user_data:
-        # Procesar nueva hora de notificación
-        user_id = context.user_data['waiting_for_time']
-        time_str = update.message.text.strip()
-
-        try:
-            # Validar formato de hora
-            datetime.strptime(time_str, '%H:%M')
-
-            if db.set_notification_time(user_id, time_str):
-                await update.message.reply_text(
-                    f"✅ Hora de notificación cambiada a {time_str}",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Volver a configuración", callback_data=f"config_back_{user_id}")
-                    ]])
-                )
-            else:
-                await update.message.reply_text("❌ Error al cambiar la hora.")
-        except ValueError:
-            await update.message.reply_text("❌ Formato inválido. Usa HH:MM (ejemplo: 09:00)")
-
-        del context.user_data['waiting_for_time']
-
-    elif 'waiting_for_country_add' in context.user_data:
-        # Procesar añadir país
-        user_id = context.user_data['waiting_for_country_add']
-        country_input = update.message.text.strip()
-
-        if country_city_service:
-            # Usar el sistema existente de añadir países
-            if len(country_input) == 2 and country_input.isalpha():
-                country_code = country_input.upper()
-                success = country_city_service.add_user_country(user_id, country_code)
-            else:
-                # Buscar por nombre
-                matching_countries = country_city_service.search_countries(country_input)
-                if len(matching_countries) == 1:
-                    success = country_city_service.add_user_country(user_id, matching_countries[0]['code'])
-                else:
-                    await update.message.reply_text("❌ País no encontrado o ambiguo. Usa el código de 2 letras.")
-                    del context.user_data['waiting_for_country_add']
-
-# PRIORIDAD MÁXIMA: Código de autorización OAuth de Spotify
-    if 'waiting_for_spotify_code' in context.user_data:
         # Procesar código de autorización OAuth
         user_id = context.user_data['waiting_for_spotify_code']
         user_input = update.message.text.strip()
@@ -6737,13 +6746,19 @@ async def country_delete_handler(update: Update, context: ContextTypes.DEFAULT_T
     await query.edit_message_text(message, reply_markup=reply_markup)
 
 async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja las acciones relacionadas con artistas desde el menú de configuración"""
+    """Maneja las acciones relacionadas con artistas desde el menú de configuración - CORREGIDO"""
     query = update.callback_query
     await query.answer()
 
     parts = query.data.split("_")
     action = parts[1]
     user_id = int(parts[2])
+
+    # Verificar usuario
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
 
     if action == "add":
         message = (
@@ -6754,13 +6769,23 @@ async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TY
         )
         context.user_data['waiting_for_artist_add'] = user_id
 
+        keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_artists_{user_id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            message,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
     elif action == "search":
-        message = (
+        # Ejecutar búsqueda de conciertos (equivalente a /search)
+        await query.edit_message_text(
             "🔍 *Buscar conciertos*\n\n"
-            "Buscando conciertos de todos tus artistas seguidos...\n"
+            "Iniciando búsqueda de conciertos de todos tus artistas seguidos...\n"
             "Esto puede tardar un momento."
         )
-        # Ejecutar búsqueda de conciertos (equivalente a /search)
+
         # Crear un update falso para reutilizar la función existente
         fake_update = type('obj', (object,), {
             'effective_chat': type('obj', (object,), {'id': query.message.chat_id})(),
@@ -6769,14 +6794,18 @@ async def artist_action_handler(update: Update, context: ContextTypes.DEFAULT_TY
             })()
         })()
 
+        fake_context = type('obj', (object,), {
+            'args': [],
+            'user_data': context.user_data
+        })()
+
         # Llamar al comando search existente
-        await search_command(fake_update, context)
+        await search_command(fake_update, fake_context)
         return
 
-    keyboard = [[InlineKeyboardButton("❌ Cancelar", callback_data=f"config_artists_{user_id}")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    else:
+        await query.edit_message_text("❌ Acción no reconocida.")
 
-    await query.edit_message_text(message, parse_mode='Markdown', reply_markup=reply_markup)
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /show - muestra conciertos futuros de artistas seguidos desde la base de datos"""
@@ -7748,7 +7777,7 @@ async def handle_lastfm_change_limit(query, user: Dict, context: ContextTypes.DE
     message = (
         "🔢 *Cambiar cantidad de artistas*\n\n"
         "Envía el número de artistas que quieres sincronizar por período.\n"
-        "Rango permitido: 5-200 artistas\n\n"
+        "Rango permitido: 5-10000 artistas\n\n"
         "Ejemplo: 50"
     )
 
@@ -8776,7 +8805,7 @@ async def handle_spotify_change_limit(query, user: Dict, context: ContextTypes.D
     message = (
         "🔢 *Cambiar cantidad de artistas*\n\n"
         "Envía el número de artistas que quieres mostrar.\n"
-        "Rango permitido: 5-100 artistas\n\n"
+        "Rango permitido: 5-10000 artistas\n\n"
         "Ejemplo: 30"
     )
 
@@ -8934,6 +8963,12 @@ def main():
     application.add_handler(CallbackQueryHandler(back_to_summary_callback, pattern="^back_to_summary_"))
     application.add_handler(CallbackQueryHandler(continent_selection_callback, pattern="^continent_"))
     application.add_handler(CallbackQueryHandler(back_to_continents_callback, pattern="^back_to_continents$"))
+
+    # Paginación de /list (ANTES de los handlers genéricos)
+    application.add_handler(CallbackQueryHandler(list_page_callback, pattern="^list_page_"))
+
+    # Callback para página actual (no hace nada, solo evita errores)
+    application.add_handler(CallbackQueryHandler(lambda update, context: update.callback_query.answer(), pattern="^current_list_page$"))
 
 
     # Handlers específicos de Spotify (DEBEN IR ANTES que los genéricos)
