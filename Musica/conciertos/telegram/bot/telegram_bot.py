@@ -17,10 +17,12 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 
 
 # Importar módulos propios
+from apis.muspy_service import MuspyService
 from apis.country_state_city import CountryCityService
 from database import ArtistTrackerDatabase
 from user_services import UserServices, initialize_concert_services, initialize_country_service, initialize_lastfm_service, validate_services, get_services
 from concert_search import search_concerts_for_artist, format_concerts_message, format_single_artist_concerts_complete, split_long_message
+from handlers_helpers import MuspyHandlers, MUSPY_EMAIL, MUSPY_PASSWORD, MUSPY_USERID
 from handlers_helpers import (
 handle_notification_callback, handle_country_callback, handle_service_callback,
 handle_lastfm_period_selection, handle_lastfm_do_sync, handle_lastfm_change_limit, handle_lastfm_change_user,
@@ -42,6 +44,8 @@ logger = logging.getLogger(__name__)
 db = None
 user_services = None
 application = None
+muspy_service = None
+muspy_handlers = None
 
 async def spotify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /spotify - gestión de sincronización con Spotify - VERSIÓN CORREGIDA"""
@@ -3649,6 +3653,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         "📖 *Configuración:*\n"
         "/config - Configurar tus preferencias\n"
+        "/muspy - Panel de configuración de Muspy\n"
         "/spotify - Configurar tus preferencias de Spotify\n"
         "/lastfm - Configurar tus preferencias de Last.fm\n\n"
 
@@ -3675,6 +3680,7 @@ async def commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📖 *Configuración:*\n"
         "/adduser <usuario> - Registrarte en el sistema\n"
         "/config - Configurar tus preferencias\n"
+        "/muspy - Panel de configuración de Muspy\n"
         "/spotify - Configurar tus preferencias de Spotify\n"
         "/lastfm - Configurar tus preferencias de Last.fm\n"
         "/notify [HH:MM] - Configurar notificaciones diarias\n"
@@ -4415,7 +4421,8 @@ async def process_and_send_concert_results(update, status_message, concerts, pro
 
 def main():
     """Función principal MODIFICADA para usar módulos separados"""
-    global db, user_services, application
+    global db, user_services, application, muspy_service, muspy_handlers
+
 
     # Configuración
     TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_CONCIERTOS')
@@ -4428,6 +4435,9 @@ def main():
 
     # Inicializar base de datos
     db = ArtistTrackerDatabase(DB_PATH)
+
+    db.init_muspy_tables()
+
 
     # Inicializar servicios de usuario
     user_services = UserServices(db)
@@ -4460,11 +4470,31 @@ def main():
     except Exception as e:
         logger.warning(f"MusicBrainz no disponible: {e}")
 
+    # Inicializar servicio de Muspy
+    muspy_service = MuspyService()
+    muspy_handlers = MuspyHandlers(db, muspy_service)
+
     # Validar servicios
     validate_services()
 
     # Crear la aplicación y agregar handlers
     application = Application.builder().token(TELEGRAM_TOKEN).build()
+
+    # ConversationHandler para el login de Muspy
+    muspy_login_conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(
+            muspy_handlers._start_muspy_login,
+            pattern="^muspy_login_"
+        )],
+        states={
+            MUSPY_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, muspy_handlers.login_email_handler)],
+            MUSPY_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, muspy_handlers.login_password_handler)],
+            MUSPY_USERID: [MessageHandler(filters.TEXT & ~filters.COMMAND, muspy_handlers.login_userid_handler)],
+        },
+        fallbacks=[CommandHandler('cancel', muspy_handlers.cancel_login)],
+        per_chat=True,
+        per_user=True
+    )
 
     # Handlers de comandos básicos
     application.add_handler(CommandHandler("start", start))
@@ -4499,9 +4529,18 @@ def main():
     # Handler de configuración
     application.add_handler(CommandHandler("config", config_command))
 
-    # Handlers de Last.fm y Spotify
+    # Handlers de Last.fm y Spotify y Muspy
     application.add_handler(CommandHandler("lastfm", lastfm_command))
     application.add_handler(CommandHandler("spotify", spotify_command))
+    application.add_handler(CommandHandler("muspy", muspy_handlers.muspy_command))
+
+    # ConversationHandler para login de Muspy
+    application.add_handler(muspy_login_conv_handler)
+
+    application.add_handler(CallbackQueryHandler(
+        muspy_handlers.muspy_callback_handler,
+        pattern="^muspy_"
+    ))
 
     # Callbacks específicos de países
     application.add_handler(CallbackQueryHandler(country_selection_callback, pattern="^(select_country_|cancel_country_selection)"))
