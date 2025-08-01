@@ -41,7 +41,6 @@ class TicketmasterService:
         # Si no hay caché válido, consultar API
         params = {
             "keyword": artist_name,
-
             "countryCode": country_code,
             "size": size,
             "sort": "date,asc",
@@ -58,19 +57,28 @@ class TicketmasterService:
 
             concerts = []
             for event in data['_embedded']['events']:
-                # Extraer datos relevantes
+                # Extraer datos relevantes con validación de calidad
+                venue_info = self._extract_venue_info(event)
+
+                # FILTRO DE CALIDAD: Solo guardar si tenemos ciudad válida
+                if venue_info['city'] == 'Unknown city' or not venue_info['city']:
+                    continue
+
                 concert = {
                     'artist': artist_name,
                     'name': event.get('name', 'No title'),
-                    'venue': event.get('_embedded', {}).get('venues', [{}])[0].get('name', 'Unknown venue'),
-                    'city': event.get('_embedded', {}).get('venues', [{}])[0].get('city', {}).get('name', 'Unknown city'),
+                    'venue': venue_info['venue'],
+                    'city': venue_info['city'],
+                    'country': venue_info['country'],
+                    'country_code': venue_info['country_code'],
                     'date': event.get('dates', {}).get('start', {}).get('localDate', 'Unknown date'),
                     'time': event.get('dates', {}).get('start', {}).get('localTime', ''),
                     'image': next((img.get('url', '') for img in event.get('images', [])
                             if img.get('ratio') == '16_9' and img.get('width') > 500),
                             event.get('images', [{}])[0].get('url', '') if event.get('images') else ''),
                     'url': event.get('url', ''),
-                    'id': event.get('id', '')  # Add this line to include the event ID
+                    'source': 'Ticketmaster',
+                    'id': event.get('id', '')
                 }
                 concerts.append(concert)
 
@@ -83,14 +91,6 @@ class TicketmasterService:
             return [], f"Error en la solicitud: {str(e)}"
         except ValueError as e:
             return [], f"Error procesando respuesta: {str(e)}"
-
-    def _get_cache_file_path(self, artist_name, country_code):
-        """Generar ruta al archivo de caché para un artista y país"""
-        # Normalizar nombre para archivo
-        safe_name = "".join(x for x in artist_name if x.isalnum() or x in " _-").rstrip()
-        safe_name = safe_name.replace(" ", "_").lower()
-
-        return self.cache_dir / f"ticketmaster_{safe_name}_{country_code}.json"
 
     def search_concerts_global(self, artist_name, size=200):
         """
@@ -133,19 +133,23 @@ class TicketmasterService:
             concerts = []
             for event in data['_embedded']['events']:
                 # Extraer datos relevantes incluyendo país
-                venue_data = event.get('_embedded', {}).get('venues', [{}])[0]
-                country_code = venue_data.get('country', {}).get('countryCode', '')
+                venue_info = self._extract_venue_info(event)
+
+                # FILTRO DE CALIDAD: Solo guardar si tenemos ciudad válida
+                if venue_info['city'] == 'Unknown city' or not venue_info['city']:
+                    continue
 
                 concert = {
-                    'artist': artist_name,  # Mantener consistencia con el nombre buscado
+                    'artist': artist_name,
                     'name': event.get('name', 'No title'),
-                    'venue': venue_data.get('name', 'Unknown venue'),
-                    'city': venue_data.get('city', {}).get('name', 'Unknown city'),
-                    'country': country_code,  # Añadir país explícitamente
+                    'venue': venue_info['venue'],
+                    'city': venue_info['city'],
+                    'country': venue_info['country'],
+                    'country_code': venue_info['country_code'],
                     'date': event.get('dates', {}).get('start', {}).get('localDate', 'Unknown date'),
                     'time': event.get('dates', {}).get('start', {}).get('localTime', ''),
                     'url': event.get('url', ''),
-                    'source': 'Ticketmaster',  # Añadir fuente
+                    'source': 'Ticketmaster',
                     'id': event.get('id', '')
                 }
                 concerts.append(concert)
@@ -160,6 +164,99 @@ class TicketmasterService:
         except ValueError as e:
             return [], f"Error procesando respuesta: {str(e)}"
 
+    def _extract_venue_info(self, event):
+        """
+        Extrae información de venue de manera robusta con múltiples fallbacks
+        Basado en la estructura oficial de la API de Ticketmaster
+        """
+        venue_info = {
+            'venue': 'Unknown venue',
+            'city': 'Unknown city',
+            'country': 'Unknown country',
+            'country_code': ''
+        }
+
+        # Intentar obtener datos del venue
+        venues = event.get('_embedded', {}).get('venues', [])
+        if not venues:
+            return venue_info
+
+        venue = venues[0]  # Primer venue
+
+        # 1. NOMBRE DEL VENUE
+        venue_info['venue'] = venue.get('name', 'Unknown venue')
+
+        # 2. CIUDAD - Según documentación de Ticketmaster
+        city = None
+
+        # Método principal: venue.city.name
+        if 'city' in venue and isinstance(venue['city'], dict):
+            city = venue['city'].get('name')
+
+        # Fallback 1: venue.address.line2 (a veces la ciudad está aquí)
+        if not city and 'address' in venue and isinstance(venue['address'], dict):
+            city = venue['address'].get('line2')
+
+        # Fallback 2: venue.state.name si no hay ciudad específica
+        if not city and 'state' in venue and isinstance(venue['state'], dict):
+            state_name = venue['state'].get('name')
+            if state_name and len(state_name) > 2:  # Evitar códigos como "CA", "TX"
+                city = state_name
+
+        # Fallback 3: venue.markets[0].name
+        if not city and 'markets' in venue and venue['markets']:
+            market = venue['markets'][0]
+            if isinstance(market, dict):
+                city = market.get('name')
+
+        venue_info['city'] = city if city else 'Unknown city'
+
+        # 3. PAÍS Y CÓDIGO DE PAÍS - Según documentación
+        country = None
+        country_code = None
+
+        # Método principal: venue.country
+        if 'country' in venue and isinstance(venue['country'], dict):
+            country = venue['country'].get('name')
+            country_code = venue['country'].get('countryCode')
+
+        # Fallback 1: venue.address.country
+        if not country_code and 'address' in venue and isinstance(venue['address'], dict):
+            address_country = venue['address'].get('country')
+            if isinstance(address_country, dict):
+                country = address_country.get('name')
+                country_code = address_country.get('countryCode')
+            elif isinstance(address_country, str) and len(address_country) == 2:
+                country_code = address_country.upper()
+
+        # Fallback 2: venue.state.stateCode para determinar país (US/CA principalmente)
+        if not country_code and 'state' in venue and isinstance(venue['state'], dict):
+            state_code = venue['state'].get('stateCode')
+            if state_code:
+                # Estados Unidos y Canadá tienen códigos de estado conocidos
+                us_states = {'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'}
+                ca_provinces = {'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'}
+
+                if state_code in us_states:
+                    country_code = 'US'
+                    country = 'United States'
+                elif state_code in ca_provinces:
+                    country_code = 'CA'
+                    country = 'Canada'
+
+        venue_info['country'] = country if country else 'Unknown country'
+        venue_info['country_code'] = country_code if country_code else ''
+
+        return venue_info
+
+    def _get_cache_file_path(self, artist_name, country_code):
+        """Generar ruta al archivo de caché para un artista y país"""
+        # Normalizar nombre para archivo
+        safe_name = "".join(x for x in artist_name if x.isalnum() or x in " _-").rstrip()
+        safe_name = safe_name.replace(" ", "_").lower()
+
+        return self.cache_dir / f"ticketmaster_{safe_name}_{country_code}.json"
+
     def _get_cache_file_path_global(self, artist_name):
         """Generar ruta al archivo de caché global para un artista"""
         # Normalizar nombre para archivo
@@ -167,7 +264,6 @@ class TicketmasterService:
         safe_name = safe_name.replace(" ", "_").lower()
 
         return self.cache_dir / f"ticketmaster_global_{safe_name}.json"
-
 
     def _load_from_cache(self, cache_file):
         """Cargar datos de caché si existen y son válidos"""
