@@ -12,18 +12,31 @@ from typing import Optional, List, Dict, Tuple
 import traceback
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
-
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters,
+    ConversationHandler
+)
 
 
 # Importar módulos propios
+# APIS
 from apis.muspy_service import MuspyService
 from apis.country_state_city import CountryCityService
+# MÓDULOS
 from database import ArtistTrackerDatabase
 from user_services import UserServices, initialize_concert_services, initialize_country_service, initialize_lastfm_service, validate_services, get_services
 from concert_search import search_concerts_for_artist, format_concerts_message, format_single_artist_concerts_complete, split_long_message
-from handlers_helpers import MuspyHandlers, MUSPY_EMAIL, MUSPY_PASSWORD, MUSPY_USERID
-from handlers_helpers import (
+# cal
+from handlers.calendar_handlers import CalendarHandlers
+# muspy
+from handlers.muspy_handlers import MuspyHandlers, MUSPY_EMAIL, MUSPY_PASSWORD, MUSPY_USERID
+# telegram handlers
+from handlers.handlers_helpers import (
 handle_notification_callback, handle_country_callback, handle_service_callback,
 handle_lastfm_period_selection, handle_lastfm_do_sync, handle_lastfm_change_limit, handle_lastfm_change_user,
 handle_spotify_authentication, handle_spotify_real_artists, handle_spotify_show_artists,
@@ -46,6 +59,7 @@ user_services = None
 application = None
 muspy_service = None
 muspy_handlers = None
+calendar_handlers = None
 
 async def spotify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /spotify - gestión de sincronización con Spotify - VERSIÓN CORREGIDA"""
@@ -2603,12 +2617,19 @@ async def show_artists_menu(query, user: Dict):
 
 
 
-def filter_future_concerts_by_countries(all_concerts, user_countries):
-    """Filtra conciertos futuros por países del usuario"""
+def filter_future_concerts_by_countries(all_concerts, user_countries, database_path=None):
+    """
+    Filtra conciertos futuros por países del usuario
+    VERSIÓN CORREGIDA: Acepta database_path como parámetro
+    """
+    from user_services import get_services
+    from datetime import datetime
+
     services = get_services()
     today = datetime.now().date()
     future_concerts = []
 
+    # Primero filtrar por fecha (solo futuros)
     for concert in all_concerts:
         concert_date = concert.get('date', '')
         if concert_date and len(concert_date) >= 10:
@@ -2617,31 +2638,45 @@ def filter_future_concerts_by_countries(all_concerts, user_countries):
                 if concert_date_obj >= today:
                     future_concerts.append(concert)
             except ValueError:
+                # Si no se puede parsear la fecha, incluir el concierto
                 future_concerts.append(concert)
         else:
+            # Si no hay fecha, incluir el concierto
             future_concerts.append(concert)
 
-    # Filtrar por países del usuario
+    # Luego filtrar por países del usuario
     filtered_concerts = []
-    if services.get('country_state_city'):
+
+    if services.get('country_state_city') and database_path:
         try:
             from apis.country_state_city import ArtistTrackerDatabaseExtended
-            extended_db = ArtistTrackerDatabaseExtended(db.db_path, services['country_state_city'])
+            extended_db = ArtistTrackerDatabaseExtended(database_path, services['country_state_city'])
             filtered_concerts = extended_db.filter_concerts_by_countries(future_concerts, user_countries)
+            logger.debug(f"Filtrado avanzado: {len(future_concerts)} -> {len(filtered_concerts)} conciertos")
+
         except Exception as e:
             logger.error(f"Error filtrando conciertos por países: {e}")
             # Fallback a filtrado básico
-            for concert in future_concerts:
-                concert_country = concert.get('country', '').upper()
-                if not concert_country or concert_country in user_countries:
-                    filtered_concerts.append(concert)
+            filtered_concerts = _basic_country_filter(future_concerts, user_countries)
     else:
         # Filtrado básico si no hay servicio de países
-        for concert in future_concerts:
-            concert_country = concert.get('country', '').upper()
-            if not concert_country or concert_country in user_countries:
-                filtered_concerts.append(concert)
+        filtered_concerts = _basic_country_filter(future_concerts, user_countries)
 
+    return filtered_concerts
+
+
+def _basic_country_filter(concerts, user_countries):
+    """Filtrado básico por código de país"""
+    filtered_concerts = []
+
+    for concert in concerts:
+        concert_country = concert.get('country_code', concert.get('country', '')).upper()
+
+        # Si no hay información de país O el país está en la lista del usuario, incluir
+        if not concert_country or concert_country in user_countries:
+            filtered_concerts.append(concert)
+
+    logger.debug(f"Filtrado básico: {len(concerts)} -> {len(filtered_concerts)} conciertos")
     return filtered_concerts
 
 def get_no_concerts_suggestions(is_search, countries_text):
@@ -4157,7 +4192,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        all_new_concerts = []
+        all_found_concerts = []
         processed_artists = 0
         total_artists = len(followed_artists)
         services = get_services()
@@ -4179,6 +4214,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             try:
                 # Buscar conciertos para este artista
+                # search_concerts_for_artist YA guarda los conciertos y retorna TODOS los encontrados
                 artist_concerts = await search_concerts_for_artist(
                     artist_name,
                     user_services_config,
@@ -4187,8 +4223,8 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     database=db
                 )
 
-                # Los conciertos ya se guardan en search_concerts_for_artist
-                all_new_concerts.extend(artist_concerts)
+                # Añadir a la lista total (sin filtrar aún)
+                all_found_concerts.extend(artist_concerts)
 
                 # Pausa para no sobrecargar las APIs
                 await asyncio.sleep(1.5)
@@ -4197,9 +4233,24 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Error buscando conciertos para {artist_name}: {e}")
                 continue
 
+        # Ahora SÍ filtrar los conciertos por países y fechas futuras
+        await status_message.edit_text(
+            f"✅ Búsqueda completada!\n"
+            f"🎵 {len(all_found_concerts)} conciertos encontrados en total\n"
+            f"🌍 Filtrando por países: {countries_text}\n"
+            f"📅 Filtrando solo conciertos futuros..."
+        )
+
+        # Filtrar por países y fechas futuras
+        filtered_concerts = filter_future_concerts_by_countries(
+            all_found_concerts,
+            user_countries,
+            database_path=db.db_path
+        )
+
         # Procesar y enviar resultados
         await process_and_send_concert_results(
-            update, status_message, all_new_concerts, processed_artists, countries_text, services_text, is_search=True
+            update, status_message, filtered_concerts, processed_artists, countries_text, services_text, is_search=True
         )
 
     except Exception as e:
@@ -4413,6 +4464,112 @@ async def process_and_send_concert_results(update, status_message, concerts, pro
     )
 
 
+# ===========================
+# MUSPY
+# ===========================
+
+async def muspy_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks de Muspy - VERSIÓN INTEGRADA"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Muspy callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) < 3 or parts[0] != "muspy":
+        await query.edit_message_text("❌ Callback no válido.")
+        return
+
+    action = parts[1]
+
+    # Obtener user_id del final
+    try:
+        user_id = int(parts[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Error de usuario.")
+        return
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        if action == "menu":
+            # Volver al menú principal de Muspy
+            fake_update = type('obj', (object,), {
+                'message': query.message,
+                'callback_query': query,
+                'effective_chat': query.message.chat
+            })()
+            await muspy_handlers.muspy_command(fake_update, context)
+
+        elif action == "artists" and len(parts) > 2 and parts[2] == "page":
+            # Manejar paginación de artistas
+            page = int(parts[3]) if len(parts) > 3 else 0
+
+            if user_id in muspy_handlers.user_artists_cache:
+                artists = muspy_handlers.user_artists_cache[user_id]
+                await muspy_handlers._show_artists_page(query, user_id, artists, page)
+            else:
+                await query.edit_message_text("❌ Lista de artistas expirada. Usa `/muspy` de nuevo.")
+
+        elif action == "current" and parts[1] == "current" and parts[2] == "page":
+            # No hacer nada si presiona el botón de página actual
+            return
+
+        else:
+            # Delegar al handler principal de Muspy
+            await muspy_handlers.muspy_callback_handler(update, context)
+
+    except Exception as e:
+        logger.error(f"Error en muspy_callback_handler: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
+
+
+# ===========================
+# CALENDARIO
+# ===========================
+
+async def calendar_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja todos los callbacks de calendario"""
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    logger.info(f"Calendar callback recibido: {callback_data}")
+
+    # Parsear callback data
+    parts = callback_data.split("_")
+    if len(parts) != 3 or parts[0] != "cal":
+        await query.edit_message_text("❌ Callback no válido.")
+        return
+
+    action = parts[1]
+    user_id = int(parts[2])
+
+    # Verificar que el usuario existe
+    user = db.get_user_by_chat_id(query.message.chat_id)
+    if not user or user['id'] != user_id:
+        await query.edit_message_text("❌ Error de autenticación.")
+        return
+
+    try:
+        # Delegar al handler principal de calendario
+        await calendar_handlers.cal_callback_handler(update, context)
+
+    except Exception as e:
+        logger.error(f"Error en calendar_callback_handler: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        await query.edit_message_text("❌ Error procesando la solicitud.")
+
 
 
 # ===========================
@@ -4474,6 +4631,10 @@ def main():
     muspy_service = MuspyService()
     muspy_handlers = MuspyHandlers(db, muspy_service)
 
+    # Inicializar handlers de calendario
+    global calendar_handlers
+    calendar_handlers = CalendarHandlers(db, muspy_service)
+
     # Validar servicios
     validate_services()
 
@@ -4507,6 +4668,8 @@ def main():
     application.add_handler(CommandHandler("notify", notify_command))
     application.add_handler(CommandHandler("playlist", playlist_command))
 
+    # Handler de comando calendario
+    application.add_handler(CommandHandler("cal", calendar_handlers.cal_command))
 
     # Handlers de búsqueda
     application.add_handler(CommandHandler("search", search_command))
@@ -4532,15 +4695,15 @@ def main():
     # Handlers de Last.fm y Spotify y Muspy
     application.add_handler(CommandHandler("lastfm", lastfm_command))
     application.add_handler(CommandHandler("spotify", spotify_command))
-    application.add_handler(CommandHandler("muspy", muspy_handlers.muspy_command))
 
     # ConversationHandler para login de Muspy
     application.add_handler(muspy_login_conv_handler)
 
-    application.add_handler(CallbackQueryHandler(
-        muspy_handlers.muspy_callback_handler,
-        pattern="^muspy_"
-    ))
+    # Handler de comando Muspy
+    application.add_handler(CommandHandler("muspy", muspy_handlers.muspy_command))
+
+    application.add_handler(CallbackQueryHandler(muspy_callback_handler, pattern="^muspy_"))
+
 
     # Callbacks específicos de países
     application.add_handler(CallbackQueryHandler(country_selection_callback, pattern="^(select_country_|cancel_country_selection)"))
@@ -4553,6 +4716,11 @@ def main():
     application.add_handler(CallbackQueryHandler(list_page_callback, pattern="^list_page_"))
     application.add_handler(CallbackQueryHandler(lastfm_callback_handler, pattern="^lastfm_"))
     application.add_handler(CallbackQueryHandler(spotify_callback_handler, pattern="^spotify_"))
+
+
+    # Callbacks de calendario (DESPUÉS de muspy_callback_handler)
+    application.add_handler(CallbackQueryHandler(calendar_callback_handler, pattern="^cal_"))
+
 
     # Callback para página actual (no hace nada, solo evita errores)
     application.add_handler(CallbackQueryHandler(

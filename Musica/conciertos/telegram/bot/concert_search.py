@@ -16,7 +16,8 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
                                    user_id: int = None, services: Dict = None, database = None) -> List[Dict]:
     """
     Busca conciertos para un artista usando los servicios habilitados
-    VERSIÓN MEJORADA: Guarda todos los conciertos pero retorna solo los filtrados por países del usuario
+    VERSIÓN CORREGIDA: Guarda todos los conciertos y retorna todos los encontrados (sin filtrar por países)
+    El filtrado por países se hace después en el comando que llama a esta función
 
     Args:
         artist_name: Nombre del artista
@@ -45,75 +46,76 @@ async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, 
     if user_services.get('ticketmaster', True) and services.get('ticketmaster_service'):
         try:
             # Usar búsqueda global para obtener TODOS los conciertos
-            concerts, _ = services['ticketmaster_service'].search_concerts_global(artist_name)
+            concerts, status = services['ticketmaster_service'].search_concerts_global(artist_name)
 
             # GUARDAR TODOS los conciertos encontrados (sin filtrar)
+            saved_count = 0
             for concert in concerts:
                 if database:
+                    # Asegurar que el concierto tenga el artist_name correcto
+                    concert['artist_name'] = artist_name
                     concert_id = database.save_concert(concert)
-                    logger.debug(f"Guardado concierto: {concert.get('name', '')} en {concert.get('country', '')}")
+                    if concert_id:
+                        saved_count += 1
+                        logger.debug(f"Guardado concierto: {concert.get('name', '')} en {concert.get('city', '')}, {concert.get('country', '')}")
 
             all_concerts.extend(concerts)
-            logger.info(f"Ticketmaster global: {len(concerts)} conciertos encontrados y guardados para {artist_name}")
+            logger.info(f"Ticketmaster global: {len(concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
+
         except Exception as e:
             logger.error(f"Error buscando en Ticketmaster: {e}")
 
-    # Buscar en Spotify si está habilitado (sin cambios)
+    # Buscar en Spotify si está habilitado
     if user_services.get('spotify', True) and services.get('spotify_service'):
         try:
-            concerts, _ = services['spotify_service'].search_artist_and_concerts(artist_name)
+            concerts, status = services['spotify_service'].search_artist_and_concerts(artist_name)
+
+            saved_count = 0
             for concert in concerts:
                 if database:
-                    database.save_concert(concert)
+                    concert['artist_name'] = artist_name
+                    concert_id = database.save_concert(concert)
+                    if concert_id:
+                        saved_count += 1
+
             all_concerts.extend(concerts)
-            logger.info(f"Spotify: {len([c for c in concerts if c.get('source') == 'Spotify'])} conciertos encontrados para {artist_name}")
+            spotify_concerts = [c for c in concerts if c.get('source') == 'Spotify']
+            logger.info(f"Spotify: {len(spotify_concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
+
         except Exception as e:
             logger.error(f"Error buscando en Spotify: {e}")
 
-    # Buscar en Setlist.fm si está habilitado - MANTENER POR PAÍS
+    # Buscar en Setlist.fm si está habilitado - BÚSQUEDA POR PAÍS
     if user_services.get('setlistfm', True) and services.get('setlistfm_service'):
         try:
+            setlist_concerts = []
+            saved_count = 0
+
             # Setlist.fm mantiene búsqueda por país ya que es más específico
             for country_code in user_countries:
-                concerts, _ = services['setlistfm_service'].search_concerts(artist_name, country_code)
+                concerts, status = services['setlistfm_service'].search_concerts(artist_name, country_code)
+
                 for concert in concerts:
                     if database:
-                        database.save_concert(concert)
-                all_concerts.extend(concerts)
+                        concert['artist_name'] = artist_name
+                        concert_id = database.save_concert(concert)
+                        if concert_id:
+                            saved_count += 1
 
-            logger.info(f"Setlist.fm: {len([c for c in all_concerts if c.get('source') == 'Setlist.fm'])} conciertos encontrados para {artist_name}")
+                setlist_concerts.extend(concerts)
+
+            all_concerts.extend(setlist_concerts)
+            logger.info(f"Setlist.fm: {len(setlist_concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
+
         except Exception as e:
             logger.error(f"Error buscando en Setlist.fm: {e}")
 
-    # FILTRAR por países del usuario SOLO para retorno (no para guardado)
-    if services.get('country_state_city') and user_id:
-        try:
-            from apis.country_state_city import ArtistTrackerDatabaseExtended
-            extended_db = ArtistTrackerDatabaseExtended(database.db_path, services['country_state_city'])
-            filtered_concerts = extended_db.filter_concerts_by_countries(all_concerts, user_countries)
+    # RETORNAR TODOS los conciertos encontrados SIN FILTRAR
+    # El filtrado por países se hará después en el comando
+    logger.info(f"Total para {artist_name}: {len(all_concerts)} conciertos encontrados y guardados")
+    return all_concerts
 
-            logger.info(f"Conciertos para {artist_name}: {len(all_concerts)} totales guardados -> {len(filtered_concerts)} filtrados para países: {user_countries}")
-            return filtered_concerts
-        except Exception as e:
-            logger.error(f"Error filtrando conciertos: {e}")
-            # Si falla el filtrado, hacer filtrado básico por país
-            filtered_concerts = []
-            for concert in all_concerts:
-                concert_country = concert.get('country', '').upper()
-                if not concert_country or concert_country in user_countries:
-                    filtered_concerts.append(concert)
 
-            logger.info(f"Filtrado básico aplicado: {len(all_concerts)} -> {len(filtered_concerts)}")
-            return filtered_concerts
-
-    # Si no hay servicio de países, filtrar manualmente
-    filtered_concerts = []
-    for concert in all_concerts:
-        concert_country = concert.get('country', '').upper()
-        if not concert_country or concert_country in user_countries:
-            filtered_concerts.append(concert)
-
-    return filtered_concerts
 
 async def update_concerts_database(database, services: Dict = None):
     """
