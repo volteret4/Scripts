@@ -10,6 +10,12 @@ import json
 import hashlib
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
+import asyncio
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+
 
 logger = logging.getLogger(__name__)
 
@@ -2219,3 +2225,236 @@ class ArtistTrackerDatabase:
             return False
         finally:
             conn.close()
+
+# clase para multihilos
+
+
+class DatabaseConcurrentWrapper:
+    """
+    Wrapper que proporciona conexiones de base de datos thread-safe
+    COMPATIBLE con código existente que espera get_connection() directo
+    """
+
+    def __init__(self, db_instance):
+        self.db_instance = db_instance
+        self.db_path = db_instance.db_path
+        self._local = threading.local()
+        self._lock = threading.Lock()
+
+    def _get_thread_connection(self):
+        """Obtiene una conexión thread-local"""
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._local.connection = sqlite3.connect(
+                self.db_path,
+                timeout=30.0,  # Timeout más largo
+                check_same_thread=False  # Permitir uso entre threads
+            )
+            self._local.connection.row_factory = sqlite3.Row
+            # Configurar conexión para mejor concurrencia
+            self._local.connection.execute("PRAGMA journal_mode=WAL")
+            self._local.connection.execute("PRAGMA synchronous=NORMAL")
+            self._local.connection.execute("PRAGMA cache_size=10000")
+            self._local.connection.execute("PRAGMA temp_store=MEMORY")
+        return self._local.connection
+
+    def get_connection(self):
+        """
+        MÉTODO COMPATIBLE: Devuelve una conexión thread-safe
+        que se comporta como la original
+        """
+        return ThreadSafeConnection(self._get_thread_connection())
+
+    @contextmanager
+    def get_connection_context(self):
+        """Context manager para operaciones más complejas"""
+        conn = self._get_thread_connection()
+        try:
+            yield conn
+        finally:
+            # NO cerrar la conexión aquí, solo commitear
+            try:
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    def save_concert(self, concert_data):
+        """Guarda un concierto de forma thread-safe"""
+        try:
+            with self.get_connection_context() as conn:
+                cursor = conn.cursor()
+
+                # Verificar si ya existe
+                cursor.execute("""
+                    SELECT id FROM concerts
+                    WHERE artist_name = ? AND venue = ? AND city = ? AND date = ?
+                """, (
+                    concert_data.get('artist_name', ''),
+                    concert_data.get('venue', ''),
+                    concert_data.get('city', ''),
+                    concert_data.get('date', '')
+                ))
+
+                if cursor.fetchone():
+                    return  # Ya existe
+
+                # Insertar nuevo concierto
+                cursor.execute("""
+                    INSERT INTO concerts (
+                        artist_name, name, venue, city, country, country_code,
+                        date, time, url, source, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """, (
+                    concert_data.get('artist_name', ''),
+                    concert_data.get('name', ''),
+                    concert_data.get('venue', ''),
+                    concert_data.get('city', ''),
+                    concert_data.get('country', ''),
+                    concert_data.get('country_code', ''),
+                    concert_data.get('date', ''),
+                    concert_data.get('time', ''),
+                    concert_data.get('url', ''),
+                    concert_data.get('source', '')
+                ))
+
+        except Exception as e:
+            logger.error(f"Error guardando concierto thread-safe: {e}")
+
+    def close_thread_connections(self):
+        """Cierra las conexiones thread-local"""
+        if hasattr(self._local, 'connection') and self._local.connection:
+            try:
+                self._local.connection.close()
+                self._local.connection = None
+            except Exception as e:
+                logger.error(f"Error cerrando conexión thread-local: {e}")
+
+    def close_pool(self):
+        """Cierra todas las conexiones del pool"""
+        self.close_thread_connections()
+
+    # Delegar otros métodos al objeto original
+    def __getattr__(self, name):
+        return getattr(self.db_instance, name)
+
+
+class ThreadSafeConnection:
+    """
+    Wrapper para conexiones SQLite que proporciona auto-commit y manejo de errores
+    COMPATIBLE con código existente
+    """
+
+    def __init__(self, connection):
+        self._connection = connection
+        self._closed = False
+
+    def cursor(self):
+        """Devuelve un cursor thread-safe"""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+        return ThreadSafeCursor(self._connection.cursor(), self._connection)
+
+    def execute(self, sql, parameters=None):
+        """Ejecuta SQL directamente"""
+        if self._closed:
+            raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+
+        if parameters:
+            return self._connection.execute(sql, parameters)
+        else:
+            return self._connection.execute(sql)
+
+    def commit(self):
+        """Commit de transacción"""
+        if not self._closed:
+            self._connection.commit()
+
+    def rollback(self):
+        """Rollback de transacción"""
+        if not self._closed:
+            self._connection.rollback()
+
+    def close(self):
+        """Marca como cerrada pero NO cierra la conexión real (thread-local se mantiene)"""
+        self._closed = True
+        # NO cerrar self._connection porque es compartida por el thread
+        # Solo hacer commit de cambios pendientes
+        try:
+            if not self._closed:
+                self._connection.commit()
+        except Exception as e:
+            logger.debug(f"Error en commit al cerrar: {e}")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.commit()
+        else:
+            self.rollback()
+        self.close()
+
+    # Delegar otros métodos a la conexión real
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+class ThreadSafeCursor:
+    """
+    Wrapper para cursors SQLite con auto-commit
+    """
+
+    def __init__(self, cursor, connection):
+        self._cursor = cursor
+        self._connection = connection
+
+    def execute(self, sql, parameters=None):
+        """Ejecuta SQL y hace auto-commit para operaciones de escritura"""
+        try:
+            if parameters:
+                result = self._cursor.execute(sql, parameters)
+            else:
+                result = self._cursor.execute(sql)
+
+            # Auto-commit para operaciones de escritura
+            sql_upper = sql.strip().upper()
+            if any(sql_upper.startswith(op) for op in ['INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP']):
+                self._connection.commit()
+
+            return result
+        except Exception as e:
+            self._connection.rollback()
+            raise e
+
+    def executemany(self, sql, parameters):
+        """Ejecuta SQL múltiple con auto-commit"""
+        try:
+            result = self._cursor.executemany(sql, parameters)
+            self._connection.commit()
+            return result
+        except Exception as e:
+            self._connection.rollback()
+            raise e
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def fetchmany(self, size=None):
+        if size is None:
+            return self._cursor.fetchmany()
+        return self._cursor.fetchmany(size)
+
+    # Delegar otros métodos al cursor real
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+
+# Función para actualizar la BD global en main()
+def upgrade_database_for_concurrency(db_instance):
+    """Wrappea la instancia de BD existente para concurrencia"""
+    return DatabaseConcurrentWrapper(db_instance)
