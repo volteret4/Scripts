@@ -6,7 +6,7 @@ Un bot de Telegram avanzado que permite buscar conciertos, gestionar artistas fa
 
 ### 🔍 Búsqueda de Conciertos
 
-- **Múltiples fuentes**: Ticketmaster, Spotify y Setlist.fm
+- **Múltiples fuentes**: Ticketmaster, Spotify Setlist.fm
 - **Búsqueda por país**: Personalizada según tu ubicación
 - **Resultados en tiempo real**: Con enlaces directos a entradas
 

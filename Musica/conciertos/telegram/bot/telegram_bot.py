@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Tuple
 import traceback
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import NetworkError, RetryAfter, TimedOut
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -21,6 +22,7 @@ from telegram.ext import (
     filters,
     ConversationHandler
 )
+
 
 
 # Importar módulos propios
@@ -3684,18 +3686,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     services = get_services()
 
     help_text = (
-        "¡Bienvenido al Bot de Seguimiento de Artistas! 🎵\n\n"
-
-        "📖 *Configuración:*\n"
-        "/config - Configurar tus preferencias\n"
-        "/muspy - Panel de configuración de Muspy\n"
-        "/spotify - Configurar tus preferencias de Spotify\n"
-        "/lastfm - Configurar tus preferencias de Last.fm\n\n"
+        "🐣Bienvenido al bot de novedades musicales\n\n"
+        "Usa /adduser para registrarte y añadir artistas con /addartist \n"
+        "/spotify y /lastfm permiten añadir artistas facilmente\n"
+        "/muspy sirve para buscar nuevos lanzamientos de tus artistas\n\n"
 
         "📝 *Comandos básicos*\n"
-        "/addartist <artista> - Seguir un artista\n"
-        "/search - Buscar nuevos conciertos de tus artistas (APIs)\n"
-        "/show - Ver conciertos guardados de tus artistas (BD)\n\n"
+        "/addartist <artista> - Añadir artista al bot\n"
+        "/search - Buscar nuevos conciertos de TODOS tus artistas\n"
+        "/show - Ver conciertos guardados de TODOS tus artistas\n"
+        "/mostrar - Ver nuevos lanzamientos de tus artistas de Muspy\n\n"
     )
 
     help_text += (
@@ -3706,29 +3706,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
 async def commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /start MODIFICADO con comandos actualizados"""
+    """Comando /commands"""
     services = get_services()
 
     help_text = (
-        "¡Bienvenido al Bot de Seguimiento de Artistas! 🎵\n\n"
+        "🐣Bienvenido al bot de novedades musicales\n\n"
 
-        "📖 *Configuración:*\n"
+        "💻 *Menús de configuración*\n"
+        "/config - Configura países, notificaciones y artistas seguidos\n"
+        "/muspy - Usa tu cuenta de muspy para buscar nuevos lanzamientos de tus artistas\n"
+        "/spotify - Permite añadir tus artistas seguidos, añadir artistas de playlists propias o desde enlaces\n"
+        "/lastfm - Posibilita añadir tus artistas más escuchados por períodos de tiempo\n\n"
+
+        "📖 *Manejo básico:*\n"
         "/adduser <usuario> - Registrarte en el sistema\n"
-        "/config - Configurar tus preferencias\n"
-        "/muspy - Panel de configuración de Muspy\n"
-        "/spotify - Configurar tus preferencias de Spotify\n"
-        "/lastfm - Configurar tus preferencias de Last.fm\n"
         "/notify [HH:MM] - Configurar notificaciones diarias\n"
         "/serviceon <servicio> - Activar servicio (ticketmaster/spotify/setlistfm)\n"
         "/serviceoff <servicio> - Desactivar servicio\n\n"
 
-        "📝 *Comandos básicos:*\n"
-        "/adduser <usuario> - Registrarte en el sistema\n"
+        "🤖 *Base de datos del bot:*\n"
         "/addartist <artista> - Seguir un artista\n"
-        "/list [usuario] - Ver artistas seguidos\n"
-        "/remove <artista> - Dejar de seguir un artista\n\n"
+        "/remove <artista> - Dejar de seguir un artista\n"
+        "/list [usuario] - Ver artistas seguidos\n\n"
 
-        "🔍 *Comandos de búsqueda:*\n"
+        "💽 *Lanzamientos musicales*\n"
+        "/mostrar - Ver nuevos lanzamientos de tus artistas\n"
+        "/artistas - Lista los artistas seguidos _en Muspy_\n\n"
+
+        "🥁 *Buscar conciertos:*\n"
         "/search - Buscar nuevos conciertos de tus artistas (APIs)\n"
         "/show - Ver conciertos guardados de tus artistas (BD)\n"
         "/searchartist <artista> - Buscar conciertos específicos\n"
@@ -4130,7 +4135,7 @@ async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===========================
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /search - busca nuevos conciertos de artistas seguidos y los muestra organizadamente"""
+    """Comando /search - versión con mejor manejo de red y límites"""
     chat_id = update.effective_chat.id
 
     # Verificar que el usuario esté registrado
@@ -4144,21 +4149,19 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Obtener configuración del usuario
     user_services_config = user_services.get_user_services(user['id'])
 
-    # Manejar caso donde user_services puede ser None
     if not user_services_config:
         user_services_config = {
             'countries': {'ES'},
             'country_filter': 'ES'
         }
 
-    # Verificar que tenga países configurados
+    # Verificar países configurados
     user_countries = user_services_config.get('countries', set())
     if not user_countries:
-        # Usar país por defecto si no tiene configurado
         country_filter = user_services_config.get('country_filter', 'ES')
         user_countries = {country_filter}
 
-    # Verificar que tenga al menos un servicio activo
+    # Verificar servicios activos
     active_services = [s for s, active in user_services_config.items() if active and s not in ['country_filter', 'countries']]
     if not active_services:
         await update.message.reply_text(
@@ -4179,69 +4182,128 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # NUEVO: Limitar número de artistas para evitar saturar la red
+    MAX_ARTISTS_PER_SEARCH = 100  # Límite razonable
+    if len(followed_artists) > MAX_ARTISTS_PER_SEARCH:
+        await update.message.reply_text(
+            f"⚠️ Tienes {len(followed_artists)} artistas seguidos, pero el límite por búsqueda es {MAX_ARTISTS_PER_SEARCH} para evitar problemas de red.\n\n"
+            f"Se procesarán los primeros {MAX_ARTISTS_PER_SEARCH} artistas.\n\n"
+            f"💡 **Sugerencia:** Usa `/show` para ver conciertos ya guardados (más rápido) o reduce el número de artistas seguidos."
+        )
+        followed_artists = followed_artists[:MAX_ARTISTS_PER_SEARCH]
+
     # Mensaje de estado inicial
     countries_text = ", ".join(sorted(user_countries))
     services_text = ", ".join(active_services)
 
-    status_message = await update.message.reply_text(
+    status_message = await safe_send_message(
+        update.message.reply_text,
         f"🔍 Buscando nuevos conciertos de tus artistas seguidos...\n"
         f"🎵 Artistas a procesar: {len(followed_artists)}\n"
         f"🔧 Servicios activos: {services_text}\n"
         f"🌍 Países: {countries_text}\n\n"
-        f"⏳ Iniciando búsqueda activa..."
+        f"⏳ Iniciando búsqueda concurrente..."
     )
 
+    if not status_message:
+        logger.error("No se pudo enviar mensaje de estado inicial")
+        return
+
     try:
-        all_found_concerts = []
-        processed_artists = 0
-        total_artists = len(followed_artists)
+        # MEJORA: Búsqueda concurrente con control de red más estricto
+        semaphore = asyncio.Semaphore(3)  # REDUCIDO de 5 a 3 para menos carga de red
         services = get_services()
 
-        # Buscar conciertos para cada artista seguido
-        for artist in followed_artists:
-            artist_name = artist['name']
-            processed_artists += 1
+        async def search_artist_concurrent_safe(artist, progress_callback):
+            """Busca conciertos para un artista de forma concurrente con mejor manejo de errores"""
+            async with semaphore:
+                try:
+                    artist_name = artist['name']
 
-            # Actualizar progreso cada 3 artistas
-            if processed_artists % 3 == 0 or processed_artists == total_artists:
-                await status_message.edit_text(
-                    f"🔍 Buscando nuevos conciertos...\n"
-                    f"📊 Progreso: {processed_artists}/{total_artists} artistas\n"
-                    f"🎵 Actual: {artist_name}\n"
-                    f"🔧 Servicios: {services_text}\n"
-                    f"🌍 Países: {countries_text}"
-                )
+                    # NUEVO: Pausa adicional entre búsquedas para reducir carga de red
+                    await asyncio.sleep(0.5)
 
-            try:
-                # Buscar conciertos para este artista
-                # search_concerts_for_artist YA guarda los conciertos y retorna TODOS los encontrados
-                artist_concerts = await search_concerts_for_artist(
-                    artist_name,
-                    user_services_config,
-                    user_id=user['id'],
-                    services=services,
-                    database=db
-                )
+                    concerts = await search_concerts_for_artist(
+                        artist_name,
+                        user_services_config,
+                        user_id=user['id'],
+                        services=services,
+                        database=db
+                    )
+                    await progress_callback(artist_name, len(concerts))
+                    return concerts
+                except Exception as e:
+                    logger.error(f"Error buscando conciertos para {artist['name']}: {e}")
+                    await progress_callback(artist['name'], 0)
+                    return []
 
-                # Añadir a la lista total (sin filtrar aún)
-                all_found_concerts.extend(artist_concerts)
+        # Contador de progreso thread-safe
+        progress_lock = asyncio.Lock()
+        processed_count = 0
+        total_artists = len(followed_artists)
 
-                # Pausa para no sobrecargar las APIs
-                await asyncio.sleep(1.5)
+        async def update_progress_safe(artist_name, concert_count):
+            """Actualiza el progreso de forma thread-safe con mejor manejo de errores de red"""
+            nonlocal processed_count
+            async with progress_lock:
+                processed_count += 1
+                # Actualizar cada 5 artistas o al final para reducir tráfico de red
+                if processed_count % 5 == 0 or processed_count == total_artists:
+                    try:
+                        await safe_edit_message(
+                            status_message.edit_text,
+                            f"🔍 Búsqueda concurrente en progreso...\n"
+                            f"📊 Progreso: {processed_count}/{total_artists} artistas\n"
+                            f"🎵 Último: {artist_name} ({concert_count} conciertos)\n"
+                            f"🔧 Servicios: {services_text}\n"
+                            f"🌍 Países: {countries_text}\n\n"
+                            f"⏱️ Tiempo estimado restante: {((total_artists - processed_count) * 2)} segundos"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Error actualizando progreso (no crítico): {e}")
 
-            except Exception as e:
-                logger.error(f"Error buscando conciertos para {artist_name}: {e}")
-                continue
+        # Ejecutar todas las búsquedas concurrentemente
+        tasks = [
+            search_artist_concurrent_safe(artist, update_progress_safe)
+            for artist in followed_artists
+        ]
 
-        # Ahora SÍ filtrar los conciertos por países y fechas futuras
-        await status_message.edit_text(
-            f"✅ Búsqueda completada!\n"
-            f"🎵 {len(all_found_concerts)} conciertos encontrados en total\n"
+        # MEJORA: Usar asyncio.gather con mejor manejo de excepciones
+        try:
+            all_results = await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            logger.error(f"Error crítico en búsqueda concurrente: {e}")
+            await safe_edit_message(
+                status_message.edit_text,
+                f"❌ Error crítico en la búsqueda concurrente.\n"
+                f"Algunos artistas pueden no haberse procesado.\n"
+                f"Error: {str(e)[:100]}..."
+            )
+            return
+
+        # Procesar resultados
+        all_found_concerts = []
+        error_count = 0
+
+        for result in all_results:
+            if isinstance(result, list):
+                all_found_concerts.extend(result)
+            elif isinstance(result, Exception):
+                error_count += 1
+                logger.error(f"Excepción en resultado: {result}")
+            else:
+                logger.error(f"Resultado inesperado: {result}")
+
+        # Filtrar por países y fechas futuras
+        await safe_edit_message(
+            status_message.edit_text,
+            f"✅ Búsqueda concurrente completada!\n"
+            f"🎵 {len(all_found_concerts)} conciertos encontrados\n"
+            f"❌ {error_count} errores de búsqueda\n"
             f"🌍 Filtrando por países: {countries_text}\n"
             f"📅 Filtrando solo conciertos futuros..."
         )
 
-        # Filtrar por países y fechas futuras
         filtered_concerts = filter_future_concerts_by_countries(
             all_found_concerts,
             user_countries,
@@ -4249,16 +4311,616 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Procesar y enviar resultados
-        await process_and_send_concert_results(
-            update, status_message, filtered_concerts, processed_artists, countries_text, services_text, is_search=True
+        await process_and_send_concert_results_safe(
+            update, status_message, filtered_concerts, processed_count,
+            countries_text, services_text, is_search=True, error_count=error_count
         )
 
     except Exception as e:
-        logger.error(f"Error en comando search: {e}")
-        await status_message.edit_text(
+        logger.error(f"Error en comando search concurrente: {e}")
+        await safe_edit_message(
+            status_message.edit_text,
             f"❌ Error al buscar conciertos. Inténtalo de nuevo más tarde.\n"
-            f"Error: {str(e)[:100]}..."
+            f"Error: {str(e)[:100]}...\n\n"
+            f"💡 **Sugerencias:**\n"
+            f"• Verifica tu conexión a internet\n"
+            f"• Reduce el número de artistas seguidos\n"
+            f"• Usa `/show` para ver conciertos ya guardados"
         )
+
+# FRAGMENTO DE telegram_bot.py - Solo las funciones modificadas para mejor manejo de red
+
+import asyncio
+from telegram.error import NetworkError, RetryAfter, TimedOut
+
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando /search - versión por lotes sin límite máximo"""
+    chat_id = update.effective_chat.id
+
+    # Verificar que el usuario esté registrado
+    user = db.get_user_by_chat_id(chat_id)
+    if not user:
+        await update.message.reply_text(
+            "❌ Primero debes registrarte con `/adduser <tu_nombre>`"
+        )
+        return
+
+    # Obtener configuración del usuario
+    user_services_config = user_services.get_user_services(user['id'])
+
+    if not user_services_config:
+        user_services_config = {
+            'countries': {'ES'},
+            'country_filter': 'ES'
+        }
+
+    # Verificar países configurados
+    user_countries = user_services_config.get('countries', set())
+    if not user_countries:
+        country_filter = user_services_config.get('country_filter', 'ES')
+        user_countries = {country_filter}
+
+    # Verificar servicios activos
+    active_services = [s for s, active in user_services_config.items() if active and s not in ['country_filter', 'countries']]
+    if not active_services:
+        await update.message.reply_text(
+            "❌ No tienes ningún servicio de búsqueda activo.\n"
+            "Usa `/serviceon <servicio>` para activar al menos uno.\n"
+            "Servicios disponibles: ticketmaster, spotify, setlistfm"
+        )
+        return
+
+    # Obtener artistas seguidos
+    followed_artists = db.get_user_followed_artists(user['id'])
+
+    if not followed_artists:
+        await update.message.reply_text(
+            "📭 No tienes artistas seguidos aún.\n"
+            "Usa `/addartist <nombre>` para seguir artistas.\n"
+            "Usa `/show` para ver conciertos ya guardados en base de datos."
+        )
+        return
+
+    # Configuración de lotes
+    BATCH_SIZE = 50  # Procesar de 50 en 50
+    total_artists = len(followed_artists)
+    total_batches = (total_artists + BATCH_SIZE - 1) // BATCH_SIZE
+
+    # Mensaje de estado inicial
+    countries_text = ", ".join(sorted(user_countries))
+    services_text = ", ".join(active_services)
+
+    status_message = await safe_send_message(
+        update.message.reply_text,
+        f"🔍 **Búsqueda por lotes iniciada**\n\n"
+        f"🎵 **Total de artistas:** {total_artists}\n"
+        f"📦 **Lotes a procesar:** {total_batches} (de {BATCH_SIZE} artistas cada uno)\n"
+        f"🔧 **Servicios activos:** {services_text}\n"
+        f"🌍 **Países:** {countries_text}\n\n"
+        f"⏳ **Iniciando lote 1/{total_batches}...**\n\n"
+        f"💡 Puedes usar otros comandos mientras se procesa la búsqueda.",
+        parse_mode='Markdown'
+    )
+
+    if not status_message:
+        logger.error("No se pudo enviar mensaje de estado inicial")
+        return
+
+    try:
+        # Procesar por lotes
+        all_found_concerts = []
+        processed_count = 0
+        total_search_errors = 0
+        total_network_errors = 0
+        services = get_services()
+
+        for batch_num in range(total_batches):
+            start_idx = batch_num * BATCH_SIZE
+            end_idx = min(start_idx + BATCH_SIZE, total_artists)
+            batch_artists = followed_artists[start_idx:end_idx]
+
+            logger.info(f"Procesando lote {batch_num + 1}/{total_batches}: artistas {start_idx + 1}-{end_idx}")
+
+            # Actualizar estado del lote
+            await safe_edit_message(
+                status_message.edit_text,
+                f"🔍 **Búsqueda por lotes en progreso**\n\n"
+                f"📦 **Lote actual:** {batch_num + 1}/{total_batches}\n"
+                f"🎵 **Artistas en este lote:** {len(batch_artists)}\n"
+                f"📊 **Progreso total:** {processed_count}/{total_artists} completados\n"
+                f"🔧 **Servicios:** {services_text}\n"
+                f"🌍 **Países:** {countries_text}\n\n"
+                f"⏳ **Procesando lote {batch_num + 1}...**\n"
+                f"🕒 **Tiempo estimado restante:** {(total_batches - batch_num) * 2} minutos",
+                parse_mode='Markdown'
+            )
+
+            # Procesar lote con concurrencia controlada
+            batch_concerts, batch_errors, batch_network_errors = await process_artist_batch(
+                batch_artists, user_services_config, user['id'], services, status_message,
+                batch_num + 1, total_batches, processed_count, total_artists
+            )
+
+            # Acumular resultados
+            all_found_concerts.extend(batch_concerts)
+            total_search_errors += batch_errors
+            total_network_errors += batch_network_errors
+            processed_count += len(batch_artists)
+
+            # Pausa entre lotes para no saturar APIs
+            if batch_num < total_batches - 1:  # No pausar después del último lote
+                await asyncio.sleep(3.0)
+
+                # Mensaje de pausa entre lotes
+                await safe_edit_message(
+                    status_message.edit_text,
+                    f"🔍 **Búsqueda por lotes en progreso**\n\n"
+                    f"✅ **Lote {batch_num + 1}/{total_batches} completado**\n"
+                    f"📊 **Progreso total:** {processed_count}/{total_artists} artistas\n"
+                    f"🎵 **Conciertos encontrados hasta ahora:** {len(all_found_concerts)}\n"
+                    f"❌ **Errores acumulados:** {total_search_errors}\n\n"
+                    f"⏸️ **Pausa de 3 segundos entre lotes...**\n"
+                    f"🕒 **Tiempo estimado restante:** {(total_batches - batch_num - 1) * 2} minutos",
+                    parse_mode='Markdown'
+                )
+
+                await asyncio.sleep(2.0)  # Pausa adicional
+
+        # Filtrar por países y fechas futuras
+        await safe_edit_message(
+            status_message.edit_text,
+            f"✅ **Búsqueda por lotes completada!**\n\n"
+            f"📦 **Lotes procesados:** {total_batches}\n"
+            f"🎵 **Artistas procesados:** {processed_count}\n"
+            f"🎪 **Conciertos encontrados:** {len(all_found_concerts)}\n"
+            f"❌ **Errores de búsqueda:** {total_search_errors}\n"
+            f"🌐 **Errores de red:** {total_network_errors}\n\n"
+            f"🌍 **Filtrando por países:** {countries_text}\n"
+            f"📅 **Filtrando solo conciertos futuros...**",
+            parse_mode='Markdown'
+        )
+
+        filtered_concerts = filter_future_concerts_by_countries(
+            all_found_concerts,
+            user_countries,
+            database_path=db.db_path
+        )
+
+        # Procesar y enviar resultados
+        await process_and_send_concert_results_safe(
+            update, status_message, filtered_concerts, processed_count,
+            countries_text, services_text, is_search=True,
+            error_count=total_search_errors, network_errors=total_network_errors
+        )
+
+    except Exception as e:
+        logger.error(f"Error en comando search por lotes: {e}")
+        await safe_edit_message(
+            status_message.edit_text,
+            f"❌ **Error en búsqueda por lotes**\n\n"
+            f"🎵 **Artistas procesados:** {processed_count}/{total_artists}\n"
+            f"🎪 **Conciertos encontrados:** {len(all_found_concerts) if 'all_found_concerts' in locals() else 0}\n"
+            f"❌ **Error:** {str(e)[:200]}...\n\n"
+            f"💡 **Sugerencias:**\n"
+            f"• Los artistas ya procesados se guardaron\n"
+            f"• Usa `/show` para ver conciertos guardados\n"
+            f"• Inténtalo de nuevo más tarde\n"
+            f"• Verifica tu conexión a internet",
+            parse_mode='Markdown'
+        )
+
+
+async def process_artist_batch(batch_artists, user_services_config, user_id, services,
+                              status_message, batch_num, total_batches, processed_count, total_artists):
+    """
+    Procesa un lote de artistas con concurrencia controlada
+
+    Returns:
+        tuple: (conciertos_encontrados, errores_busqueda, errores_red)
+    """
+    # Configuración de concurrencia para lotes
+    semaphore = asyncio.Semaphore(3)  # Máximo 3 búsquedas simultáneas por lote
+    batch_concerts = []
+    batch_errors = 0
+    batch_network_errors = 0
+
+    # Contador de progreso dentro del lote
+    batch_progress = 0
+    batch_size = len(batch_artists)
+
+    async def search_artist_in_batch(artist, artist_index):
+        """Busca conciertos para un artista dentro del lote"""
+        nonlocal batch_progress, batch_errors, batch_network_errors
+
+        async with semaphore:
+            try:
+                artist_name = artist['name']
+
+                # Pausa para reducir carga de APIs
+                await asyncio.sleep(0.3)
+
+                concerts = await search_concerts_for_artist(
+                    artist_name,
+                    user_services_config,
+                    user_id=user_id,
+                    services=services,
+                    database=db
+                )
+
+                # Actualizar progreso dentro del lote cada 5 artistas
+                async with asyncio.Lock():
+                    batch_progress += 1
+
+                    if batch_progress % 5 == 0 or batch_progress == batch_size:
+                        total_processed = processed_count + batch_progress
+
+                        try:
+                            await safe_edit_message(
+                                status_message.edit_text,
+                                f"🔍 **Lote {batch_num}/{total_batches} en progreso**\n\n"
+                                f"📦 **Progreso del lote:** {batch_progress}/{batch_size}\n"
+                                f"📊 **Progreso total:** {total_processed}/{total_artists}\n"
+                                f"🎵 **Último procesado:** {artist_name}\n"
+                                f"🎪 **Conciertos encontrados:** {len(concerts)}\n\n"
+                                f"⏳ **Completando lote {batch_num}...**",
+                                parse_mode='Markdown'
+                            )
+                        except Exception as e:
+                            # Error de red al actualizar estado (no crítico)
+                            batch_network_errors += 1
+                            logger.debug(f"Error actualizando progreso (no crítico): {e}")
+
+                return concerts
+
+            except Exception as e:
+                logger.error(f"Error buscando conciertos para {artist['name']}: {e}")
+                batch_errors += 1
+                return []
+
+    # Ejecutar búsquedas del lote concurrentemente
+    tasks = [
+        search_artist_in_batch(artist, i)
+        for i, artist in enumerate(batch_artists)
+    ]
+
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Procesar resultados del lote
+        for result in results:
+            if isinstance(result, list):
+                batch_concerts.extend(result)
+            elif isinstance(result, Exception):
+                batch_errors += 1
+                logger.error(f"Excepción en lote: {result}")
+
+    except Exception as e:
+        logger.error(f"Error crítico en lote {batch_num}: {e}")
+        batch_errors += len(batch_artists)  # Marcar todo el lote como error
+
+    logger.info(f"Lote {batch_num} completado: {len(batch_concerts)} conciertos, {batch_errors} errores")
+
+    return batch_concerts, batch_errors, batch_network_errors
+
+
+
+async def safe_send_message(send_func, *args, **kwargs):
+    """Envía un mensaje de forma segura con reintentos"""
+    max_retries = 3
+    base_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            return await send_func(*args, **kwargs)
+        except NetworkError as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)  # Backoff exponencial
+                logger.warning(f"Error de red enviando mensaje (intento {attempt + 1}/{max_retries}): {e}")
+                logger.info(f"Reintentando en {delay} segundos...")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Error definitivo enviando mensaje después de {max_retries} intentos: {e}")
+                return None
+        except RetryAfter as e:
+            if attempt < max_retries - 1:
+                delay = e.retry_after + 1
+                logger.warning(f"Rate limit, esperando {delay} segundos...")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Rate limit persistente después de {max_retries} intentos")
+                return None
+        except TimedOut as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"Timeout enviando mensaje (intento {attempt + 1}/{max_retries}): {e}")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Timeout definitivo después de {max_retries} intentos: {e}")
+                return None
+        except Exception as e:
+            logger.error(f"Error inesperado enviando mensaje: {e}")
+            return None
+
+    return None
+
+
+async def safe_edit_message(edit_func, *args, **kwargs):
+    """Edita un mensaje de forma segura con reintentos"""
+    max_retries = 3
+    base_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            return await edit_func(*args, **kwargs)
+        except NetworkError as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"Error de red editando mensaje (intento {attempt + 1}/{max_retries}): {e}")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Error definitivo editando mensaje: {e}")
+                return None
+        except RetryAfter as e:
+            if attempt < max_retries - 1:
+                delay = e.retry_after + 1
+                logger.warning(f"Rate limit editando mensaje, esperando {delay} segundos...")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Rate limit persistente editando mensaje")
+                return None
+        except TimedOut as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"Timeout editando mensaje (intento {attempt + 1}/{max_retries}): {e}")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Timeout definitivo editando mensaje: {e}")
+                return None
+        except Exception as e:
+            # Para otros errores (como mensaje idéntico), no reintentar
+            logger.debug(f"Error editando mensaje (no crítico): {e}")
+            return None
+
+    return None
+
+
+async def process_and_send_concert_results_safe(update, status_message, concerts, processed_count,
+                                               countries_text, source_text, is_search=True,
+                                               error_count=0, network_errors=0):
+    """Procesa y envía los resultados de conciertos con mejor manejo de red - VERSIÓN ACTUALIZADA"""
+    # Filtrar solo conciertos futuros
+    today = datetime.now().date()
+    future_concerts = []
+
+    for concert in concerts:
+        concert_date = concert.get('date', '')
+        if concert_date and len(concert_date) >= 10:
+            try:
+                concert_date_obj = datetime.strptime(concert_date[:10], '%Y-%m-%d').date()
+                if concert_date_obj >= today:
+                    future_concerts.append(concert)
+            except ValueError:
+                future_concerts.append(concert)  # Incluir si no se puede parsear
+        else:
+            future_concerts.append(concert)  # Incluir si no hay fecha
+
+    # Agrupar conciertos por artista
+    concerts_by_artist = {}
+    for concert in future_concerts:
+        artist_name = concert.get('artist_name', 'Artista desconocido')
+        if artist_name not in concerts_by_artist:
+            concerts_by_artist[artist_name] = []
+        concerts_by_artist[artist_name].append(concert)
+
+    # Actualizar mensaje de estado
+    await safe_edit_message(
+        status_message.edit_text,
+        f"✅ **Procesamiento completado!**\n\n"
+        f"🎵 **Artistas con conciertos futuros:** {len(concerts_by_artist)}\n"
+        f"📅 **Conciertos próximos:** {len(future_concerts)}\n"
+        f"🎪 **Total encontrados:** {len(concerts)}\n"
+        f"❌ **Errores de búsqueda:** {error_count}\n"
+        f"🌐 **Errores de red:** {network_errors}\n"
+        f"🌍 **Países:** {countries_text}\n\n"
+        f"📤 **Enviando resultados...**",
+        parse_mode='Markdown'
+    )
+
+    # Enviar un mensaje por cada artista con conciertos futuros
+    artists_with_concerts = 0
+    messages_sent = 0
+    send_errors = 0
+
+    for artist_name, artist_concerts in concerts_by_artist.items():
+        if artist_concerts:  # Solo enviar si tiene conciertos futuros
+            # Formatear mensaje del artista
+            message = format_single_artist_concerts_complete(
+                artist_concerts,
+                artist_name,
+                show_notified=not is_search  # Solo mostrar notificaciones en /show
+            )
+
+            # Dividir en chunks si es muy largo
+            if len(message) > 4000:
+                chunks = split_long_message(message, max_length=4000)
+                for i, chunk in enumerate(chunks):
+                    result = await safe_send_message(
+                        update.message.reply_text,
+                        chunk,
+                        parse_mode='Markdown',
+                        disable_web_page_preview=True
+                    )
+                    if result:
+                        messages_sent += 1
+                    else:
+                        send_errors += 1
+
+                    # Pausa entre chunks del mismo artista
+                    if i < len(chunks) - 1:
+                        await asyncio.sleep(0.5)
+            else:
+                result = await safe_send_message(
+                    update.message.reply_text,
+                    message,
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
+                )
+                if result:
+                    messages_sent += 1
+                else:
+                    send_errors += 1
+
+            artists_with_concerts += 1
+
+            # Pausa entre mensajes de diferentes artistas
+            await asyncio.sleep(1.0)
+
+            # Si hay muchos errores de envío, pausar más tiempo
+            if send_errors > 3:
+                logger.warning(f"Detectados {send_errors} errores de envío, aumentando pausa...")
+                await asyncio.sleep(3.0)
+
+    # Mensaje final de resumen
+    action_text = "búsqueda por lotes"
+    if artists_with_concerts == 0:
+        suggestion_text = get_no_concerts_suggestions(is_search, countries_text)
+
+        summary_result = await safe_send_message(
+            update.message.reply_text,
+            f"📭 **No se encontraron conciertos futuros** en tus países configurados ({countries_text}).\n\n"
+            f"📊 **Estadísticas de {action_text}:**\n"
+            f"• **Artistas procesados:** {processed_count}\n"
+            f"• **Conciertos encontrados:** {len(concerts)}\n"
+            f"• **Conciertos futuros:** {len(future_concerts)}\n"
+            f"• **Errores de búsqueda:** {error_count}\n"
+            f"• **Errores de red:** {network_errors}\n"
+            f"• **Fuente:** {source_text}\n\n"
+            f"{suggestion_text}",
+            parse_mode='Markdown'
+        )
+    else:
+        summary_message = (
+            f"🎉 **Resultados de {action_text}**\n\n"
+            f"📊 **Artistas con conciertos futuros:** {artists_with_concerts}\n"
+            f"📅 **Total de conciertos próximos:** {len(future_concerts)}\n"
+            f"📤 **Mensajes enviados exitosamente:** {messages_sent}\n"
+            f"❌ **Errores de búsqueda:** {error_count}\n"
+            f"🌐 **Errores de red:** {network_errors}\n"
+            f"📨 **Errores de envío:** {send_errors}\n"
+            f"🔧 **Fuente:** {source_text}\n"
+            f"🌍 **Países consultados:** {countries_text}\n\n"
+            f"💡 **Comandos útiles:**\n"
+            f"• `/show` - Ver conciertos guardados\n"
+            f"• `/showartist <nombre>` - Ver todos los conciertos de un artista\n"
+            f"• `/addcountry <país>` - Añadir más países"
+        )
+
+        if network_errors > 0 or send_errors > 0:
+            summary_message += f"\n\n⚠️ **Nota:** Se detectaron errores de comunicación. Algunos datos pueden no haberse enviado correctamente."
+
+        summary_result = await safe_send_message(
+            update.message.reply_text,
+            summary_message,
+            parse_mode='Markdown'
+        )
+
+    # Actualizar mensaje de estado final
+    final_status = f"✅ **{action_text.capitalize()} completada**\n\n"
+    final_status += f"🎵 **Artistas con conciertos:** {artists_with_concerts}\n"
+    final_status += f"📅 **Conciertos futuros:** {len(future_concerts)}\n"
+    final_status += f"📤 **Mensajes enviados:** {messages_sent}"
+
+    if error_count > 0:
+        final_status += f"\n❌ **Errores de búsqueda:** {error_count}"
+    if network_errors > 0:
+        final_status += f"\n🌐 **Errores de red:** {network_errors}"
+    if send_errors > 0:
+        final_status += f"\n📨 **Errores de envío:** {send_errors}"
+
+    await safe_edit_message(status_message.edit_text, final_status, parse_mode='Markdown')
+
+
+async def search_concerts_for_artist_async(artist_name, user_services_config, user_id=None, services=None, database=None):
+    """
+    Versión asíncrona de search_concerts_for_artist
+    Esta función debe ser implementada para reemplazar la versión síncrona
+    """
+    # Crear tareas asíncronas para cada servicio
+    tasks = []
+
+    if user_services_config.get('ticketmaster', True) and services.get('ticketmaster_service'):
+        tasks.append(search_ticketmaster_async(artist_name, user_services_config, services))
+
+    if user_services_config.get('spotify', True) and services.get('spotify_service'):
+        tasks.append(search_spotify_async(artist_name, user_services_config, services))
+
+    if user_services_config.get('setlistfm', True) and services.get('setlistfm_service'):
+        tasks.append(search_setlistfm_async(artist_name, user_services_config, services))
+
+    # Ejecutar todas las búsquedas concurrentemente
+    if tasks:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Combinar resultados exitosos
+        all_concerts = []
+        for result in results:
+            if isinstance(result, list):
+                all_concerts.extend(result)
+            else:
+                logger.error(f"Error en búsqueda de servicio: {result}")
+
+        # Guardar conciertos en base de datos de forma asíncrona
+        if database and all_concerts:
+            await save_concerts_async(database, all_concerts)
+
+        return all_concerts
+
+    return []
+
+async def error_handler_improved(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja errores de forma que no afecte a otros usuarios - VERSIÓN MEJORADA"""
+    logger.error("Exception while handling an update:", exc_info=context.error)
+
+    # Si hay un update válido, informar al usuario específico
+    if update and hasattr(update, 'effective_chat'):
+        try:
+            error_message = "❌ Error temporal. "
+
+            # Personalizar mensaje según el tipo de error
+            if isinstance(context.error, NetworkError):
+                error_message += "Problema de conexión detectado. Inténtalo de nuevo en unos segundos."
+            elif isinstance(context.error, RetryAfter):
+                retry_after = getattr(context.error, 'retry_after', 30)
+                error_message += f"Límite de velocidad alcanzado. Espera {retry_after} segundos."
+            elif isinstance(context.error, TimedOut):
+                error_message += "Tiempo de espera agotado. Inténtalo de nuevo."
+            else:
+                error_message += "Inténtalo de nuevo en unos segundos."
+
+            await safe_send_message(
+                context.bot.send_message,
+                chat_id=update.effective_chat.id,
+                text=error_message
+            )
+        except Exception:
+            pass  # Ignorar errores al enviar mensaje de error
+
+
+
+
+
+
+async def save_concerts_async(database, concerts):
+    """Guarda conciertos en base de datos de forma asíncrona"""
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: [database.save_concert(concert) for concert in concerts]
+        )
+    except Exception as e:
+        logger.error(f"Error guardando conciertos: {e}")
+
 
 async def show_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /show - muestra conciertos futuros de artistas seguidos desde la base de datos"""
@@ -4577,9 +5239,8 @@ async def calendar_callback_handler(update: Update, context: ContextTypes.DEFAUL
 # ===========================
 
 def main():
-    """Función principal MODIFICADA para usar módulos separados"""
+    """Función principal MODIFICADA para soportar concurrencia real"""
     global db, user_services, application, muspy_service, muspy_handlers
-
 
     # Configuración
     TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_CONCIERTOS')
@@ -4590,11 +5251,15 @@ def main():
         logger.error("❌ No se ha configurado TELEGRAM_BOT_CONCIERTOS en las variables de entorno")
         return
 
-    # Inicializar base de datos
+    # MEJORA: Inicializar base de datos normal y luego añadir wrapper concurrente
     db = ArtistTrackerDatabase(DB_PATH)
 
-    db.init_muspy_tables()
+    # Añadir funciones de wrapper concurrente al archivo database.py
+    from database import DatabaseConcurrentWrapper
+    db = DatabaseConcurrentWrapper(db)
+    logger.info("✅ Base de datos inicializada con wrapper thread-safe")
 
+    db.init_muspy_tables()
 
     # Inicializar servicios de usuario
     user_services = UserServices(db)
@@ -4623,7 +5288,7 @@ def main():
     try:
         from apis.mb_artist_info import setup_musicbrainz
         setup_musicbrainz(user_agent=user_agent, cache_directory=CACHE_DIR)
-        logger.info("MusicBrainz configurado correctamente")
+        logger.info("✅ MusicBrainz configurado correctamente")
     except Exception as e:
         logger.warning(f"MusicBrainz no disponible: {e}")
 
@@ -4638,8 +5303,13 @@ def main():
     # Validar servicios
     validate_services()
 
-    # Crear la aplicación y agregar handlers
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    # MEJORA: Crear la aplicación con configuración optimizada para concurrencia
+    application = (
+        Application.builder()
+        .token(TELEGRAM_TOKEN)
+        .concurrent_updates(256)  # Permitir hasta 256 updates concurrentes
+        .build()
+    )
 
     # ConversationHandler para el login de Muspy
     muspy_login_conv_handler = ConversationHandler(
@@ -4671,45 +5341,34 @@ def main():
     # Handler de comando calendario
     application.add_handler(CommandHandler("cal", calendar_handlers.cal_command))
 
-    # Handlers de búsqueda
-    application.add_handler(CommandHandler("search", search_command))
+    # MEJORA: Handlers de búsqueda con la nueva versión concurrente
+    application.add_handler(CommandHandler("search", search_command))  # Usa la nueva versión concurrente
     application.add_handler(CommandHandler("show", show_command))
     application.add_handler(CommandHandler("searchartist", searchartist_command))
     application.add_handler(CommandHandler("showartist", showartist_command))
 
-    # Handlers de servicios
+    # Resto de handlers (sin cambios)...
     application.add_handler(CommandHandler("serviceon", serviceon_command))
     application.add_handler(CommandHandler("serviceoff", serviceoff_command))
-
-    # Handlers de países
     application.add_handler(CommandHandler("country", country_command))
     application.add_handler(CommandHandler("addcountry", addcountry_command))
     application.add_handler(CommandHandler("removecountry", removecountry_command))
     application.add_handler(CommandHandler("mycountries", mycountries_command))
     application.add_handler(CommandHandler("listcountries", listcountries_command))
     application.add_handler(CommandHandler("refreshcountries", refreshcountries_command))
-
-    # Handler de configuración
     application.add_handler(CommandHandler("config", config_command))
-
-    # Handlers de Last.fm y Spotify y Muspy
     application.add_handler(CommandHandler("lastfm", lastfm_command))
     application.add_handler(CommandHandler("spotify", spotify_command))
 
     # ConversationHandler para login de Muspy
     application.add_handler(muspy_login_conv_handler)
-
-    # Handler de comando Muspy
     application.add_handler(CommandHandler("muspy", muspy_handlers.muspy_command))
-
     application.add_handler(CallbackQueryHandler(muspy_callback_handler, pattern="^muspy_"))
-
 
     # Callbacks específicos de países
     application.add_handler(CallbackQueryHandler(country_selection_callback, pattern="^(select_country_|cancel_country_selection)"))
     application.add_handler(CallbackQueryHandler(continent_selection_callback, pattern="^continent_"))
     application.add_handler(CallbackQueryHandler(back_to_continents_callback, pattern="^back_to_continents"))
-
 
     # Handlers de callbacks específicos (ORDEN IMPORTANTE)
     application.add_handler(CallbackQueryHandler(artist_selection_callback, pattern="^(select_artist_|cancel_artist_selection)"))
@@ -4717,10 +5376,8 @@ def main():
     application.add_handler(CallbackQueryHandler(lastfm_callback_handler, pattern="^lastfm_"))
     application.add_handler(CallbackQueryHandler(spotify_callback_handler, pattern="^spotify_"))
 
-
     # Callbacks de calendario (DESPUÉS de muspy_callback_handler)
     application.add_handler(CallbackQueryHandler(calendar_callback_handler, pattern="^cal_"))
-
 
     # Callback para página actual (no hace nada, solo evita errores)
     application.add_handler(CallbackQueryHandler(
@@ -4734,23 +5391,56 @@ def main():
     # Handler de texto (DEBE SER EL ÚLTIMO)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
 
+    # MEJORA: Configurar manejo de errores global para concurrencia
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Maneja errores de forma que no afecte a otros usuarios"""
+        logger.error("Exception while handling an update:", exc_info=context.error)
+
+        # Si hay un update válido, informar al usuario específico
+        if update and hasattr(update, 'effective_chat'):
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="❌ Error temporal. Inténtalo de nuevo en unos segundos."
+                )
+            except Exception:
+                pass  # Ignorar errores al enviar mensaje de error
+
+    application.add_error_handler(error_handler_improved)
+
     # Iniciar el bot
     services = get_services()
-    logger.info("🤖 Bot de seguimiento de artistas iniciado con arquitectura modular.")
+    logger.info("🤖 Bot de seguimiento de artistas iniciado con soporte CONCURRENTE.")
+    logger.info("✅ Múltiples usuarios pueden usar comandos simultáneamente")
     if services.get('country_state_city'):
         logger.info("✅ Sistema de países múltiples activado")
     else:
         logger.info("⚠️ Sistema de países múltiples no disponible (falta API key)")
 
     logger.info("🔔 Para notificaciones, ejecuta: python notification_scheduler.py")
+    logger.info("⚡ Máximo 256 updates concurrentes configurados")
+    logger.info("🗄️ Pool de 10 conexiones de base de datos para concurrencia")
     logger.info("Presiona Ctrl+C para detenerlo.")
 
     try:
-        application.run_polling()
+        # MEJORA: Usar polling optimizado para concurrencia
+        application.run_polling(
+            allowed_updates=['message', 'callback_query'],  # Solo los updates que necesitamos
+            drop_pending_updates=True,  # Descartar updates pendientes al reiniciar
+            timeout=30,  # Timeout más alto para mejor estabilidad
+            poll_interval=0.1  # Polling más frecuente para mejor responsividad
+        )
     except KeyboardInterrupt:
         logger.info("🛑 Bot detenido por el usuario")
+        # Cerrar pool de conexiones limpiamente
+        if hasattr(db, 'close_pool'):
+            db.close_pool()
+            logger.info("✅ Pool de conexiones cerrado")
     except Exception as e:
         logger.error(f"❌ Error crítico en el bot: {e}")
+        # Cerrar pool de conexiones en caso de error
+        if hasattr(db, 'close_pool'):
+            db.close_pool()
 
 if __name__ == "__main__":
     main()

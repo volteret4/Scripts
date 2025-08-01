@@ -12,108 +12,164 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
-async def search_concerts_for_artist(artist_name: str, user_services: Dict[str, any] = None,
-                                   user_id: int = None, services: Dict = None, database = None) -> List[Dict]:
+async def search_concerts_for_artist(artist_name, user_services_config, user_id=None, services=None, database=None):
     """
-    Busca conciertos para un artista usando los servicios habilitados
-    VERSIÓN CORREGIDA: Guarda todos los conciertos y retorna todos los encontrados (sin filtrar por países)
-    El filtrado por países se hace después en el comando que llama a esta función
+    Versión asíncrona de búsqueda de conciertos con mejor manejo de base de datos
 
     Args:
-        artist_name: Nombre del artista
-        user_services: Configuración de servicios del usuario
-        user_id: ID del usuario
-        services: Diccionario con referencias a los servicios
-        database: Instancia de la base de datos
-    """
-    if user_services is None:
-        user_services = {
-            'ticketmaster': True,
-            'spotify': True,
-            'setlistfm': True,
-            'country_filter': 'ES',
-            'countries': {'ES'}
-        }
+        artist_name (str): Nombre del artista
+        user_services_config (dict): Configuración de servicios del usuario
+        user_id (int): ID del usuario
+        services (dict): Servicios disponibles
+        database: Instancia de base de datos (thread-safe)
 
-    if services is None:
-        from user_services import get_services
-        services = get_services()
+    Returns:
+        list: Lista de conciertos encontrados
+    """
+    if not services:
+        logger.warning(f"No hay servicios disponibles para buscar {artist_name}")
+        return []
 
     all_concerts = []
-    user_countries = user_services.get('countries', {'ES'})
 
-    # Buscar en Ticketmaster si está habilitado - BÚSQUEDA GLOBAL Y GUARDADO
-    if user_services.get('ticketmaster', True) and services.get('ticketmaster_service'):
+    # Configurar países para la búsqueda
+    user_countries = user_services_config.get('countries', set())
+    if not user_countries:
+        country_filter = user_services_config.get('country_filter', 'ES')
+        user_countries = {country_filter}
+
+    logger.info(f"Buscando conciertos para {artist_name} en países: {user_countries}")
+
+    # Crear tareas asíncronas para cada servicio
+    tasks = []
+
+    # TICKETMASTER
+    if user_services_config.get('ticketmaster', True) and services.get('ticketmaster_service'):
+        for country_code in user_countries:
+            task = search_ticketmaster_async(artist_name, country_code, services['ticketmaster_service'])
+            tasks.append(('ticketmaster', task))
+
+    # SPOTIFY
+    if user_services_config.get('spotify', True) and services.get('spotify_service'):
+        task = search_spotify_async(artist_name, services['spotify_service'])
+        tasks.append(('spotify', task))
+
+    # SETLISTFM (si está disponible)
+    if user_services_config.get('setlistfm', True) and services.get('setlistfm_service'):
+        task = search_setlistfm_async(artist_name, services['setlistfm_service'])
+        tasks.append(('setlistfm', task))
+
+    # Ejecutar todas las búsquedas concurrentemente
+    if tasks:
+        logger.info(f"Ejecutando {len(tasks)} búsquedas concurrentes para {artist_name}")
+
+        # Extraer solo las tareas
+        task_list = [task for service_name, task in tasks]
+        service_names = [service_name for service_name, task in tasks]
+
         try:
-            # Usar búsqueda global para obtener TODOS los conciertos
-            concerts, status = services['ticketmaster_service'].search_concerts_global(artist_name)
+            results = await asyncio.gather(*task_list, return_exceptions=True)
 
-            # GUARDAR TODOS los conciertos encontrados (sin filtrar)
-            saved_count = 0
-            for concert in concerts:
-                if database:
-                    # Asegurar que el concierto tenga el artist_name correcto
-                    concert['artist_name'] = artist_name
-                    concert_id = database.save_concert(concert)
-                    if concert_id:
-                        saved_count += 1
-                        logger.debug(f"Guardado concierto: {concert.get('name', '')} en {concert.get('city', '')}, {concert.get('country', '')}")
+            # Procesar resultados
+            for i, result in enumerate(results):
+                service_name = service_names[i]
 
-            all_concerts.extend(concerts)
-            logger.info(f"Ticketmaster global: {len(concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
+                if isinstance(result, Exception):
+                    logger.error(f"Error en {service_name} para {artist_name}: {result}")
+                elif isinstance(result, list):
+                    logger.info(f"{service_name}: {len(result)} conciertos para {artist_name}")
+                    all_concerts.extend(result)
+                else:
+                    logger.warning(f"Resultado inesperado de {service_name}: {type(result)}")
 
         except Exception as e:
-            logger.error(f"Error buscando en Ticketmaster: {e}")
+            logger.error(f"Error en búsqueda concurrente para {artist_name}: {e}")
 
-    # Buscar en Spotify si está habilitado
-    if user_services.get('spotify', True) and services.get('spotify_service'):
-        try:
-            concerts, status = services['spotify_service'].search_artist_and_concerts(artist_name)
+    # Guardar conciertos en base de datos de forma thread-safe
+    if database and all_concerts:
+        logger.info(f"Guardando {len(all_concerts)} conciertos para {artist_name}")
+        await save_concerts_thread_safe(database, all_concerts)
 
-            saved_count = 0
-            for concert in concerts:
-                if database:
-                    concert['artist_name'] = artist_name
-                    concert_id = database.save_concert(concert)
-                    if concert_id:
-                        saved_count += 1
-
-            all_concerts.extend(concerts)
-            spotify_concerts = [c for c in concerts if c.get('source') == 'Spotify']
-            logger.info(f"Spotify: {len(spotify_concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
-
-        except Exception as e:
-            logger.error(f"Error buscando en Spotify: {e}")
-
-    # Buscar en Setlist.fm si está habilitado - BÚSQUEDA POR PAÍS
-    if user_services.get('setlistfm', True) and services.get('setlistfm_service'):
-        try:
-            setlist_concerts = []
-            saved_count = 0
-
-            # Setlist.fm mantiene búsqueda por país ya que es más específico
-            for country_code in user_countries:
-                concerts, status = services['setlistfm_service'].search_concerts(artist_name, country_code)
-
-                for concert in concerts:
-                    if database:
-                        concert['artist_name'] = artist_name
-                        concert_id = database.save_concert(concert)
-                        if concert_id:
-                            saved_count += 1
-
-                setlist_concerts.extend(concerts)
-
-            all_concerts.extend(setlist_concerts)
-            logger.info(f"Setlist.fm: {len(setlist_concerts)} conciertos encontrados, {saved_count} guardados para {artist_name}")
-
-        except Exception as e:
-            logger.error(f"Error buscando en Setlist.fm: {e}")
-
-    # RETORNAR TODOS los conciertos encontrados SIN FILTRAR
-    # El filtrado por países se hará después en el comando
-    logger.info(f"Total para {artist_name}: {len(all_concerts)} conciertos encontrados y guardados")
+    logger.info(f"Búsqueda completada para {artist_name}: {len(all_concerts)} conciertos")
     return all_concerts
+
+
+async def search_ticketmaster_async(artist_name, country_code, ticketmaster_service):
+    """Búsqueda asíncrona en Ticketmaster"""
+    try:
+        # Ejecutar en thread pool para no bloquear el loop
+        loop = asyncio.get_event_loop()
+
+        def search_sync():
+            return ticketmaster_service.search_concerts(artist_name, country_code)
+
+        concerts, message = await loop.run_in_executor(None, search_sync)
+        logger.debug(f"Ticketmaster {country_code}: {len(concerts)} conciertos para {artist_name}")
+        return concerts
+
+    except Exception as e:
+        logger.error(f"Error en Ticketmaster para {artist_name} ({country_code}): {e}")
+        return []
+
+
+async def search_spotify_async(artist_name, spotify_service):
+    """Búsqueda asíncrona en Spotify"""
+    try:
+        # Ejecutar en thread pool para no bloquear el loop
+        loop = asyncio.get_event_loop()
+
+        def search_sync():
+            return spotify_service.search_artist_and_concerts(artist_name)
+
+        concerts, message = await loop.run_in_executor(None, search_sync)
+        logger.debug(f"Spotify: {len(concerts)} conciertos para {artist_name}")
+        return concerts
+
+    except Exception as e:
+        logger.error(f"Error en Spotify para {artist_name}: {e}")
+        return []
+
+
+async def search_setlistfm_async(artist_name, setlistfm_service):
+    """Búsqueda asíncrona en SetlistFM"""
+    try:
+        # Ejecutar en thread pool para no bloquear el loop
+        loop = asyncio.get_event_loop()
+
+        def search_sync():
+            return setlistfm_service.search_concerts(artist_name)
+
+        concerts, message = await loop.run_in_executor(None, search_sync)
+        logger.debug(f"SetlistFM: {len(concerts)} conciertos para {artist_name}")
+        return concerts
+
+    except Exception as e:
+        logger.error(f"Error en SetlistFM para {artist_name}: {e}")
+        return []
+
+
+async def save_concerts_thread_safe(database, concerts):
+    """Guarda conciertos en base de datos de forma thread-safe"""
+    try:
+        # Ejecutar en thread pool para no bloquear el loop
+        loop = asyncio.get_event_loop()
+
+        def save_sync():
+            saved_count = 0
+            for concert in concerts:
+                try:
+                    database.save_concert(concert)
+                    saved_count += 1
+                except Exception as e:
+                    logger.error(f"Error guardando concierto individual: {e}")
+            return saved_count
+
+        saved_count = await loop.run_in_executor(None, save_sync)
+        logger.debug(f"Guardados {saved_count}/{len(concerts)} conciertos en base de datos")
+
+    except Exception as e:
+        logger.error(f"Error guardando conciertos en base de datos: {e}")
+
 
 
 
