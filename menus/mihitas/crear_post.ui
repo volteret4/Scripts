@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Creador de Posts - Obsidian a Hugo</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">/* Los estilos serán aplicados dinámicamente por el ThemeManager */</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="mainHorizontalLayout">
+    <item>
+     <widget class="QSplitter" name="mainSplitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QWidget" name="leftPanel" native="true">
+       <property name="minimumSize">
+        <size>
+         <width>400</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>600</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="leftPanelLayout">
+        <item>
+         <widget class="QGroupBox" name="categoriesGroup">
+          <property name="title">
+           <string>📂 Categorías</string>
+          </property>
+          <layout class="QVBoxLayout" name="categoriesMainLayout">
+           <item>
+            <widget class="QLabel" name="categoriesInstructionLabel">
+             <property name="text">
+              <string>Seleccionar Categoría (usa números 1-9 para selección rápida):</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">font-weight: bold; font-size: 11px; color: #333;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QScrollArea" name="categoriesScrollArea">
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>200</height>
+              </size>
+             </property>
+             <property name="widgetResizable">
+              <bool>true</bool>
+             </property>
+             <widget class="QWidget" name="categoriesScrollAreaWidget">
+              <property name="geometry">
+               <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>376</width>
+                <height>198</height>
+               </rect>
+              </property>
+              <layout class="QGridLayout" name="categoriesGridLayout"/>
+             </widget>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="addCategoryButton">
+             <property name="text">
+              <string>➕ Añadir Nueva Categoría</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="tagsGroup">
+          <property name="title">
+           <string>🏷️ Tags</string>
+          </property>
+          <layout class="QVBoxLayout" name="tagsMainLayout">
+           <item>
+            <widget class="QLabel" name="tagsInstructionLabel">
+             <property name="text">
+              <string>Seleccionar Tags (usa Alt+números 1-9):</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">font-weight: bold; font-size: 11px; color: #333;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QScrollArea" name="tagsScrollArea">
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>200</height>
+              </size>
+             </property>
+             <property name="widgetResizable">
+              <bool>true</bool>
+             </property>
+             <widget class="QWidget" name="tagsScrollAreaWidget">
+              <property name="geometry">
+               <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>376</width>
+                <height>198</height>
+               </rect>
+              </property>
+              <layout class="QGridLayout" name="tagsGridLayout"/>
+             </widget>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="addTagButton">
+             <property name="text">
+              <string>➕ Añadir Nuevo Tag</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="leftPanelSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="rightPanel" native="true">
+       <property name="minimumSize">
+        <size>
+         <width>600</width>
+         <height>0</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="rightPanelLayout">
+        <item>
+         <widget class="QLabel" name="fileInfoLabel">
+          <property name="text">
+           <string>📄 Arrastra aquí un archivo .md o usa Ctrl+O para abrir</string>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">font-weight: bold; color: #0078d4; padding: 10px; border: 2px dashed #0078d4; border-radius: 5px; text-align: center;</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="titleGroup">
+          <property name="title">
+           <string>📝 Título del Post</string>
+          </property>
+          <layout class="QVBoxLayout" name="titleLayout">
+           <item>
+            <widget class="QLineEdit" name="titleLineEdit">
+             <property name="placeholderText">
+              <string>Título del post...</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="descriptionGroup">
+          <property name="title">
+           <string>📄 Descripción</string>
+          </property>
+          <layout class="QVBoxLayout" name="descriptionLayout">
+           <item>
+            <widget class="QTextEdit" name="descriptionTextEdit">
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>100</height>
+              </size>
+             </property>
+             <property name="placeholderText">
+              <string>Descripción del post...</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="categoryGroup">
+          <property name="title">
+           <string>📂 Categoría Seleccionada (solo blog notas)</string>
+          </property>
+          <layout class="QVBoxLayout" name="categoryLayout">
+           <item>
+            <widget class="QLabel" name="selectedCategoryLabel">
+             <property name="text">
+              <string>Ninguna categoría seleccionada</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: #f9f9f9;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="tagsGroup">
+          <property name="title">
+           <string>🏷️ Tags Seleccionados</string>
+          </property>
+          <layout class="QVBoxLayout" name="tagsMainLayout">
+           <item>
+            <widget class="QLabel" name="selectedTagsLabel">
+             <property name="text">
+              <string>Ningún tag seleccionado</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: #f9f9f9;</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="blogsGroup">
+          <property name="title">
+           <string>🌐 Blogs de Destino</string>
+          </property>
+          <layout class="QVBoxLayout" name="blogsLayout">
+           <item>
+            <widget class="QCheckBox" name="blogNotasCheckBox">
+             <property name="text">
+              <string>Blog Notas</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="blogMihitasCheckBox">
+             <property name="text">
+              <string>Blog Mihitas</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="allBlogsCheckBox">
+             <property name="text">
+              <string>✅ Todos los Blogs</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QProgressBar" name="progressBar">
+          <property name="visible">
+           <bool>false</bool>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QProgressBar {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+}
+
+QProgressBar::chunk {
+    background-color: #0078d4;
+    border-radius: 4px;
+}</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTextEdit" name="progressLogTextEdit">
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>100</height>
+           </size>
+          </property>
+          <property name="visible">
+           <bool>false</bool>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="placeholderText">
+           <string>Log de progreso...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="buttonsLayout">
+          <item>
+           <widget class="QPushButton" name="processButton">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>40</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>🚀 Procesar Post</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton {
+    background-color: #0078d4;
+    color: white;
+    font-weight: bold;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+QPushButton:hover {
+    background-color: #106ebe;
+}
+
+QPushButton:disabled {
+    background-color: #ccc;
+}</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="cancelButton">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>40</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>❌ Cancelar</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QPushButton {
+    background-color: #dc3545;
+    color: white;
+    font-weight: bold;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+QPushButton:hover {
+    background-color: #c82333;
+}</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1200</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuArchivo">
+    <property name="title">
+     <string>Archivo</string>
+    </property>
+    <addaction name="actionAbrir"/>
+    <addaction name="actionRefrescar"/>
+    <addaction name="separator"/>
+    <addaction name="actionSalir"/>
+   </widget>
+   <widget class="QMenu" name="menuAyuda">
+    <property name="title">
+     <string>Ayuda</string>
+    </property>
+    <addaction name="actionAtajos"/>
+    <addaction name="actionAcerca_de"/>
+   </widget>
+   <widget class="QMenu" name="menuTemas">
+    <property name="title">
+     <string>🎨 Temas</string>
+    </property>
+   </widget>
+   <addaction name="menuArchivo"/>
+   <addaction name="menuTemas"/>
+   <addaction name="menuAyuda"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionAbrir">
+   <property name="text">
+    <string>Abrir Archivo...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionSalir">
+   <property name="text">
+    <string>Salir</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionRefrescar">
+   <property name="text">
+    <string>Refrescar Lista</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
+   </property>
+  </action>
+  <action name="actionAtajos">
+   <property name="text">
+    <string>Atajos de Teclado</string>
+   </property>
+   <property name="shortcut">
+    <string>F1</string>
+   </property>
+  </action>
+  <action name="actionAcerca_de">
+   <property name="text">
+    <string>Acerca de...</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>cancelButton</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1050</x>
+     <y>745</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>599</x>
+     <y>399</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>actionSalir</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>599</x>
+     <y>399</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soul Funk - Bandcamp Collection</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #4c1da3;
+        }
+
+        .back-link {
+            color: #9a64ff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: #333;
+        }
+
+        h1 {
+            color: #4c1da3;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .genre-info {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            color: #9a64ff;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .embed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .embed-item {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .embed-item.listened {
+            opacity: 0.5;
+            background: #1a1a1a;
+        }
+
+        .embed-item iframe {
+            width: 100%;
+            border-radius: 4px;
+        }
+
+        .embed-title {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #b0b0b0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .listened-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 8px 15px;
+            background: #4c1da3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .listened-btn:hover {
+            background: #6b2fb5;
+        }
+
+        .listened-btn.marked {
+            background: #2a7a2a;
+        }
+
+        .listened-btn.marked:hover {
+            background: #3a9a3a;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .page-btn {
+            padding: 10px 15px;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #4c1da3;
+            transform: translateY(-2px);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: #4c1da3;
+            font-weight: bold;
+        }
+
+        .page-info {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            color: #9a64ff;
+        }
+
+        .page-content {
+            display: none;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .embed-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .stats {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Soul Funk</h1>
+            <a href="index.html" class="back-link">
+                <span>←</span>
+                <span>Volver al índice</span>
+            </a>
+        </div>
+
+        <div class="genre-info">
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">116</div>
+                    <div class="stat-label">Discos</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">12</div>
+                    <div class="stat-label">Páginas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-content active" id="page-1">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-2675824870188533357" data-message-id="&lt;3pGt_mpLTjSoTO4bb_Yu_A@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=4048490950/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;3pGt_mpLTjSoTO4bb_Yu_A@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3035252396621952956" data-message-id="&lt;gs-0C760SVelZtIbiYWNbQ@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2018998796/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;gs-0C760SVelZtIbiYWNbQ@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7379748368536656051" data-message-id="&lt;fePp_ggnRz6KRkw0oJGhnw@geopod-ismtpd-5&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=420833196/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;fePp_ggnRz6KRkw0oJGhnw@geopod-ismtpd-5&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3977671923884560490" data-message-id="&lt;ngP3QDBQT2ijdA4J3MNTdg@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2238486112/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ngP3QDBQT2ijdA4J3MNTdg@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-8394415010173659079" data-message-id="&lt;3rV07AAQRUWOUIHvLrjq7g@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2426947547/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;3rV07AAQRUWOUIHvLrjq7g@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7253222682352638564" data-message-id="&lt;GANnqjJtTeCs3-tGxGpnXQ@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3858847722/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;GANnqjJtTeCs3-tGxGpnXQ@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3416015765842431347" data-message-id="&lt;WXrNoK4BRj-GE5SZHXu39A@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2358476769/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;WXrNoK4BRj-GE5SZHXu39A@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-5516861629347910817" data-message-id="&lt;C3MwoZakSviuFn9Cvnx1gw@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1880739644/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;C3MwoZakSviuFn9Cvnx1gw@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7323890090316645746" data-message-id="&lt;LIPgRqynQN2n6PFRy-4U2A@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2196355670/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;LIPgRqynQN2n6PFRy-4U2A@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1441853291394216148" data-message-id="&lt;tp2cyJCiTV2k1VCwjPWhLA@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1766673067/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;tp2cyJCiTV2k1VCwjPWhLA@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-2">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-3154514000757054070" data-message-id="&lt;q9NewXppQ-6oEOluQ4vLNA@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1969713444/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;q9NewXppQ-6oEOluQ4vLNA@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-6768431312097703089" data-message-id="&lt;QfqRnZCbSHmTOCqefcWrzA@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2666336432/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;QfqRnZCbSHmTOCqefcWrzA@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2060099391902560951" data-message-id="&lt;DbiM1Ki0RLur3BATZVUl-w@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=385120681/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;DbiM1Ki0RLur3BATZVUl-w@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-998004919704658839" data-message-id="&lt;5gIKNdXPRhO8o7mz5EdYNw@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1622902358/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;5gIKNdXPRhO8o7mz5EdYNw@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3612169123807313048" data-message-id="&lt;p8zDlh0iTUa9ickTx6YSgQ@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3739522845/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;p8zDlh0iTUa9ickTx6YSgQ@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7520254264682789868" data-message-id="&lt;KHMFY2GXSZO0zvUh2jcYsQ@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2597348673/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;KHMFY2GXSZO0zvUh2jcYsQ@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-5738956842230554533" data-message-id="&lt;uA13zEZnRl2_2bhIAA67sw@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=3227683385/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;uA13zEZnRl2_2bhIAA67sw@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-614543483388897717" data-message-id="&lt;XS2HVt-kTTympu7n4nrkBQ@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1210091727/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;XS2HVt-kTTympu7n4nrkBQ@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6029284421930911955" data-message-id="&lt;PYHIsqNzTGK30Cm2YK06UQ@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1305917946/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;PYHIsqNzTGK30Cm2YK06UQ@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8869530472962666230" data-message-id="&lt;9yNxkIHHQhmTb203atnrqw@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=386311333/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;9yNxkIHHQhmTb203atnrqw@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-3">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-7842632989227038725" data-message-id="&lt;_WT6kaeUR-mjpfL7ybzdRQ@geopod-ismtpd-17&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3391978875/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;_WT6kaeUR-mjpfL7ybzdRQ@geopod-ismtpd-17&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-8719624299670176019" data-message-id="&lt;J2DK6M_2SHSYqFv7jQW86A@geopod-ismtpd-8&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2934718826/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;J2DK6M_2SHSYqFv7jQW86A@geopod-ismtpd-8&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8182948433701866067" data-message-id="&lt;97mFBnR6RhuK_w5dPpvNBQ@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3090553447/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;97mFBnR6RhuK_w5dPpvNBQ@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1463382071530378011" data-message-id="&lt;n2gfxag5QEqsZ4Pzmf4w7g@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3421496119/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from 180 Proof Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;n2gfxag5QEqsZ4Pzmf4w7g@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6064888780684556728" data-message-id="&lt;qDLAF0atQW-aHgfgsdCHtA@geopod-ismtpd-5&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1337269568/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;qDLAF0atQW-aHgfgsdCHtA@geopod-ismtpd-5&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--5972843187357973163" data-message-id="&lt;ht_ul0x4RQuJz4mJ0gmLKw@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=587150342/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ht_ul0x4RQuJz4mJ0gmLKw@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-8039347865227212592" data-message-id="&lt;foWrhpKVQeiBnip-gjvAtA@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1268121025/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;foWrhpKVQeiBnip-gjvAtA@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1523310151221593418" data-message-id="&lt;0PIX1MF_Rc6HXTqUZfv32A@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1442298581/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;0PIX1MF_Rc6HXTqUZfv32A@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4133739331422210063" data-message-id="&lt;641o7q_TSpex6M4g-vi03Q@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4037492964/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;641o7q_TSpex6M4g-vi03Q@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7408691691924585554" data-message-id="&lt;kHoBNdqbTr-mwyx-Mn-0Kw@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4232956925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;kHoBNdqbTr-mwyx-Mn-0Kw@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-4">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed--5514925770770388290" data-message-id="&lt;H1JQv-0jStehv7rb08Ky5w@geopod-ismtpd-16&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=229383286/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;H1JQv-0jStehv7rb08Ky5w@geopod-ismtpd-16&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--658916331548673020" data-message-id="&lt;A22soJZUQVKOa5iA1ovPXg@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3816827998/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;A22soJZUQVKOa5iA1ovPXg@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2894787230799455192" data-message-id="&lt;NpiP-toFT8WZZsM8dRYvnA@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1372024477/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;NpiP-toFT8WZZsM8dRYvnA@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1566668054528727332" data-message-id="&lt;-nhPw5AKRYqAhxBppBJGtw@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=278145432/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New releases from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;-nhPw5AKRYqAhxBppBJGtw@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4093502236078125144" data-message-id="&lt;X2AZODWrTG2LFQK-y0mdXQ@geopod-ismtpd-8&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1954937958/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;X2AZODWrTG2LFQK-y0mdXQ@geopod-ismtpd-8&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--9036628490028534332" data-message-id="&lt;OduSjTZ8TU-3PoX6bs7WYg@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1184332375/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;OduSjTZ8TU-3PoX6bs7WYg@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1833740081099963981" data-message-id="&lt;CtE7_OGTQkqPjmb6dm47yw@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=204888850/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;CtE7_OGTQkqPjmb6dm47yw@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--4915474835015846579" data-message-id="&lt;4WZwt2LgRCGyO_OzYWgaeA@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4057789784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;4WZwt2LgRCGyO_OzYWgaeA@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6349404211056137191" data-message-id="&lt;-x2YiHVdQSWC2X7_IJS9eQ@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2432870082/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;-x2YiHVdQSWC2X7_IJS9eQ@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2009954864953735809" data-message-id="&lt;m7G3z9uGRPO_7_-fDGrbhA@geopod-ismtpd-16&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4118879471/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;m7G3z9uGRPO_7_-fDGrbhA@geopod-ismtpd-16&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-5">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-7232048393724851188" data-message-id="&lt;0gSaaDv2QfqUxSwlW3SDKQ@geopod-ismtpd-13&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2109231060/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;0gSaaDv2QfqUxSwlW3SDKQ@geopod-ismtpd-13&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2888207489289481376" data-message-id="&lt;03ZWIbkeTfKH6tsK_96GCw@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3057335349/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;03ZWIbkeTfKH6tsK_96GCw@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-5749521537942444126" data-message-id="&lt;ZEPAjmDNSmGtIXSzKrwMZw@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=54933715/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ZEPAjmDNSmGtIXSzKrwMZw@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8930154743102226447" data-message-id="&lt;cC3KgN8HQ9mAGzv7RfCPKQ@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=968686394/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;cC3KgN8HQ9mAGzv7RfCPKQ@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2000182324905820136" data-message-id="&lt;ksRWuUO2Romz73k_6V6SjQ@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3111357660/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ksRWuUO2Romz73k_6V6SjQ@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-846025872472757714" data-message-id="&lt;d444ad33f04b54c80159c8645.4ee700f5c0.20230825153140.11278b390f.e694aa3c@mail220.sea101.rsgsv.net&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3378990914/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">=?utf-8?Q?OUT=20NOW=3A=20Kendra=20Morris=20drops=20her=20new=20LP=20today=21?=</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;d444ad33f04b54c80159c8645.4ee700f5c0.20230825153140.11278b390f.e694aa3c@mail220.sea101.rsgsv.net&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2135878053878491594" data-message-id="&lt;vZ-tJzDMQACF8R2Fwt68LQ@geopod-ismtpd-14&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3298780756/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;vZ-tJzDMQACF8R2Fwt68LQ@geopod-ismtpd-14&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4694486443335797830" data-message-id="&lt;RZtEqLCJQ-uOmV5-tStlnQ@geopod-ismtpd-15&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=3564515807/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;RZtEqLCJQ-uOmV5-tStlnQ@geopod-ismtpd-15&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2544934549365622573" data-message-id="&lt;Emaz9xHbSR2GDD9LbuUhQA@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=623275973/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New releases from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Emaz9xHbSR2GDD9LbuUhQA@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6473646748541636784" data-message-id="&lt;iMsYJeHWQ7egN-LRH4acsw@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1170997353/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;iMsYJeHWQ7egN-LRH4acsw@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-6">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed--5655730015971266770" data-message-id="&lt;jnVR-4v3QxSeB9q8kombFQ@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2351513400/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;jnVR-4v3QxSeB9q8kombFQ@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6102268402287637482" data-message-id="&lt;uGLwUMkhQ6iAOtC7jnIB1g@geopod-ismtpd-4&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=387502291/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;uGLwUMkhQ6iAOtC7jnIB1g@geopod-ismtpd-4&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7071613389941368739" data-message-id="&lt;gFXzlhBlSlWTeEM2bU_dTw@geopod-ismtpd-4&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=933666424/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;gFXzlhBlSlWTeEM2bU_dTw@geopod-ismtpd-4&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--755513132343263977" data-message-id="&lt;TCpgKu9KRt-l4cUs5Ac4dw@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1708127488/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;TCpgKu9KRt-l4cUs5Ac4dw@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3832280868064403459" data-message-id="&lt;D5G03wD1TVmFkft4gC5ZUQ@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=3411680093/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;D5G03wD1TVmFkft4gC5ZUQ@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7628271773428499969" data-message-id="&lt;ubGeypMuRr6gwLEW_B_JLA@geopod-ismtpd-15&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1282816462/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ubGeypMuRr6gwLEW_B_JLA@geopod-ismtpd-15&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6095531462138530233" data-message-id="&lt;I5b2UPp1TrCH5pwoSnomVA@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=686476144/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;I5b2UPp1TrCH5pwoSnomVA@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--4276174144882757875" data-message-id="&lt;N8ZVW5JuRDyPUCpy4iXG0w@geopod-ismtpd-4&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=607311152/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;N8ZVW5JuRDyPUCpy4iXG0w@geopod-ismtpd-4&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1071925078993234683" data-message-id="&lt;DERWyl74RC2zzRU6GJE5tQ@geopod-ismtpd-19&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1201830598/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Olindo Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;DERWyl74RC2zzRU6GJE5tQ@geopod-ismtpd-19&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-246327570863818532" data-message-id="&lt;BQ0GuYL9Smyq8tWXlkVrsA@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=760081823/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;BQ0GuYL9Smyq8tWXlkVrsA@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-7">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-6894877823169773488" data-message-id="&lt;Pdm5gxH_RGihKIGjI-kBuw@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2056042828/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Pdm5gxH_RGihKIGjI-kBuw@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7272146616953655434" data-message-id="&lt;IHVStexKTje3fsPG0ELtjw@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1953225681/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;IHVStexKTje3fsPG0ELtjw@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2762133617087072279" data-message-id="&lt;E4Ru45qMQweJNKqni-r2fQ@geopod-ismtpd-14&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=810457650/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;E4Ru45qMQweJNKqni-r2fQ@geopod-ismtpd-14&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8166097091522419283" data-message-id="&lt;4L9cL-d7RtOKvMuOcX_8cw@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3393420387/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;4L9cL-d7RtOKvMuOcX_8cw@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3884785955719991029" data-message-id="&lt;EXg8yuk_Qge2_bZDj8gJxg@geopod-ismtpd-16&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2573078737/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;EXg8yuk_Qge2_bZDj8gJxg@geopod-ismtpd-16&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--5800646412775319252" data-message-id="&lt;6TJHaWLBTkyLS4sgNArAqQ@geopod-ismtpd-27&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=288906048/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;6TJHaWLBTkyLS4sgNArAqQ@geopod-ismtpd-27&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-5497772906707606466" data-message-id="&lt;EIQFksy8S3G7REa4z50ZEg@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1263822551/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;EIQFksy8S3G7REa4z50ZEg@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4190421800891159129" data-message-id="&lt;ontp_xc-SyaS-L4eLxUmsg@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3858939787/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ontp_xc-SyaS-L4eLxUmsg@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7440882329807047118" data-message-id="&lt;FEQchVJxQ0KxFZq16JRV8w@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2963023740/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;FEQchVJxQ0KxFZq16JRV8w@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2545050173601384028" data-message-id="&lt;XzpseJCTT6WCvgaUcCZJlw@geopod-ismtpd-19&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1544418261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;XzpseJCTT6WCvgaUcCZJlw@geopod-ismtpd-19&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-8">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed--4139229606853104903" data-message-id="&lt;Y3Iu3ic3RkiYrqRI5clU-w@geopod-ismtpd-17&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=762203925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Y3Iu3ic3RkiYrqRI5clU-w@geopod-ismtpd-17&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1709639290448264419" data-message-id="&lt;h2aKoMGJRkmx6Kv2qR4OHg@geopod-ismtpd-23&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=677416272/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;h2aKoMGJRkmx6Kv2qR4OHg@geopod-ismtpd-23&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-6754770585693621937" data-message-id="&lt;dh0vwVvzTXiN9ky_KI5GvQ@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=1606989583/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;dh0vwVvzTXiN9ky_KI5GvQ@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-5915842485992039036" data-message-id="&lt;0ur0b1bjTjOSEjK1YhRAuw@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1955487190/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;0ur0b1bjTjOSEjK1YhRAuw@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3874868887986046946" data-message-id="&lt;fO3H_oxYRSitoKvXcIaz8A@geopod-ismtpd-22&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=804395902/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;fO3H_oxYRSitoKvXcIaz8A@geopod-ismtpd-22&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1136136487343980374" data-message-id="&lt;57rwq7JZS62sr2w5xL2S-Q@geopod-ismtpd-19&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2168755038/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;57rwq7JZS62sr2w5xL2S-Q@geopod-ismtpd-19&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6065987293096752515" data-message-id="&lt;hhNInmuQTMqDXWf9RGaeIA@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3525285357/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;hhNInmuQTMqDXWf9RGaeIA@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2734206256417980037" data-message-id="&lt;vUIS_QGBRmKN_1GNdpVf1g@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=41088538/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;vUIS_QGBRmKN_1GNdpVf1g@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2997932049677885216" data-message-id="&lt;t59KZjMyRu6uc-EwqwZWng@geopod-ismtpd-14&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=665396436/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New releases from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;t59KZjMyRu6uc-EwqwZWng@geopod-ismtpd-14&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6361134768380637553" data-message-id="&lt;bsb-L97AR9mrAs1uopQTTQ@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=2455845827/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;bsb-L97AR9mrAs1uopQTTQ@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-9">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed--5661438839763274329" data-message-id="&lt;mKCu83qWTnazBfQdAtFLgA@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3484929252/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;mKCu83qWTnazBfQdAtFLgA@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8777989521971877618" data-message-id="&lt;Ie9tT-tVQH6Mw-JzbgaXQg@geopod-ismtpd-11&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616095870/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Ie9tT-tVQH6Mw-JzbgaXQg@geopod-ismtpd-11&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1534808978876878441" data-message-id="&lt;anKUd2vkR6W7hK8obDGaiw@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3374288917/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;anKUd2vkR6W7hK8obDGaiw@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-669788202950642582" data-message-id="&lt;hcyRR72nQIaWiFRLHcQwcw@geopod-ismtpd-22&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2486647924/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;hcyRR72nQIaWiFRLHcQwcw@geopod-ismtpd-22&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-928215794422156106" data-message-id="&lt;KnZnooSJRfiE58Uqr2HTog@geopod-ismtpd-5&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3960774498/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;KnZnooSJRfiE58Uqr2HTog@geopod-ismtpd-5&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3860494218124142126" data-message-id="&lt;JOc0IFoNQmyqhauJPN3K-w@geopod-ismtpd-16&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=688692261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from 180 Proof Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;JOc0IFoNQmyqhauJPN3K-w@geopod-ismtpd-16&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7523869116645493095" data-message-id="&lt;Hki1_aFOTJyxB5WIAnrsUg@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Thee Sacred Souls</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Hki1_aFOTJyxB5WIAnrsUg@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--4473287053004909609" data-message-id="&lt;UPrKvI_4Q-uZjkMAVaU0YA@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=289200919/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;UPrKvI_4Q-uZjkMAVaU0YA@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--5974559063540592149" data-message-id="&lt;dIXpphe0RbiavAWWXSBwHw@geopod-ismtpd-13&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2148931197/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;dIXpphe0RbiavAWWXSBwHw@geopod-ismtpd-13&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1939853126932041182" data-message-id="&lt;AX8XXeGoREmA0eYLzOOpog@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2270721748/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;AX8XXeGoREmA0eYLzOOpog@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-10">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-5543117615444603832" data-message-id="&lt;ZJDwT2RQSj6NI2W-0IrS5g@geopod-ismtpd-8&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=101676645/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ZJDwT2RQSj6NI2W-0IrS5g@geopod-ismtpd-8&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2414959524917631676" data-message-id="&lt;kuzEthAzRZ2K1g5VvHXitg@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2254254929/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;kuzEthAzRZ2K1g5VvHXitg@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-8628219005469504976" data-message-id="&lt;TXiE27GnRsmgP_sY5Auhqg@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=104246849/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;TXiE27GnRsmgP_sY5Auhqg@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--1366599727257113966" data-message-id="&lt;3UMJz43jTBWOZARbTz39ww@geopod-ismtpd-13&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1928337752/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;3UMJz43jTBWOZARbTz39ww@geopod-ismtpd-13&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7895470842630403641" data-message-id="&lt;6H4Ercy_QCelJD2_WbxzeQ@geopod-ismtpd-14&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4199967987/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Peter Cat Recording Co.</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;6H4Ercy_QCelJD2_WbxzeQ@geopod-ismtpd-14&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--582859924552076088" data-message-id="&lt;tafH0w75QZKhIqB443v8VA@geopod-ismtpd-8&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=255081097/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;tafH0w75QZKhIqB443v8VA@geopod-ismtpd-8&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2908657553871452819" data-message-id="&lt;0sIenqwzSdW4_fHwHhjfQg@geopod-ismtpd-4&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=726754222/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;0sIenqwzSdW4_fHwHhjfQg@geopod-ismtpd-4&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3927948575338208790" data-message-id="&lt;nk6ZeUmiRnaGe9N3XvEkaA@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2933266146/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;nk6ZeUmiRnaGe9N3XvEkaA@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7118876736675425996" data-message-id="&lt;K0TpboeMSVW_Oh-2PR38sg@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3007541183/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;K0TpboeMSVW_Oh-2PR38sg@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4708622062709411925" data-message-id="&lt;yEYZXvfUR76KD9Uu0bfaSQ@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1524628784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;yEYZXvfUR76KD9Uu0bfaSQ@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-11">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-784268620863489732" data-message-id="&lt;7VsfV0swRv2hbBmrKX1kgw@geopod-ismtpd-15&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3080969890/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;7VsfV0swRv2hbBmrKX1kgw@geopod-ismtpd-15&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3061533369352326059" data-message-id="&lt;TPfk-ivJSBmlBHn8KiMsAQ@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=728552579/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;TPfk-ivJSBmlBHn8KiMsAQ@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6825710858604678193" data-message-id="&lt;a9eNgHSaTNSeN7Yp8UTJFQ@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1005580961/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;a9eNgHSaTNSeN7Yp8UTJFQ@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--3967376073735212462" data-message-id="&lt;V78-hzOYRD63iJiaTi5ghQ@geopod-ismtpd-13&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2178426280/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from BurningSoleRecords, who brought you MEXICO (PT.1)</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;V78-hzOYRD63iJiaTi5ghQ@geopod-ismtpd-13&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7428542749810512303" data-message-id="&lt;DbC_xiyESyG667OrFL1LGQ@geopod-ismtpd-9&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1098402799/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;DbC_xiyESyG667OrFL1LGQ@geopod-ismtpd-9&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3126724280289394285" data-message-id="&lt;W9JqZXfpSv-TFerCgz8eMQ@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=54435843/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;W9JqZXfpSv-TFerCgz8eMQ@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--134578381182229999" data-message-id="&lt;1bDI7vwkQnuaaMF1IPohOQ@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2936051067/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Athens Of The North, who brought you The Time is
+ Right</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;1bDI7vwkQnuaaMF1IPohOQ@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-8227847305661756894" data-message-id="&lt;8RfSfOWGTAOBcAwtCaqdBQ@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1295286540/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;8RfSfOWGTAOBcAwtCaqdBQ@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2695071354420334942" data-message-id="&lt;vhnb96pJSZ-qgbVso-KQow@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=440440189/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;vhnb96pJSZ-qgbVso-KQow@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2392671905457135955" data-message-id="&lt;Q6Q9gVVISeeiSorPN-8hOw@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=428806227/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from NuNorthern Soul, who brought you Summer Selections
+ Three</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Q6Q9gVVISeeiSorPN-8hOw@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-12">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed--3755387187544290433" data-message-id="&lt;3UnbziYkRDS6LaYweU2mYQ@geopod-ismtpd-15&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2040959058/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;3UnbziYkRDS6LaYweU2mYQ@geopod-ismtpd-15&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-941090872071924073" data-message-id="&lt;F-whLfc4QeevdqGsXrzkRw@geopod-ismtpd-22&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=502782641/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;F-whLfc4QeevdqGsXrzkRw@geopod-ismtpd-22&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--7983199284165691511" data-message-id="&lt;QkGfxTrvTJSFT8Glm3S9ig@geopod-ismtpd-10&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1688225830/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Favorite Recordings</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;QkGfxTrvTJSFT8Glm3S9ig@geopod-ismtpd-10&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3099148041950449204" data-message-id="&lt;LqdyRQVjTgyxKmKlmYd9Dw@geopod-ismtpd-14&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=982970726/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;LqdyRQVjTgyxKmKlmYd9Dw@geopod-ismtpd-14&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1388507703451976383" data-message-id="&lt;yPhpQtdjSXSqAuTRorUlwA@geopod-ismtpd-7&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3950029959/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Matasuna Records</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;yPhpQtdjSXSqAuTRorUlwA@geopod-ismtpd-7&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--6485306946227893908" data-message-id="&lt;4kUMY2L_Sl2jO3ybwQk0tA@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=3339169616/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Wah Wah 45s</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;4kUMY2L_Sl2jO3ybwQk0tA@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/Soul Funk', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="pagination">
+            <button class="page-btn" id="prev-btn" onclick="changePage(-1)">← Anterior</button>
+            <div class="page-info">
+                Página <span id="current-page">1</span> de <span id="total-pages">12</span>
+            </div>
+
+            <button class="page-btn page-number active" onclick="goToPage(1)">1</button>
+
+            <button class="page-btn page-number " onclick="goToPage(2)">2</button>
+
+            <button class="page-btn page-number " onclick="goToPage(3)">3</button>
+
+            <button class="page-btn page-number " onclick="goToPage(4)">4</button>
+
+            <button class="page-btn page-number " onclick="goToPage(5)">5</button>
+
+            <button class="page-btn page-number " onclick="goToPage(6)">6</button>
+
+            <button class="page-btn page-number " onclick="goToPage(7)">7</button>
+
+            <button class="page-btn page-number " onclick="goToPage(8)">8</button>
+
+            <button class="page-btn page-number " onclick="goToPage(9)">9</button>
+
+            <button class="page-btn page-number " onclick="goToPage(10)">10</button>
+
+            <button class="page-btn page-number " onclick="goToPage(11)">11</button>
+
+            <button class="page-btn page-number " onclick="goToPage(12)">12</button>
+
+            <button class="page-btn" id="next-btn" onclick="changePage(1)">Siguiente →</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const totalPages = 12;
+
+        // Cargar estado de escuchados desde localStorage
+        function loadListenedState() {
+            const listened = JSON.parse(localStorage.getItem('listened_albums') || '[]');
+            listened.forEach(messageId => {
+                const embedItem = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (embedItem) {
+                    embedItem.classList.add('listened');
+                    const btn = embedItem.querySelector('.listened-btn');
+                    if (btn) {
+                        btn.classList.add('marked');
+                        btn.textContent = '✓ Marcado';
+                    }
+                }
+            });
+        }
+
+        // Marcar álbum como escuchado
+        function markAsListened(messageId, mboxPath, button) {
+            const embedItem = button.closest('.embed-item');
+            const listened = JSON.parse(localStorage.getItem('listened_albums') || '[]');
+
+            if (listened.includes(messageId)) {
+                // Ya está marcado, desmarcarlo
+                const index = listened.indexOf(messageId);
+                listened.splice(index, 1);
+                embedItem.classList.remove('listened');
+                button.classList.remove('marked');
+                button.textContent = '✓ Escuchado';
+            } else {
+                // Marcarlo como escuchado
+                listened.push(messageId);
+                embedItem.classList.add('listened');
+                button.classList.add('marked');
+                button.textContent = '✓ Marcado';
+
+                // Enviar petición al servidor para marcar como leído en Thunderbird
+                markEmailAsRead(messageId, mboxPath);
+            }
+
+            localStorage.setItem('listened_albums', JSON.stringify(listened));
+        }
+
+        // Intentar marcar el correo como leído en Thunderbird
+        function markEmailAsRead(messageId, mboxPath) {
+            // Enviar petición al servidor local si está corriendo
+            fetch('http://localhost:8765/mark_read', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_id: messageId,
+                    mbox_path: mboxPath
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✓ Correo marcado como leído en Thunderbird');
+                } else {
+                    console.log('⚠ No se pudo marcar en Thunderbird (servidor no disponible)');
+                }
+            })
+            .catch(error => {
+                console.log('ℹ️ Marcado solo localmente (inicia el servidor para sincronizar con Thunderbird)');
+            });
+        }
+
+        function updatePagination() {
+            // Actualizar visibilidad de páginas
+            document.querySelectorAll('.page-content').forEach((page, index) => {
+                page.classList.toggle('active', index === currentPage - 1);
+            });
+
+            // Actualizar botones de página
+            document.querySelectorAll('.page-number').forEach((btn, index) => {
+                btn.classList.toggle('active', index === currentPage - 1);
+            });
+
+            // Actualizar info de página
+            document.getElementById('current-page').textContent = currentPage;
+
+            // Actualizar botones prev/next
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === totalPages;
+
+            // Scroll al inicio
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                updatePagination();
+            }
+        }
+
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                updatePagination();
+            }
+        }
+
+        // Atajos de teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                changePage(-1);
+            } else if (e.key === 'ArrowRight') {
+                changePage(1);
+            }
+        });
+
+        // Inicializar
+        updatePagination();
+        loadListenedState();
+    </script>
+</body>
+</html>

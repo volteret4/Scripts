@@ -3,6 +3,8 @@
 Sincronizador de Playlists M3U a Airsonic (Compatible con Cron)
 Sincroniza playlists locales .m3u con Airsonic usando sincronización incremental.
 Solo añade canciones nuevas y elimina las que ya no existen.
+
+MEJORA: Extrae metadata de archivos cuando el regex no encuentra artista/título.
 """
 
 import os
@@ -20,6 +22,19 @@ from urllib.parse import urlencode
 import logging
 import sys
 from dotenv import load_dotenv
+
+# Intentar importar mutagen para leer metadata
+try:
+    from mutagen import File as MutagenFile
+    from mutagen.easyid3 import EasyID3
+    from mutagen.mp3 import MP3
+    from mutagen.flac import FLAC
+    from mutagen.mp4 import MP4
+    MUTAGEN_AVAILABLE = True
+except ImportError:
+    MUTAGEN_AVAILABLE = False
+    print("⚠️  Advertencia: mutagen no está instalado. No se podrá leer metadata de archivos.", file=sys.stderr)
+    print("   Instala con: pip install mutagen", file=sys.stderr)
 
 # Configuración de rutas
 script_dir = Path(__file__).parent.absolute()
@@ -198,603 +213,467 @@ class AirsonicSyncer:
                     elif error_code == 50:
                         self.logger.error("Cliente no autorizado")
                     elif error_code == 60:
-                        self.logger.error("Prueba expirada")
+                        self.logger.error("Prueba de servidor requerida")
                     elif error_code == 70:
-                        self.logger.error("Los datos solicitados no se encontraron")
+                        self.logger.error("Recurso no encontrado")
 
                     return None
 
-            return data
-
-        except requests.exceptions.ConnectionError as e:
-            self.logger.error(f"Error de conexión a Airsonic: {e}")
-            self.logger.error(f"Verifica que Airsonic esté ejecutándose en {self.airsonic_url}")
-            return None
-        except requests.exceptions.Timeout as e:
-            self.logger.error(f"Timeout en petición a Airsonic: {e}")
-            return None
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Error en petición HTTP: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Error decodificando JSON: {e}")
-            self.logger.error("La respuesta del servidor no es JSON válido")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error inesperado en petición: {e}")
             return None
 
-    def _load_song_cache(self):
-        """Carga el cache de canciones desde archivo si existe"""
-        if not self.song_cache_file.exists():
-            self._song_cache = {}
-            return
-
-        try:
-            with open(self.song_cache_file, 'r', encoding='utf-8') as f:
-                cache_data = json.load(f)
-
-            # Validar estructura del cache
-            if isinstance(cache_data, dict) and 'songs' in cache_data:
-                self._song_cache = cache_data['songs']
-                # Solo usar logger si ya existe
-                if hasattr(self, 'logger'):
-                    self.logger.info(f"Cache de canciones cargado: {len(self._song_cache)} entradas")
-            else:
-                # Cache corrupto
-                self._song_cache = {}
-                if hasattr(self, 'logger'):
-                    self.logger.warning("Cache corrupto, será reconstruido")
-
+        except requests.exceptions.ConnectionError:
+            self.logger.error(f"Error de conexión con {self.airsonic_url}")
+            return None
+        except requests.exceptions.Timeout:
+            self.logger.error("Timeout en la conexión con Airsonic")
+            return None
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"Error HTTP: {e}")
+            return None
         except Exception as e:
-            self._song_cache = {}
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Error cargando cache de canciones: {e}")
-
-
-    def _save_song_cache(self):
-        """Guarda el cache de canciones en archivo con verificación"""
-        try:
-            # Crear directorio si no existe
-            self.song_cache_file.parent.mkdir(parents=True, exist_ok=True)
-
-            cache_data = {
-                'songs': self._song_cache,
-                'created': datetime.now().isoformat(),
-                'version': '1.0',
-                'total_entries': len(self._song_cache)
-            }
-
-            # Escribir a archivo temporal primero
-            temp_file = self.song_cache_file.with_suffix('.tmp')
-
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, indent=2, ensure_ascii=False)
-
-            # Verificar que se escribió correctamente
-            with open(temp_file, 'r', encoding='utf-8') as f:
-                verification = json.load(f)
-
-            if verification.get('total_entries') == len(self._song_cache):
-                # Mover archivo temporal al definitivo
-                temp_file.replace(self.song_cache_file)
-
-                if hasattr(self, 'interactive') and self.interactive:
-                    print(f"💾 Cache guardado: {len(self._song_cache)} entradas en {self.song_cache_file}")
-                self.logger.info(f"Cache guardado: {len(self._song_cache)} entradas")
-            else:
-                raise ValueError("Verificación de cache falló")
-
-        except Exception as e:
-            if hasattr(self, 'interactive') and self.interactive:
-                print(f"❌ Error guardando cache: {e}")
-            self.logger.error(f"Error guardando cache de canciones: {e}")
-
-            # Limpiar archivo temporal si existe
-            if 'temp_file' in locals() and temp_file.exists():
-                temp_file.unlink()
-
-    def verify_cache_integrity(self) -> bool:
-        """Verifica que el cache esté íntegro y sea usable"""
-        try:
-            if not self._song_cache:
-                return False
-
-            # Verificar que tenga entradas válidas
-            sample_size = min(10, len(self._song_cache))
-            sample_keys = list(self._song_cache.keys())[:sample_size]
-
-            for key in sample_keys:
-                entries = self._song_cache[key]
-                if not isinstance(entries, list) or not entries:
-                    return False
-
-                # Verificar que las entradas tengan campos requeridos
-                for entry in entries[:3]:  # Solo verificar las primeras 3
-                    if not isinstance(entry, dict):
-                        return False
-                    if 'id' not in entry or 'title' not in entry:
-                        return False
-
-            return True
-
-        except Exception:
-            return False
-
-    def _is_cache_stale(self) -> bool:
-        """Verifica si el cache es muy viejo (más de 24 horas)"""
-        if not self.song_cache_file.exists():
-            return True
-
-        try:
-            # Verificar tiempo de modificación del archivo
-            file_time = os.path.getmtime(self.song_cache_file)
-            current_time = time.time()
-            age_hours = (current_time - file_time) / 3600
-
-            # Log para debug
-            self.logger.debug(f"Cache age: {age_hours:.1f} hours")
-
-            return age_hours > 24  # Cache viejo si tiene más de 24 horas
-        except Exception as e:
-            # Asegurar que logger existe antes de usarlo
-            if hasattr(self, 'logger'):
-                self.logger.warning(f"Error verificando edad del cache: {e}")
-            return True
-
-
-    def _build_song_cache(self):
-        """Construye un cache de todas las canciones en Airsonic para búsquedas rápidas"""
-        self.logger.info("Construyendo cache de canciones de Airsonic...")
-
-        try:
-            # Limpiar cache existente
-            self._song_cache = {}
-
-            # Obtener todos los artistas
-            response = self._make_request('getArtists')
-            if not response or 'artists' not in response:
-                self.logger.warning("No se pudieron obtener artistas de Airsonic")
-                return
-
-            song_count = 0
-
-            # Para cada artista, obtener álbumes y canciones
-            for index in response['artists'].get('index', []):
-                for artist in index.get('artist', []):
-                    artist_id = artist['id']
-
-                    # Obtener álbumes del artista
-                    albums_response = self._make_request('getArtist', {'id': artist_id})
-                    if not albums_response or 'artist' not in albums_response:
-                        continue
-
-                    artist_data = albums_response['artist']
-
-                    # Procesar álbumes
-                    for album in artist_data.get('album', []):
-                        album_id = album['id']
-
-                        # Obtener canciones del álbum
-                        songs_response = self._make_request('getAlbum', {'id': album_id})
-                        if not songs_response or 'album' not in songs_response:
-                            continue
-
-                        album_data = songs_response['album']
-
-                        # Indexar canciones
-                        for song in album_data.get('song', []):
-                            song_info = {
-                                'id': song['id'],
-                                'title': song.get('title', ''),
-                                'artist': song.get('artist', ''),
-                                'album': song.get('album', ''),
-                                'track': song.get('track', 0),
-                                'year': song.get('year', 0),
-                                'genre': song.get('genre', ''),
-                                'path': song.get('path', ''),
-                                'suffix': song.get('suffix', ''),
-                                'duration': song.get('duration', 0)
-                            }
-
-                            # Crear claves de búsqueda normalizadas
-                            normalized_title = self._normalize_string(song_info['title'])
-                            normalized_artist = self._normalize_string(song_info['artist'])
-                            normalized_album = self._normalize_string(song_info['album'])
-
-                            # Múltiples estrategias de indexado
-                            search_keys = [
-                                f"{normalized_artist}|{normalized_title}",
-                                f"{normalized_artist}|{normalized_title}|{normalized_album}",
-                                f"{normalized_title}|{normalized_artist}",
-                                normalized_title if len(normalized_title) > 3 else None,
-                            ]
-
-                            for key in search_keys:
-                                if key:
-                                    if key not in self._song_cache:
-                                        self._song_cache[key] = []
-                                    self._song_cache[key].append(song_info)
-
-                            song_count += 1
-
-                    time.sleep(0.1)  # Pequeña pausa para no sobrecargar el servidor
-
-            self.logger.info(f"Cache construido: {song_count} canciones indexadas con {len(self._song_cache)} claves de búsqueda")
-
-            # Guardar cache en archivo
-            self._save_song_cache()
-
-        except Exception as e:
-            self.logger.error(f"Error construyendo cache: {e}")
-
-    def _normalize_string(self, text: str) -> str:
-        """Normaliza strings para búsquedas más flexibles"""
-        if not text:
-            return ""
-
-        # Convertir a minúsculas
-        text = text.lower()
-
-        # Remover acentos básicos
-        accents = {
-            'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ā': 'a', 'ã': 'a',
-            'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'ē': 'e',
-            'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'ī': 'i',
-            'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'ō': 'o', 'õ': 'o',
-            'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'ū': 'u',
-            'ñ': 'n', 'ç': 'c'
-        }
-
-        for accented, plain in accents.items():
-            text = text.replace(accented, plain)
-
-        # Remover caracteres especiales y espacios extra
-        text = re.sub(r'[^\w\s]', ' ', text)
-        text = re.sub(r'\s+', ' ', text)
-        text = text.strip()
-
-        return text
+            self.logger.error(f"Error en petición: {e}")
+            return None
 
     def _load_sync_state(self) -> Dict:
-        """Carga el estado de sincronización anterior"""
+        """Carga el estado de sincronización desde archivo"""
         if self.sync_state_file.exists():
             try:
-                with open(self.sync_state_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                with open(self.sync_state_file, 'r') as f:
+                    state = json.load(f)
+                    self.logger.info(f"Estado de sincronización cargado: {len(state.get('playlists', {}))} playlists")
+                    return state
             except Exception as e:
-                self.logger.warning(f"Error cargando estado de sincronización: {e}")
+                self.logger.warning(f"Error cargando estado: {e}")
 
-        return {"playlists": {}, "last_sync": None}
+        return {
+            "playlists": {},
+            "last_update": datetime.now().isoformat()
+        }
 
     def _save_sync_state(self):
         """Guarda el estado de sincronización"""
         try:
-            self.sync_state["last_sync"] = datetime.now().isoformat()
-            with open(self.sync_state_file, 'w', encoding='utf-8') as f:
-                json.dump(self.sync_state, f, indent=2, ensure_ascii=False)
+            self.sync_state["last_update"] = datetime.now().isoformat()
+            with open(self.sync_state_file, 'w') as f:
+                json.dump(self.sync_state, f, indent=2)
+            self.logger.debug("Estado guardado correctamente")
         except Exception as e:
-            self.logger.error(f"Error guardando estado de sincronización: {e}")
+            self.logger.error(f"Error guardando estado: {e}")
 
     def _get_m3u_hash(self, m3u_path: str) -> str:
-        """Genera hash del contenido del archivo M3U"""
-        try:
-            with open(m3u_path, 'rb') as f:
-                content = f.read()
-            return hashlib.md5(content).hexdigest()
-        except Exception as e:
-            self.logger.error(f"Error generando hash para {m3u_path}: {e}")
-            return ""
+        """Calcula hash SHA256 del archivo M3U"""
+        with open(m3u_path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
 
-    def parse_m3u_file(self, m3u_path: str) -> List[Dict[str, str]]:
-        """Parsea un archivo M3U y extrae información de las canciones."""
-        tracks = []
-
-        try:
-            with open(m3u_path, 'r', encoding='utf-8') as file:
-                for line in file:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        track_info = self._parse_track_filename(line)
-                        if track_info:
-                            tracks.append(track_info)
-
-        except Exception as e:
-            self.logger.error(f"Error leyendo archivo M3U {m3u_path}: {e}")
-
-        return tracks
-
-    def _parse_track_filename(self, filename: str) -> Optional[Dict[str, str]]:
-        """Parsea el nombre de archivo para extraer información de la canción."""
-        pattern = r'([^/]+)/([^-]+)\s*-\s*([^[]+)\s*\[([^-]+)\s*-\s*([^\]]+)\]\.(\w+)'
-        match = re.match(pattern, filename)
-
-        if match:
-            genre, artist, title, year, album, extension = match.groups()
-            return {
-                'genre': genre.strip(),
-                'artist': artist.strip(),
-                'title': title.strip(),
-                'year': year.strip(),
-                'album': album.strip(),
-                'filename': filename,
-                'file_path': filename
-            }
-        else:
-            self.logger.warning(f"No se pudo parsear: {filename}")
-            return None
-
-    def find_track_in_db(self, track_info: Dict[str, str]) -> Optional[Dict[str, any]]:
-        """Busca una canción en la base de datos local."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-
-            query = """
-            SELECT s.*, a.name as artist_name, al.name as album_name
-            FROM songs s
-            LEFT JOIN artists a ON s.artist = a.name
-            LEFT JOIN albums al ON s.album = al.name
-            WHERE LOWER(s.artist) LIKE LOWER(?)
-            AND LOWER(s.title) LIKE LOWER(?)
-            ORDER BY
-                CASE
-                    WHEN LOWER(s.artist) = LOWER(?) AND LOWER(s.title) = LOWER(?) THEN 1
-                    ELSE 2
-                END
-            LIMIT 1
-            """
-
-            artist = track_info['artist'].strip()
-            title = track_info['title'].strip()
-
-            cursor.execute(query, (f"%{artist}%", f"%{title}%", artist, title))
-            result = cursor.fetchone()
-
-            if result:
-                return dict(result)
-
-            # Búsqueda FTS alternativa
+    def _load_song_cache(self):
+        """Carga el cache de canciones desde archivo"""
+        if self.song_cache_file.exists():
             try:
-                fts_query = """
-                SELECT s.*, a.name as artist_name, al.name as album_name
-                FROM song_fts
-                JOIN songs s ON song_fts.id = s.id
-                LEFT JOIN artists a ON s.artist = a.name
-                LEFT JOIN albums al ON s.album = al.name
-                WHERE song_fts MATCH ?
-                LIMIT 1
-                """
-                search_term = f'"{artist}" "{title}"'
-                cursor.execute(fts_query, (search_term,))
-                result = cursor.fetchone()
+                with open(self.song_cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                    self._song_cache = cache_data.get('songs', {})
+                    self._cache_timestamp = cache_data.get('timestamp', 0)
+                    self.logger.info(f"Cache cargado: {len(self._song_cache)} entradas")
+            except Exception as e:
+                self.logger.warning(f"Error cargando cache: {e}")
+                self._song_cache = {}
+                self._cache_timestamp = 0
+        else:
+            self._cache_timestamp = 0
 
-                if result:
-                    return dict(result)
-            except:
-                pass
-
-            return None
-
-        except Exception as e:
-            self.logger.error(f"Error buscando en DB: {e}")
-            return None
-        finally:
-            if conn:
-                conn.close()
-
-    def search_track_in_airsonic(self, track_info: Dict[str, str], db_track: Optional[Dict] = None) -> Optional[str]:
-        """
-        Busca una canción en Airsonic usando el cache construido.
-
-        Returns:
-            ID de la canción en Airsonic o None si no se encuentra
-        """
+    def _save_song_cache(self):
+        """Guarda el cache de canciones"""
         try:
-            # Usar información de la DB local si está disponible
-            if db_track:
-                search_artist = db_track.get('artist', track_info['artist'])
-                search_title = db_track.get('title', track_info['title'])
-                search_album = db_track.get('album', track_info['album'])
-            else:
-                search_artist = track_info['artist']
-                search_title = track_info['title']
-                search_album = track_info['album']
-
-            # Normalizar strings de búsqueda
-            norm_artist = self._normalize_string(search_artist)
-            norm_title = self._normalize_string(search_title)
-            norm_album = self._normalize_string(search_album)
-
-            # Estrategias de búsqueda en orden de preferencia
-            search_strategies = [
-                f"{norm_artist}|{norm_title}|{norm_album}",  # Coincidencia exacta
-                f"{norm_artist}|{norm_title}",               # Artista + título
-                f"{norm_title}|{norm_artist}",               # Título + artista (orden inverso)
-                norm_title if len(norm_title) > 3 else None  # Solo título (si es lo suficientemente largo)
-            ]
-
-            for strategy in search_strategies:
-                if not strategy:
-                    continue
-
-                if strategy in self._song_cache:
-                    candidates = self._song_cache[strategy]
-
-                    # Si hay múltiples candidatos, elegir el mejor
-                    if len(candidates) == 1:
-                        match = candidates[0]
-                        self.logger.debug(f"Encontrado en Airsonic: {search_artist} - {search_title}")
-                        return match['id']
-                    elif len(candidates) > 1:
-                        # Usar scoring para elegir la mejor coincidencia
-                        best_match = self._score_matches(candidates, norm_artist, norm_title, norm_album)
-                        if best_match:
-                            self.logger.debug(f"Encontrado en Airsonic (múltiples): {search_artist} - {search_title}")
-                            return best_match['id']
-
-            # Fallback: búsqueda por API si el cache no tiene resultados
-            api_result = self._search_by_api(search_title, search_artist)
-            if api_result:
-                self.logger.debug(f"Encontrado en Airsonic (API): {search_artist} - {search_title}")
-                return api_result
-
-            self.logger.debug(f"No encontrado en Airsonic: {search_artist} - {search_title}")
-            return None
-
+            cache_data = {
+                'timestamp': time.time(),
+                'songs': self._song_cache
+            }
+            with open(self.song_cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            self.logger.debug("Cache guardado correctamente")
         except Exception as e:
-            self.logger.error(f"Error buscando en Airsonic: {e}")
-            return None
+            self.logger.error(f"Error guardando cache: {e}")
 
-    def _score_matches(self, candidates: List[Dict], norm_artist: str, norm_title: str, norm_album: str) -> Optional[Dict]:
-        """Puntúa múltiples candidatos y retorna el mejor"""
-        best_score = 0
-        best_match = None
+    def _is_cache_stale(self, max_age_hours: int = 24) -> bool:
+        """Verifica si el cache está obsoleto"""
+        if not hasattr(self, '_cache_timestamp'):
+            return True
+        age_hours = (time.time() - self._cache_timestamp) / 3600
+        return age_hours > max_age_hours
 
-        for candidate in candidates:
-            score = 0
+    def _build_song_cache(self):
+        """Construye cache de todas las canciones en Airsonic"""
+        self.logger.info("Construyendo cache de canciones...")
 
-            cand_artist = self._normalize_string(candidate['artist'])
-            cand_title = self._normalize_string(candidate['title'])
-            cand_album = self._normalize_string(candidate['album'])
-
-            # Puntuación por coincidencia exacta
-            if cand_artist == norm_artist:
-                score += 10
-            elif norm_artist in cand_artist or cand_artist in norm_artist:
-                score += 5
-
-            if cand_title == norm_title:
-                score += 10
-            elif norm_title in cand_title or cand_title in norm_title:
-                score += 5
-
-            if cand_album == norm_album:
-                score += 3
-            elif norm_album in cand_album or cand_album in norm_album:
-                score += 1
-
-            if score > best_score:
-                best_score = score
-                best_match = candidate
-
-        # Solo retornar si hay una coincidencia razonable
-        return best_match if best_score >= 10 else None
-
-    def _search_by_api(self, title: str, artist: str) -> Optional[str]:
-        """Búsqueda fallback usando la API de Airsonic"""
         try:
-            # Búsqueda combinada
-            query = f"{title} {artist}".strip()
-            if not query:
-                return None
-
-            response = self._make_request('search3', {
-                'query': query,
-                'songCount': 10,
-                'songOffset': 0
-            })
+            # Obtener todas las canciones de Airsonic
+            response = self._make_request('search3', {'query': '*', 'songCount': 10000})
 
             if response and 'searchResult3' in response:
                 songs = response['searchResult3'].get('song', [])
 
-                if songs:
-                    # Buscar la mejor coincidencia
-                    norm_title = self._normalize_string(title)
-                    norm_artist = self._normalize_string(artist)
+                for song in songs:
+                    # Obtener y validar el ID
+                    song_id = song.get('id')
+                    if isinstance(song_id, list):
+                        song_id = song_id[0] if song_id else None
+                    if not song_id:
+                        continue
+                    song_id = str(song_id)
+
+                    # Normalizar para búsqueda
+                    artist = self._normalize_text(song.get('artist', ''))
+                    title = self._normalize_text(song.get('title', ''))
+                    album = self._normalize_text(song.get('album', ''))
+
+                    # Crear múltiples claves de búsqueda
+                    keys = [
+                        f"{artist}|{title}",
+                        f"{title}|{artist}",
+                    ]
+
+                    # Agregar clave con álbum si está disponible
+                    if album:
+                        keys.append(f"{artist}|{title}|{album}")
+                        keys.append(f"{artist}|{album}|{title}")
+
+                    # Guardar en cache
+                    for key in keys:
+                        self._song_cache[key] = song_id
+
+                self._save_song_cache()
+                self.logger.info(f"Cache construido: {len(songs)} canciones, {len(self._song_cache)} claves")
+            else:
+                self.logger.warning("No se pudieron obtener canciones de Airsonic")
+
+        except Exception as e:
+            self.logger.error(f"Error construyendo cache: {e}")
+
+    def _normalize_text(self, text: str) -> str:
+        """Normaliza texto para búsqueda (lowercase, sin espacios extra)"""
+        if not text:
+            return ""
+        return ' '.join(text.lower().strip().split())
+
+    def parse_m3u_file(self, m3u_path: str) -> List[Dict[str, str]]:
+        """
+        Parsea archivo M3U y extrae información de las canciones.
+        MEJORA: Extrae metadata del archivo cuando el regex no funciona.
+        """
+        tracks = []
+
+        with open(m3u_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+
+        current_info = {}
+        for line in lines:
+            line = line.strip()
+
+            # Líneas de info EXTINF
+            if line.startswith('#EXTINF:'):
+                match = re.search(r'#EXTINF:.*?,\s*(.+?)\s*-\s*(.+)', line)
+                if match:
+                    current_info = {
+                        'artist': match.group(1).strip(),
+                        'title': match.group(2).strip()
+                    }
+
+            # Líneas de archivo
+            elif line and not line.startswith('#'):
+                file_path = line
+
+                # Si no tenemos info del EXTINF, intentar extraer del nombre de archivo
+                if not current_info:
+                    current_info = self._extract_info_from_filename(file_path)
+
+                # Si aún no tenemos info completa, intentar extraer metadata del archivo
+                if not current_info.get('artist') or not current_info.get('title'):
+                    metadata_info = self._extract_metadata_from_file(file_path)
+                    if metadata_info:
+                        # Usar metadata solo si no tenemos la info
+                        if not current_info.get('artist'):
+                            current_info['artist'] = metadata_info.get('artist', '')
+                        if not current_info.get('title'):
+                            current_info['title'] = metadata_info.get('title', '')
+                        if metadata_info.get('album'):
+                            current_info['album'] = metadata_info['album']
+
+                # Agregar path del archivo
+                current_info['path'] = file_path
+
+                # Solo agregar si tenemos al menos artista o título
+                if current_info.get('artist') or current_info.get('title'):
+                    tracks.append(current_info.copy())
+
+                # Reset para siguiente canción
+                current_info = {}
+
+        return tracks
+
+    def _extract_info_from_filename(self, file_path: str) -> Dict[str, str]:
+        """Extrae información del nombre del archivo usando regex"""
+        filename = os.path.basename(file_path)
+        name_without_ext = os.path.splitext(filename)[0]
+
+        # Patrones comunes de nombres de archivo
+        patterns = [
+            # Artista - Título
+            r'^(.+?)\s*-\s*(.+?)$',
+            # Artista_-_Título
+            r'^(.+?)_-_(.+?)$',
+            # [Sello] Artista - Título
+            r'^\[.+?\]\s*(.+?)\s*-\s*(.+?)$',
+            # (Sello) Artista - Título
+            r'^\(.+?\)\s*(.+?)\s*-\s*(.+?)$',
+            # Número. Artista - Título
+            r'^\d+\.\s*(.+?)\s*-\s*(.+?)$',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, name_without_ext)
+            if match:
+                return {
+                    'artist': match.group(1).strip(),
+                    'title': match.group(2).strip()
+                }
+
+        # Si no hay match, intentar dividir por guión
+        if ' - ' in name_without_ext:
+            parts = name_without_ext.split(' - ', 1)
+            # Limpiar posibles prefijos de sello/número
+            artist = re.sub(r'^\[.+?\]|\(.+?\)|\d+\.\s*', '', parts[0]).strip()
+            return {
+                'artist': artist,
+                'title': parts[1].strip()
+            }
+
+        return {'artist': '', 'title': name_without_ext}
+
+    def _extract_metadata_from_file(self, file_path: str) -> Optional[Dict[str, str]]:
+        """
+        NUEVA FUNCIÓN: Extrae metadata (ID3 tags, etc.) del archivo de audio.
+
+        Args:
+            file_path: Ruta al archivo de audio
+
+        Returns:
+            Diccionario con artist, title, album o None si no se puede leer
+        """
+        if not MUTAGEN_AVAILABLE:
+            return None
+
+        # Verificar si el archivo existe
+        if not os.path.exists(file_path):
+            self.logger.debug(f"Archivo no encontrado para metadata: {file_path}")
+            return None
+
+        try:
+            audio = MutagenFile(file_path, easy=True)
+
+            if audio is None:
+                return None
+
+            metadata = {}
+
+            # Intentar extraer artista
+            if 'artist' in audio:
+                artists = audio['artist']
+                metadata['artist'] = artists[0] if isinstance(artists, list) else str(artists)
+            elif 'albumartist' in audio:
+                artists = audio['albumartist']
+                metadata['artist'] = artists[0] if isinstance(artists, list) else str(artists)
+
+            # Intentar extraer título
+            if 'title' in audio:
+                titles = audio['title']
+                metadata['title'] = titles[0] if isinstance(titles, list) else str(titles)
+
+            # Intentar extraer álbum
+            if 'album' in audio:
+                albums = audio['album']
+                metadata['album'] = albums[0] if isinstance(albums, list) else str(albums)
+
+            if metadata.get('artist') or metadata.get('title'):
+                self.logger.debug(f"Metadata extraída: {metadata.get('artist', 'N/A')} - {metadata.get('title', 'N/A')}")
+                return metadata
+
+        except Exception as e:
+            self.logger.debug(f"No se pudo leer metadata de {file_path}: {e}")
+
+        return None
+
+    def find_track_in_db(self, track_info: Dict[str, str]) -> Optional[Dict]:
+        """Busca una canción en la base de datos local"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            artist = track_info.get('artist', '')
+            title = track_info.get('title', '')
+
+            # Búsqueda exacta
+            cursor.execute("""
+                SELECT artist, title, album, path
+                FROM tracks
+                WHERE LOWER(artist) = LOWER(?) AND LOWER(title) = LOWER(?)
+            """, (artist, title))
+
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                return {
+                    'artist': result[0],
+                    'title': result[1],
+                    'album': result[2],
+                    'path': result[3]
+                }
+
+        except Exception as e:
+            self.logger.debug(f"Error buscando en DB: {e}")
+
+        return None
+
+    def search_track_in_airsonic(self, track_info: Dict[str, str], db_track: Optional[Dict] = None) -> Optional[str]:
+        """
+        Busca una canción en Airsonic.
+        MEJORA: Usa metadata adicional (álbum) para mejorar la búsqueda.
+        """
+        artist = track_info.get('artist', '').strip()
+        title = track_info.get('title', '').strip()
+        album = track_info.get('album', '').strip()
+
+        if not artist and not title:
+            return None
+
+        # 1. Búsqueda en cache con múltiples variantes
+        cache_keys = []
+
+        if artist and title:
+            cache_keys.append(f"{self._normalize_text(artist)}|{self._normalize_text(title)}")
+            cache_keys.append(f"{self._normalize_text(title)}|{self._normalize_text(artist)}")
+
+            if album:
+                cache_keys.append(f"{self._normalize_text(artist)}|{self._normalize_text(title)}|{self._normalize_text(album)}")
+                cache_keys.append(f"{self._normalize_text(artist)}|{self._normalize_text(album)}|{self._normalize_text(title)}")
+
+        for key in cache_keys:
+            if key in self._song_cache:
+                cached_id = self._song_cache[key]
+                # CORRECCIÓN: Asegurarse de que el ID es un string
+                if isinstance(cached_id, list):
+                    cached_id = cached_id[0] if cached_id else None
+                if cached_id:
+                    self.logger.debug(f"✓ Cache hit: {artist} - {title}")
+                    return str(cached_id)
+
+        # 2. Búsqueda en API de Airsonic
+        search_queries = []
+
+        # Construir queries de búsqueda
+        if artist and title:
+            search_queries.append(f"{artist} {title}")
+            if album:
+                search_queries.append(f"{artist} {title} {album}")
+                search_queries.append(f"{artist} {album}")
+        elif artist:
+            search_queries.append(artist)
+        elif title:
+            search_queries.append(title)
+
+        for query in search_queries:
+            try:
+                response = self._make_request('search3', {
+                    'query': query,
+                    'songCount': 10
+                })
+
+                if response and 'searchResult3' in response:
+                    songs = response['searchResult3'].get('song', [])
 
                     for song in songs:
-                        song_title = self._normalize_string(song.get('title', ''))
-                        song_artist = self._normalize_string(song.get('artist', ''))
+                        song_artist = song.get('artist', '').lower()
+                        song_title = song.get('title', '').lower()
+                        song_album = song.get('album', '').lower()
+                        song_id = song.get('id')
 
-                        if (norm_title in song_title or song_title in norm_title) and \
-                           (norm_artist in song_artist or song_artist in norm_artist):
-                            return song['id']
+                        # CORRECCIÓN: Asegurarse de que el ID es un string
+                        if isinstance(song_id, list):
+                            song_id = song_id[0] if song_id else None
+                        if not song_id:
+                            continue
+                        song_id = str(song_id)
 
-            return None
+                        # Verificación flexible
+                        artist_match = not artist or artist.lower() in song_artist or song_artist in artist.lower()
+                        title_match = not title or title.lower() in song_title or song_title in title.lower()
+                        album_match = not album or album.lower() in song_album or song_album in album.lower()
 
-        except Exception as e:
-            self.logger.error(f"Error en búsqueda por API: {e}")
-            return None
+                        if artist_match and title_match:
+                            # Match más fuerte si coincide el álbum también
+                            if album and album_match:
+                                self.logger.debug(f"✓ API match (con álbum): {artist} - {title} ({album})")
+                                return song_id
+                            elif not album:
+                                self.logger.debug(f"✓ API match: {artist} - {title}")
+                                return song_id
 
-    def get_airsonic_playlist(self, playlist_name: str) -> Optional[Dict]:
-        """Obtiene información de una playlist existente en Airsonic"""
+                    # Si no encontramos match exacto pero sí resultados, usar el primero
+                    if songs and len(search_queries) == 1:
+                        song = songs[0]
+                        song_id = song.get('id')
+                        # CORRECCIÓN: Asegurarse de que el ID es un string
+                        if isinstance(song_id, list):
+                            song_id = song_id[0] if song_id else None
+                        if song_id:
+                            song_id = str(song_id)
+                            self.logger.debug(f"≈ Mejor coincidencia aproximada: {song.get('artist')} - {song.get('title')}")
+                            return song_id
+
+            except Exception as e:
+                self.logger.debug(f"Error en búsqueda de Airsonic: {e}")
+
+        self.logger.debug(f"✗ No encontrado: {artist} - {title}")
+        return None
+
+    def get_airsonic_playlist(self, name: str) -> Optional[Dict]:
+        """Obtiene una playlist de Airsonic por nombre"""
         try:
             response = self._make_request('getPlaylists')
-            if not response or 'playlists' not in response:
-                return None
-
-            for playlist in response['playlists'].get('playlist', []):
-                if playlist['name'] == playlist_name:
-                    # Obtener detalles completos de la playlist
-                    detail_response = self._make_request('getPlaylist', {'id': playlist['id']})
-                    if detail_response and 'playlist' in detail_response:
-                        return detail_response['playlist']
-
+            if response and 'playlists' in response:
+                playlists = response['playlists'].get('playlist', [])
+                for playlist in playlists:
+                    if playlist.get('name') == name:
+                        # Obtener detalles completos de la playlist
+                        details = self._make_request('getPlaylist', {'id': playlist['id']})
+                        if details and 'playlist' in details:
+                            return details['playlist']
             return None
-
         except Exception as e:
-            self.logger.error(f"Error obteniendo playlist {playlist_name}: {e}")
+            self.logger.error(f"Error obteniendo playlist: {e}")
             return None
 
-    def create_airsonic_playlist(self, playlist_name: str, song_ids: List[str]) -> Optional[str]:
-        """Crea una nueva playlist en Airsonic (compatible con API 1.15.0)"""
+    def create_airsonic_playlist(self, name: str, song_ids: List[str]) -> Optional[str]:
+        """Crea una nueva playlist en Airsonic"""
         try:
             if not song_ids:
-                self.logger.warning("No se pueden crear playlists vacías")
+                self.logger.warning("No hay canciones para crear la playlist")
                 return None
 
-            # Crear playlist vacía primero
-            response = self._make_request('createPlaylist', {'name': playlist_name})
-            if not response:
-                self.logger.error(f"Error creando playlist {playlist_name}")
-                return None
+            # Crear playlist
+            params = {
+                'name': name,
+                'songId': song_ids
+            }
 
-            # En API 1.15.0, la respuesta puede no incluir el ID directamente
-            playlist_id = None
-            if 'playlist' in response:
-                playlist_id = response['playlist'].get('id')
+            response = self._make_request('createPlaylist', params)
 
-            # Si no obtuvimos el ID, buscar la playlist recién creada
-            if not playlist_id:
-                time.sleep(1)  # Pequeña pausa para que se propague la creación
-                response = self._make_request('getPlaylists')
-                if response and 'playlists' in response:
-                    for playlist in response['playlists'].get('playlist', []):
-                        if playlist['name'] == playlist_name:
-                            playlist_id = playlist['id']
-                            break
-
-            if not playlist_id:
-                self.logger.error(f"No se pudo obtener ID de playlist creada: {playlist_name}")
-                return None
-
-            # Añadir canciones de una en una (más compatible con versiones antiguas)
-            success_count = 0
-            for song_id in song_ids:
-                try:
-                    add_response = self._make_request('updatePlaylist', {
-                        'playlistId': playlist_id,
-                        'songIdToAdd': song_id
-                    })
-                    if add_response:
-                        success_count += 1
-                    else:
-                        self.logger.warning(f"Error añadiendo canción {song_id} a playlist {playlist_name}")
-
-                    # Pausa pequeña para evitar sobrecargar la API
-                    time.sleep(0.1)
-
-                except Exception as e:
-                    self.logger.warning(f"Error añadiendo canción {song_id}: {e}")
-                    continue
-
-            if success_count > 0:
-                self.logger.info(f"Playlist '{playlist_name}' creada con {success_count}/{len(song_ids)} canciones")
+            if response and 'playlist' in response:
+                playlist_id = response['playlist']['id']
+                self.logger.info(f"Playlist '{name}' creada con {len(song_ids)} canciones")
                 return playlist_id
             else:
-                self.logger.error(f"No se pudieron añadir canciones a playlist {playlist_name}")
+                self.logger.error(f"Error creando playlist: {response}")
                 return None
 
         except Exception as e:
@@ -802,62 +681,41 @@ class AirsonicSyncer:
             return None
 
     def update_airsonic_playlist(self, playlist_id: str, new_song_ids: Set[str], current_song_ids: Set[str]) -> bool:
-        """Actualiza una playlist existente en Airsonic de forma incremental (compatible con API 1.15.0)"""
+        """
+        Actualiza una playlist existente con sincronización incremental.
+        Solo añade canciones nuevas y elimina las que ya no existen.
+        """
         try:
-            # Calcular diferencias
-            songs_to_add = new_song_ids - current_song_ids
-            songs_to_remove = current_song_ids - new_song_ids
+            to_add = new_song_ids - current_song_ids
+            to_remove = current_song_ids - new_song_ids
 
-            changes_made = False
+            self.logger.info(f"Cambios: +{len(to_add)} canciones, -{len(to_remove)} canciones")
 
-            # Eliminar canciones que ya no están (de atrás hacia adelante para mantener índices)
-            if songs_to_remove:
-                # Obtener playlist actual para los índices
-                current_playlist = self._make_request('getPlaylist', {'id': playlist_id})
-                if current_playlist and 'playlist' in current_playlist:
-                    entries = current_playlist['playlist'].get('entry', [])
+            # Añadir nuevas canciones
+            if to_add:
+                params = {
+                    'playlistId': playlist_id,
+                    'songIdToAdd': list(to_add)
+                }
+                response = self._make_request('updatePlaylist', params)
+                if not response:
+                    self.logger.error("Error añadiendo canciones")
+                    return False
+                self.logger.info(f"✅ {len(to_add)} canciones añadidas")
 
-                    # Crear lista de índices a eliminar (de mayor a menor)
-                    indices_to_remove = []
-                    for i, entry in enumerate(entries):
-                        if entry['id'] in songs_to_remove:
-                            indices_to_remove.append(i)
-
-                    # Eliminar de atrás hacia adelante
-                    for index in sorted(indices_to_remove, reverse=True):
-                        try:
-                            remove_response = self._make_request('updatePlaylist', {
-                                'playlistId': playlist_id,
-                                'songIndexToRemove': index
-                            })
-                            if remove_response:
-                                changes_made = True
-                            time.sleep(0.1)
-                        except Exception as e:
-                            self.logger.warning(f"Error eliminando canción en índice {index}: {e}")
-
-                self.logger.info(f"Eliminadas {len(indices_to_remove)} canciones")
-
-            # Añadir canciones nuevas de una en una
-            if songs_to_add:
-                success_count = 0
-                for song_id in songs_to_add:
-                    try:
-                        add_response = self._make_request('updatePlaylist', {
+            # Eliminar canciones obsoletas
+            if to_remove:
+                for song_id in to_remove:
+                    # Obtener índice de la canción en la playlist
+                    index = self._get_song_index_in_playlist(playlist_id, song_id)
+                    if index is not None:
+                        params = {
                             'playlistId': playlist_id,
-                            'songIdToAdd': song_id
-                        })
-                        if add_response:
-                            success_count += 1
-                            changes_made = True
-                        time.sleep(0.1)
-                    except Exception as e:
-                        self.logger.warning(f"Error añadiendo canción {song_id}: {e}")
+                            'songIndexToRemove': index
+                        }
+                        self._make_request('updatePlaylist', params)
 
-                self.logger.info(f"Añadidas {success_count}/{len(songs_to_add)} canciones nuevas")
-
-            if not changes_made:
-                self.logger.info("No hay cambios que sincronizar")
+                self.logger.info(f"✅ {len(to_remove)} canciones eliminadas")
 
             return True
 
@@ -908,10 +766,12 @@ class AirsonicSyncer:
         # Buscar canciones en Airsonic
         airsonic_song_ids = set()
         not_found = []
+        found_with_metadata = 0
 
         for i, track_info in enumerate(tracks, 1):
             if self.interactive:
-                self.logger.info(f"Procesando {i}/{len(tracks)}: {track_info['artist']} - {track_info['title']}")
+                album_info = f" ({track_info['album']})" if track_info.get('album') else ""
+                self.logger.info(f"Procesando {i}/{len(tracks)}: {track_info['artist']} - {track_info['title']}{album_info}")
 
             # Buscar en base de datos local
             db_track = self.find_track_in_db(track_info)
@@ -921,8 +781,11 @@ class AirsonicSyncer:
 
             if song_id:
                 airsonic_song_ids.add(song_id)
+                if track_info.get('album'):
+                    found_with_metadata += 1
             else:
-                not_found.append(f"{track_info['artist']} - {track_info['title']}")
+                album_info = f" ({track_info['album']})" if track_info.get('album') else ""
+                not_found.append(f"{track_info['artist']} - {track_info['title']}{album_info}")
 
             time.sleep(0.05)  # Rate limiting más suave
 
@@ -960,6 +823,9 @@ class AirsonicSyncer:
                 success_rate = len(airsonic_song_ids) / len(tracks) * 100 if tracks else 0
                 self.logger.info(f"✅ Sincronización completada: {len(airsonic_song_ids)}/{len(tracks)} canciones ({success_rate:.1f}%)")
 
+                if found_with_metadata > 0:
+                    self.logger.info(f"📝 {found_with_metadata} canciones encontradas usando metadata del archivo")
+
                 if not_found and self.interactive:
                     self.logger.warning(f"❌ Canciones no encontradas ({len(not_found)}):")
                     for track in not_found[:5]:
@@ -996,6 +862,11 @@ def main():
     if not args.cron:
         print("🎵 SINCRONIZADOR DE PLAYLISTS M3U -> AIRSONIC")
         print("=" * 55)
+        if MUTAGEN_AVAILABLE:
+            print("✅ Soporte de metadata activado (mutagen disponible)")
+        else:
+            print("⚠️  Soporte de metadata desactivado (instala mutagen)")
+        print()
 
     # Verificar base de datos
     if not DB_PATH.exists():

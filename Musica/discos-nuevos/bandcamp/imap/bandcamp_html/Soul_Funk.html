@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Soul Funk - Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        .embeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .embed-item.hidden {
+            display: none;
+        }
+
+        .embed-item.removed {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .embed-info {
+            margin-top: 15px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .embed-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .mark-read-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mark-read-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .mark-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .delete-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .embeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .action-btn {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Soul Funk</h1>
+            <p class="subtitle">📀 83 discos</p>
+            <a href="index.html" class="back-link">← Volver al índice</a>
+        </header>
+
+        <div class="embeds-grid">
+            
+        <div class="embed-item page-1" data-page="1" id="embed_0">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=440440189/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 18 Nov 2024 14:15:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_0', '116', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_0', '116', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_1">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2040959058/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Tue, 29 Oct 2024 07:26:46 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_1', '113', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_1', '113', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_2">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=428806227/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 17 Oct 2024 10:21:23 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_2', '112', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_2', '112', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_3">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=440440189/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Wed, 16 Oct 2024 12:56:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_3', '111', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_3', '111', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_4">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=728552579/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 14 Oct 2024 09:07:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_4', '110', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_4', '110', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_5">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1295286540/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 11 Oct 2024 07:08:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_5', '109', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_5', '109', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_6">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2936051067/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:02:36 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_6', '108', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_6', '108', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_7">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=54435843/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:02:17 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_7', '107', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_7', '107', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_8">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1098402799/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:01:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_8', '106', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_8', '106', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_9">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Thee Sacred Souls</strong><br>
+                <small>📅 Fri, 04 Oct 2024 04:09:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_9', '105', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_9', '105', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_10">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Thee Sacred Souls: Got A Story To Tell, Standard LP &amp; &quot;Lucid
+ Girl&quot; 45</strong><br>
+                <small>📅 Wed, 02 Oct 2024 20:06:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_10', '104', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_10', '104', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_11">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2178426280/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 30 Sep 2024 10:46:29 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_11', '103', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_11', '103', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_12">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=726754222/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Tue, 24 Sep 2024 12:15:07 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_12', '102', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_12', '102', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_13">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2933266146/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Tue, 24 Sep 2024 12:14:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_13', '101', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_13', '101', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_14">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1524628784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 24 Sep 2024 11:24:34 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_14', '100', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_14', '100', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_15">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1005580961/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 20 Sep 2024 08:47:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_15', '99', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_15', '99', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_16">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3007541183/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Mon, 16 Sep 2024 11:50:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_16', '98', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_16', '98', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_17">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=104246849/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Thu, 12 Sep 2024 17:38:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_17', '97', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_17', '97', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_18">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=728552579/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 12 Sep 2024 07:23:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_18', '96', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_18', '96', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_19">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3080969890/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 06 Sep 2024 12:48:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_19', '95', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_19', '95', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_20">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1524628784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 03 Sep 2024 14:58:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_20', '94', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_20', '94', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_21">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3007541183/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:25:21 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_21', '93', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_21', '93', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_22">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2933266146/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:23:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_22', '92', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_22', '92', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_23">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=726754222/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:22:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_23', '91', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_23', '91', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_24">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=255081097/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Fri, 30 Aug 2024 07:13:37 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_24', '90', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_24', '90', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_25">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=104246849/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 26 Aug 2024 06:31:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_25', '89', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_25', '89', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_26">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1928337752/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Thu, 22 Aug 2024 07:51:20 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_26', '88', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_26', '88', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_27">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2254254929/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 09 Aug 2024 05:47:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_27', '87', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_27', '87', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_28">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=101676645/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 25 Jul 2024 22:53:01 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_28', '86', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_28', '86', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_29">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2270721748/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 12 Jul 2024 07:00:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_29', '85', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_29', '85', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_30">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3484929252/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Athens Of The North: Cool Cool, Limited Edition Cassette
+ (Pre-Order, released 26th July) by James Alexander Bright</strong><br>
+                <small>📅 Thu, 11 Jul 2024 12:58:30 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_30', '84', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_30', '84', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_31">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=289200919/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 05 Jul 2024 07:55:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_31', '83', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_31', '83', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_32">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3374288917/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Fri, 28 Jun 2024 07:28:58 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_32', '82', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_32', '82', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_33">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616095870/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 28 Jun 2024 06:09:20 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_33', '81', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_33', '81', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_34">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2148931197/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 24 Jun 2024 10:44:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_34', '80', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_34', '80', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_35">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=289200919/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 21 Jun 2024 06:12:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_35', '79', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_35', '79', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_36">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Thee Sacred Souls</strong><br>
+                <small>📅 Tue, 18 Jun 2024 12:57:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_36', '78', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_36', '78', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_37">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=41088538/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 14 Jun 2024 03:36:04 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_37', '77', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_37', '77', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_38">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=688692261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from 180 Proof Records</strong><br>
+                <small>📅 Wed, 12 Jun 2024 14:32:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_38', '76', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_38', '76', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_39">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2486647924/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 07 Jun 2024 05:43:45 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_39', '74', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_39', '74', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_40">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3960774498/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Thu, 06 Jun 2024 13:36:28 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_40', '73', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_40', '73', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_41">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1955487190/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 30 May 2024 09:36:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_41', '71', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_41', '71', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_42">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2486647924/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Wed, 29 May 2024 22:30:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_42', '70', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_42', '70', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_43">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=804395902/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 17 May 2024 09:47:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_43', '69', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_43', '69', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_44">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3374288917/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 16 May 2024 22:30:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_44', '68', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_44', '68', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_45">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616095870/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Thu, 09 May 2024 23:33:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_45', '65', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_45', '65', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_46">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=762203925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 09 May 2024 21:02:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_46', '64', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_46', '64', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_47">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3484929252/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 08 May 2024 08:00:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_47', '63', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_47', '63', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_48">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=2455845827/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 08 May 2024 06:26:59 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_48', '62', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_48', '62', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_49">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3525285357/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sun, 05 May 2024 09:19:34 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_49', '61', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_49', '61', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_50">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=665396436/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New releases from Athens Of The North</strong><br>
+                <small>📅 Fri, 03 May 2024 13:36:11 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_50', '60', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_50', '60', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_51">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=41088538/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 03 May 2024 06:25:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_51', '58', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_51', '58', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_52">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3525285357/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sat, 27 Apr 2024 10:53:25 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_52', '57', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_52', '57', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_53">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2168755038/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Sat, 27 Apr 2024 10:05:47 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_53', '56', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_53', '56', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_54">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=804395902/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 12 Apr 2024 12:08:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_54', '55', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_54', '55', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_55">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=810457650/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Thu, 04 Apr 2024 22:51:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_55', '53', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_55', '53', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_56">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1955487190/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 29 Mar 2024 12:00:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_56', '52', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_56', '52', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_57">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=1606989583/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 29 Mar 2024 07:57:41 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_57', '51', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_57', '51', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_58">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=677416272/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 25 Mar 2024 10:43:10 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_58', '50', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_58', '50', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_59">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=762203925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Mon, 25 Mar 2024 07:55:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_59', '49', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_59', '49', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_60">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1544418261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 22 Mar 2024 08:48:14 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_60', '46', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_60', '46', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_61">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2963023740/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Thu, 14 Mar 2024 15:50:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_61', '45', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_61', '45', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_62">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2573078737/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 08 Mar 2024 08:18:33 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_62', '43', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_62', '43', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_63">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3858939787/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 08 Mar 2024 08:12:46 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_63', '42', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_63', '42', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_64">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1263822551/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 04 Mar 2024 10:59:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_64', '40', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_64', '40', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_65">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=288906048/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 01 Mar 2024 13:08:19 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_65', '39', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_65', '39', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_66">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2573078737/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 01 Mar 2024 00:05:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_66', '38', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_66', '38', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_67">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=607311152/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 29 Feb 2024 18:46:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_67', '36', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_67', '36', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_68">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=760081823/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 26 Feb 2024 11:11:30 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_68', '35', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_68', '35', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_69">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1201830598/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Wed, 14 Feb 2024 10:01:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_69', '31', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_69', '31', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_70">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3393420387/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 14 Feb 2024 07:47:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_70', '30', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_70', '30', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_71">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=810457650/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 09 Feb 2024 10:47:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_71', '27', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_71', '27', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_72">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1953225681/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 01 Feb 2024 13:28:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_72', '25', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_72', '25', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_73">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2056042828/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 19 Jan 2024 07:15:41 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_73', '23', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_73', '23', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_74">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=760081823/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 18 Jan 2024 14:39:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_74', '22', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_74', '22', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_75">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1201830598/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Fri, 12 Jan 2024 11:42:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_75', '20', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_75', '20', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_76">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=607311152/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sun, 17 Dec 2023 09:12:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_76', '15', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_76', '15', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_77">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=686476144/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Wed, 13 Dec 2023 08:20:00 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_77', '12', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_77', '12', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_78">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1708127488/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Wed, 22 Nov 2023 12:37:40 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_78', '8', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_78', '8', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_79">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=933666424/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 17 Nov 2023 12:01:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_79', '6', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_79', '6', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_80">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1210091727/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 17 Nov 2023 06:46:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_80', '5', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_80', '5', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_81">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1282816462/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Thu, 16 Nov 2023 23:01:22 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_81', '4', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_81', '4', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_82">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1282816462/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 03 Nov 2023 10:09:00 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_82', '2', 'Musica.Soul Funk')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_82', '2', 'Musica.Soul Funk')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        </div>
+
+        <div class="pagination"><button class="page-btn active" data-page="1">Página 1</button><button class="page-btn " data-page="2">Página 2</button><button class="page-btn " data-page="3">Página 3</button><button class="page-btn " data-page="4">Página 4</button><button class="page-btn " data-page="5">Página 5</button><button class="page-btn " data-page="6">Página 6</button><button class="page-btn " data-page="7">Página 7</button><button class="page-btn " data-page="8">Página 8</button><button class="page-btn " data-page="9">Página 9</button></div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Configuración de conexión IMAP
+        const imapConfig = {"server": "disroot.org", "port": 993, "email": "frodobolson@disroot.org"};
+
+        // Paginación
+        const pageButtons = document.querySelectorAll('.page-btn');
+        const embedItems = document.querySelectorAll('.embed-item');
+
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const page = button.dataset.page;
+
+                pageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                embedItems.forEach(item => {
+                    if (item.dataset.page === page) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Mostrar solo la primera página al cargar
+        if (pageButtons.length > 0) {
+            embedItems.forEach(item => {
+                if (item.dataset.page !== '1') {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Funciones de notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Función para marcar como leído
+        async function markAsRead(embedId, emailId, folder) {
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.mark-read-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Procesando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                // Por ahora simulamos la operación
+                const response = await fetch('/api/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    button.textContent = '✓ Leído';
+                    button.style.background = '#95d5b2';
+                    showNotification('Correo marcado como leído', 'success');
+                } else {
+                    throw new Error('Error al marcar como leído');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '📖 Marcar como leído';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Función para eliminar
+        async function deleteEmail(embedId, emailId, folder) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este correo? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.delete-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Eliminando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                const response = await fetch('/api/delete-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    embedElement.classList.add('removed');
+                    button.textContent = '✓ Eliminado';
+                    showNotification('Correo eliminado', 'success');
+
+                    setTimeout(() => {
+                        embedElement.style.display = 'none';
+                    }, 1000);
+                } else {
+                    throw new Error('Error al eliminar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '🗑️ Eliminar';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Aviso sobre el API
+        console.log('%c⚠️ NOTA: Los botones de acción requieren un servidor API backend', 'color: orange; font-size: 14px; font-weight: bold');
+        console.log('Para implementar la funcionalidad completa, necesitas crear un servidor que maneje las peticiones /api/mark-read y /api/delete-email');
+    </script>
+</body>
+</html>

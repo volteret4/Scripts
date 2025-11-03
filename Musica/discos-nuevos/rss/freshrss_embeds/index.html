@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreshRSS Embeds - Índice</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #718096;
+            margin-bottom: 20px;
+        }
+
+        .global-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .global-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .global-stat-number {
+            font-size: 2em;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .global-stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .search-box {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 600px;
+            padding: 15px 25px;
+            font-size: 1.1em;
+            border: 2px solid #e2e8f0;
+            border-radius: 50px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .feeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .feed-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .feed-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .feed-title {
+            font-size: 1.5em;
+            color: #2d3748;
+            margin-bottom: 15px;
+            word-wrap: break-word;
+        }
+
+        .feed-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .stat-icon {
+            font-size: 1.5em;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-number {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #718096;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .feed-date {
+            font-size: 0.9em;
+            color: #718096;
+            margin-bottom: 15px;
+        }
+
+        .feed-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s;
+            margin-top: auto;
+        }
+
+        .feed-link:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+            font-size: 1.2em;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+            color: #718096;
+        }
+
+        @media (max-width: 768px) {
+            .feeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .feed-stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 FreshRSS Embeds</h1>
+            <p class="subtitle">Colección de música de tus feeds RSS</p>
+
+            <div class="global-stats">
+                <div class="global-stat">
+                    <span class="global-stat-number">5</span>
+                    <span class="global-stat-label">Feeds</span>
+                </div>
+                <div class="global-stat">
+                    <span class="global-stat-number">0</span>
+                    <span class="global-stat-label">Total embeds</span>
+                </div>
+                <div class="global-stat">
+                    <span class="global-stat-number">🎵 0</span>
+                    <span class="global-stat-label">Bandcamp</span>
+                </div>
+                <div class="global-stat">
+                    <span class="global-stat-number">📺 0</span>
+                    <span class="global-stat-label">YouTube</span>
+                </div>
+                <div class="global-stat">
+                    <span class="global-stat-number">🔊 0</span>
+                    <span class="global-stat-label">SoundCloud</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="search-box">
+            <input type="text"
+                   id="search"
+                   class="search-input"
+                   placeholder="🔍 Buscar feeds..."
+                   onkeyup="filterFeeds()">
+        </div>
+
+        <div class="feeds-grid" id="feeds-grid">
+            
+        <div class="feed-card">
+            <h3 class="feed-title">Ambientblog</h3>
+            <div class="feed-stats">
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎵</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📺</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔊</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">páginas</span>
+                </div>
+            </div>
+            
+            <a href="Ambientblog.html" class="feed-link">Ver embeds →</a>
+        </div>
+        
+        <div class="feed-card">
+            <h3 class="feed-title">Ban Ban Ton Ton</h3>
+            <div class="feed-stats">
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎵</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📺</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔊</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">páginas</span>
+                </div>
+            </div>
+            
+            <a href="Ban_Ban_Ton_Ton.html" class="feed-link">Ver embeds →</a>
+        </div>
+        
+        <div class="feed-card">
+            <h3 class="feed-title">Depósito sonoro</h3>
+            <div class="feed-stats">
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎵</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📺</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔊</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">páginas</span>
+                </div>
+            </div>
+            
+            <a href="Depósito_sonoro.html" class="feed-link">Ver embeds →</a>
+        </div>
+        
+        <div class="feed-card">
+            <h3 class="feed-title">FW Rare Jazz Vinyl Collector</h3>
+            <div class="feed-stats">
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎵</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📺</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔊</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">páginas</span>
+                </div>
+            </div>
+            
+            <a href="FW_Rare_Jazz_Vinyl_Collector.html" class="feed-link">Ver embeds →</a>
+        </div>
+        
+        <div class="feed-card">
+            <h3 class="feed-title">Lost Turntable</h3>
+            <div class="feed-stats">
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🎵</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📺</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">🔊</span>
+                    <span class="stat-number">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">0</span>
+                    <span class="stat-label">páginas</span>
+                </div>
+            </div>
+            
+            <a href="Lost_Turntable.html" class="feed-link">Ver embeds →</a>
+        </div>
+        
+        </div>
+
+        <div id="no-results" class="no-results" style="display: none;">
+            No se encontraron feeds que coincidan con tu búsqueda.
+        </div>
+
+        <footer>
+            <p>Generado el 2025-10-30 00:11:30</p>
+            <p style="margin-top: 10px;">
+                <a href="https://github.com/FreshRSS/FreshRSS" target="_blank" style="color: #667eea; text-decoration: none;">
+                    FreshRSS Embed Generator
+                </a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function filterFeeds() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            const feedCards = document.querySelectorAll('.feed-card');
+            const noResults = document.getElementById('no-results');
+            let visibleCount = 0;
+
+            feedCards.forEach(card => {
+                const title = card.querySelector('.feed-title').textContent.toLowerCase();
+                if (title.includes(searchTerm)) {
+                    card.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            if (visibleCount === 0) {
+                noResults.style.display = 'block';
+            } else {
+                noResults.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

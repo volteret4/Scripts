@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 12px;
+        }
+
+        h1 {
+            font-size: 3.5em;
+            color: #4c1da3;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #888;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            color: #9a64ff;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 1em;
+            margin-top: 5px;
+        }
+
+        .search-box {
+            max-width: 600px;
+            margin: 0 auto 40px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            font-size: 1.1em;
+            background: #2a2a2a;
+            border: 2px solid #333;
+            border-radius: 10px;
+            color: #e0e0e0;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4c1da3;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+            font-size: 1.2em;
+        }
+
+        .genres-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .genre-card {
+            background: linear-gradient(135deg, #2a2a2a 0%, #222 100%);
+            padding: 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .genre-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(76, 29, 163, 0.4);
+            border-color: #4c1da3;
+        }
+
+        .genre-card.hidden {
+            display: none;
+        }
+
+        .genre-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .genre-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .genre-count {
+            text-align: center;
+            color: #9a64ff;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .genre-count::after {
+            content: ' discos';
+            font-weight: normal;
+            color: #888;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+            font-size: 1.2em;
+            display: none;
+        }
+
+        .no-results.visible {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: auto;
+            padding: 30px 20px;
+            color: #666;
+            border-top: 1px solid #333;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .genres-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-bar {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Mi Colección de Bandcamp</h1>
+            <p class="subtitle">Explora tu música por género</p>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-number" id="total-genres">9</div>
+                <div class="stat-label">Géneros</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="total-albums">453</div>
+                <div class="stat-label">Discos</div>
+            </div>
+        </div>
+
+        <div class="search-box">
+            <input type="text"
+                   class="search-input"
+                   id="search-input"
+                   placeholder="Buscar género..."
+                   autocomplete="off">
+            <span class="search-icon">🔍</span>
+        </div>
+
+        <div class="genres-grid" id="genres-grid">
+
+            <a href="deep.html" class="genre-card" data-genre="deep">
+                <div class="genre-icon">🌊</div>
+                <div class="genre-name">Deep</div>
+                <div class="genre-count">60</div>
+            </a>
+
+            <a href="experimental.html" class="genre-card" data-genre="experimental">
+                <div class="genre-icon">🔬</div>
+                <div class="genre-name">Experimental</div>
+                <div class="genre-count">16</div>
+            </a>
+
+            <a href="idm.html" class="genre-card" data-genre="idm">
+                <div class="genre-icon">🎵</div>
+                <div class="genre-name">IDM</div>
+                <div class="genre-count">15</div>
+            </a>
+
+            <a href="metal.html" class="genre-card" data-genre="metal">
+                <div class="genre-icon">🤘</div>
+                <div class="genre-name">Metal</div>
+                <div class="genre-count">10</div>
+            </a>
+
+            <a href="musthave.html" class="genre-card" data-genre="musthave">
+                <div class="genre-icon">🎧</div>
+                <div class="genre-name">Musthave</div>
+                <div class="genre-count">104</div>
+            </a>
+
+            <a href="soul_funk.html" class="genre-card" data-genre="soul funk">
+                <div class="genre-icon">🕺</div>
+                <div class="genre-name">Soul Funk</div>
+                <div class="genre-count">116</div>
+            </a>
+
+            <a href="synth_pop.html" class="genre-card" data-genre="synth pop">
+                <div class="genre-icon">🎹</div>
+                <div class="genre-name">Synth Pop</div>
+                <div class="genre-count">4</div>
+            </a>
+
+            <a href="techno.html" class="genre-card" data-genre="techno">
+                <div class="genre-icon">🔊</div>
+                <div class="genre-name">Techno</div>
+                <div class="genre-count">109</div>
+            </a>
+
+            <a href="world.html" class="genre-card" data-genre="world">
+                <div class="genre-icon">🌍</div>
+                <div class="genre-name">World</div>
+                <div class="genre-count">19</div>
+            </a>
+
+        </div>
+
+        <div class="no-results" id="no-results">
+            No se encontraron géneros que coincidan con tu búsqueda 😕
+        </div>
+
+        <footer>
+            Generado con ❤️ desde tus correos de Bandcamp
+        </footer>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const genreCards = document.querySelectorAll('.genre-card');
+        const noResults = document.getElementById('no-results');
+        const genresGrid = document.getElementById('genres-grid');
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            genreCards.forEach(card => {
+                const genreName = card.dataset.genre;
+                const matches = genreName.includes(searchTerm);
+
+                card.classList.toggle('hidden', !matches);
+                if (matches) visibleCount++;
+            });
+
+            noResults.classList.toggle('visible', visibleCount === 0 && searchTerm !== '');
+        });
+
+        // Limpiar búsqueda con ESC
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        });
+    </script>
+</body>
+</html>

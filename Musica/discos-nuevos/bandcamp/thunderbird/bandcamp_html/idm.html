@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDM - Bandcamp Collection</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #4c1da3;
+        }
+
+        .back-link {
+            color: #9a64ff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: #333;
+        }
+
+        h1 {
+            color: #4c1da3;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .genre-info {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            color: #9a64ff;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .embed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .embed-item {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .embed-item.listened {
+            opacity: 0.5;
+            background: #1a1a1a;
+        }
+
+        .embed-item iframe {
+            width: 100%;
+            border-radius: 4px;
+        }
+
+        .embed-title {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #b0b0b0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .listened-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 8px 15px;
+            background: #4c1da3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .listened-btn:hover {
+            background: #6b2fb5;
+        }
+
+        .listened-btn.marked {
+            background: #2a7a2a;
+        }
+
+        .listened-btn.marked:hover {
+            background: #3a9a3a;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .page-btn {
+            padding: 10px 15px;
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1em;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #4c1da3;
+            transform: translateY(-2px);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: #4c1da3;
+            font-weight: bold;
+        }
+
+        .page-info {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            color: #9a64ff;
+        }
+
+        .page-content {
+            display: none;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .embed-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .stats {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 IDM</h1>
+            <a href="index.html" class="back-link">
+                <span>←</span>
+                <span>Volver al índice</span>
+            </a>
+        </div>
+
+        <div class="genre-info">
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">15</div>
+                    <div class="stat-label">Discos</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">Páginas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-content active" id="page-1">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-7426240400435056241" data-message-id="&lt;1ctbVxFBRwe4_-7G1s_H5g@geopod-ismtpd-12&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2065799474/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;1ctbVxFBRwe4_-7G1s_H5g@geopod-ismtpd-12&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--5743374465720716999" data-message-id="&lt;lWOCxEcHSZ6_CItV_8jrwA@geopod-ismtpd-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=347292208/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;lWOCxEcHSZ6_CItV_8jrwA@geopod-ismtpd-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-4082063679994177306" data-message-id="&lt;QJKTN8LpSMOSL_eN7IEx6g@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=460918745/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;QJKTN8LpSMOSL_eN7IEx6g@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2444391082114470120" data-message-id="&lt;9L_FBnwxSJamY6hrs6S_bw@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3723448557/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;9L_FBnwxSJamY6hrs6S_bw@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--740929615138272454" data-message-id="&lt;W5OnUgnQRFeKKK4sqcyNFw@geopod-ismtpd-28&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3469480469/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;W5OnUgnQRFeKKK4sqcyNFw@geopod-ismtpd-28&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-7002332449733671903" data-message-id="&lt;afETxbZmQcm-rlWFcmVvOg@geopod-ismtpd-canary-0&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2073409809/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;afETxbZmQcm-rlWFcmVvOg@geopod-ismtpd-canary-0&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--5173916700341681023" data-message-id="&lt;ULvfg3AKSEOxty4Ert5flw@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=755054872/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;ULvfg3AKSEOxty4Ert5flw@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1597149020110304612" data-message-id="&lt;cQOgCitpRuCFBJm19svobQ@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4251115785/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;cQOgCitpRuCFBJm19svobQ@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--8616354649881089121" data-message-id="&lt;VCusYw7VQQ2qqjYXJx63nQ@geopod-ismtpd-6&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2582694757/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;VCusYw7VQQ2qqjYXJx63nQ@geopod-ismtpd-6&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3699827706451415527" data-message-id="&lt;5ZOuh2hWTSupQI-3bPCpRA@geopod-ismtpd-4&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1204527868/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Floating Points</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;5ZOuh2hWTSupQI-3bPCpRA@geopod-ismtpd-4&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="page-content " id="page-2">
+            <div class="embed-grid">
+
+                <div class="embed-item" id="embed-4321504413089079835" data-message-id="&lt;YyDLLD8XQMy5xxp7H6o9cg@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2542950929/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Mehmet Aslan</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;YyDLLD8XQMy5xxp7H6o9cg@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-3196511865726165971" data-message-id="&lt;Vuct93FcSdWQuaau-L1zYg@geopod-ismtpd-2&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2876635648/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;Vuct93FcSdWQuaau-L1zYg@geopod-ismtpd-2&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-2366671830968726002" data-message-id="&lt;VCmg2wc3QUC89QU-iXUkZA@geopod-ismtpd-1&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=362222213/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;VCmg2wc3QUC89QU-iXUkZA@geopod-ismtpd-1&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed-1513682448505230788" data-message-id="&lt;8T376YJMSwGSoSPMApuVVQ@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=69995198/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;8T376YJMSwGSoSPMApuVVQ@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+                <div class="embed-item" id="embed--2216526912716065351" data-message-id="&lt;5tGJrhNNQgGjCV3OWJR6IQ@geopod-ismtpd-3&gt;" data-mbox-path="/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM">
+                    <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3053783878/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+                    <div class="embed-title">New release from Planet Mu</div>
+                    <button class="listened-btn" onclick="markAsListened('&lt;5tGJrhNNQgGjCV3OWJR6IQ@geopod-ismtpd-3&gt;', '/home/huan/.thunderbird/9iyguy1b.default-release/ImapMail/disroot.org/Musica.sbd/IDM', this)">
+                        ✓ Escuchado
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="pagination">
+            <button class="page-btn" id="prev-btn" onclick="changePage(-1)">← Anterior</button>
+            <div class="page-info">
+                Página <span id="current-page">1</span> de <span id="total-pages">2</span>
+            </div>
+
+            <button class="page-btn page-number active" onclick="goToPage(1)">1</button>
+
+            <button class="page-btn page-number " onclick="goToPage(2)">2</button>
+
+            <button class="page-btn" id="next-btn" onclick="changePage(1)">Siguiente →</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const totalPages = 2;
+
+        // Cargar estado de escuchados desde localStorage
+        function loadListenedState() {
+            const listened = JSON.parse(localStorage.getItem('listened_albums') || '[]');
+            listened.forEach(messageId => {
+                const embedItem = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (embedItem) {
+                    embedItem.classList.add('listened');
+                    const btn = embedItem.querySelector('.listened-btn');
+                    if (btn) {
+                        btn.classList.add('marked');
+                        btn.textContent = '✓ Marcado';
+                    }
+                }
+            });
+        }
+
+        // Marcar álbum como escuchado
+        function markAsListened(messageId, mboxPath, button) {
+            const embedItem = button.closest('.embed-item');
+            const listened = JSON.parse(localStorage.getItem('listened_albums') || '[]');
+
+            if (listened.includes(messageId)) {
+                // Ya está marcado, desmarcarlo
+                const index = listened.indexOf(messageId);
+                listened.splice(index, 1);
+                embedItem.classList.remove('listened');
+                button.classList.remove('marked');
+                button.textContent = '✓ Escuchado';
+            } else {
+                // Marcarlo como escuchado
+                listened.push(messageId);
+                embedItem.classList.add('listened');
+                button.classList.add('marked');
+                button.textContent = '✓ Marcado';
+
+                // Enviar petición al servidor para marcar como leído en Thunderbird
+                markEmailAsRead(messageId, mboxPath);
+            }
+
+            localStorage.setItem('listened_albums', JSON.stringify(listened));
+        }
+
+        // Intentar marcar el correo como leído en Thunderbird
+        function markEmailAsRead(messageId, mboxPath) {
+            // Enviar petición al servidor local si está corriendo
+            fetch('http://localhost:8765/mark_read', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_id: messageId,
+                    mbox_path: mboxPath
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✓ Correo marcado como leído en Thunderbird');
+                } else {
+                    console.log('⚠ No se pudo marcar en Thunderbird (servidor no disponible)');
+                }
+            })
+            .catch(error => {
+                console.log('ℹ️ Marcado solo localmente (inicia el servidor para sincronizar con Thunderbird)');
+            });
+        }
+
+        function updatePagination() {
+            // Actualizar visibilidad de páginas
+            document.querySelectorAll('.page-content').forEach((page, index) => {
+                page.classList.toggle('active', index === currentPage - 1);
+            });
+
+            // Actualizar botones de página
+            document.querySelectorAll('.page-number').forEach((btn, index) => {
+                btn.classList.toggle('active', index === currentPage - 1);
+            });
+
+            // Actualizar info de página
+            document.getElementById('current-page').textContent = currentPage;
+
+            // Actualizar botones prev/next
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = currentPage === totalPages;
+
+            // Scroll al inicio
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                updatePagination();
+            }
+        }
+
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                updatePagination();
+            }
+        }
+
+        // Atajos de teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                changePage(-1);
+            } else if (e.key === 'ArrowRight') {
+                changePage(1);
+            }
+        });
+
+        // Inicializar
+        updatePagination();
+        loadListenedState();
+    </script>
+</body>
+</html>

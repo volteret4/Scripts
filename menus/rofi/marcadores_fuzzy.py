@@ -13,6 +13,9 @@ output_path = '/mnt/windows/FTP/wiki/marcadores'
 # Dominios a excluir
 excluded_pattern = re.compile(r'^(http://|https://)?(www\.)?(google\.com|google\.es|github\.com|bandcamp\.[a-z]{2,4}|invidious\.[a-z]{2,4}|twitter\.com|pornhub\.com|192\.168\.1\.\d{1,3})')
 
+# Límite de caracteres para el nombre del archivo (dejando margen para la extensión .md)
+MAX_FILENAME_LENGTH = 200
+
 # Copiar el archivo places.sqlite a la nueva ubicación
 shutil.copy(src_db_path, output_db_path)
 
@@ -47,11 +50,25 @@ def create_directory_structure(bookmark_id, parent_id, title):
     path.reverse()  # Invertir para tener la jerarquía correcta
     return os.path.join(output_path, *path, title)
 
+# Función para truncar el nombre del archivo si es muy largo
+def truncate_filename(filename, max_length=MAX_FILENAME_LENGTH):
+    """Trunca el nombre del archivo si excede el límite, añadiendo un hash al final"""
+    if len(filename) <= max_length:
+        return filename
+
+    # Calcular un hash simple del nombre completo para mantener unicidad
+    import hashlib
+    file_hash = hashlib.md5(filename.encode()).hexdigest()[:8]
+
+    # Truncar y añadir el hash
+    truncated = filename[:max_length - 9] + '_' + file_hash
+    return truncated
+
 # Procesar los marcadores
 for bookmark in bookmarks:
     bookmark_id, title, bookmark_type, parent_id, url = bookmark
 
-    if bookmark_type == 1 and not excluded_pattern.match(url):  # Si es un marcador y no está en la lista de exclusión
+    if bookmark_type == 1 and url and not excluded_pattern.match(url):  # Si es un marcador y no está en la lista de exclusión
         # Verificar si el título no es None
         if title is not None:
             # Crear la estructura de carpetas basada en la jerarquía de los marcadores
@@ -63,7 +80,10 @@ for bookmark in bookmarks:
             os.makedirs(directory_to_create, exist_ok=True)
 
             # Definir el nombre del archivo .md como el título sanitizado
-            file_name = re.sub(r'[^a-zA-Z0-9]', '_', sanitized_title) + '.md'  # Sanitizar título para el nombre del archivo
+            base_filename = re.sub(r'[^a-zA-Z0-9]', '_', sanitized_title)
+            # Truncar si es necesario
+            base_filename = truncate_filename(base_filename)
+            file_name = base_filename + '.md'
             file_path = os.path.join(directory_to_create, file_name)
 
             # Escribir el título y la URL en el archivo .md

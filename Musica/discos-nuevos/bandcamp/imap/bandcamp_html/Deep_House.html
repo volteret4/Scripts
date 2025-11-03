@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Deep House - Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        .embeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .embed-item.hidden {
+            display: none;
+        }
+
+        .embed-item.removed {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .embed-info {
+            margin-top: 15px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .embed-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .mark-read-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mark-read-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .mark-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .delete-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .embeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .action-btn {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Deep House</h1>
+            <p class="subtitle">📀 82 discos</p>
+            <a href="index.html" class="back-link">← Volver al índice</a>
+        </header>
+
+        <div class="embeds-grid">
+            
+        <div class="embed-item page-1" data-page="1" id="embed_0">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2974221138/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 06 Jun 2025 07:08:25 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_0', '88', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_0', '88', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_1">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2537556309/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Tue, 03 Jun 2025 09:04:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_1', '87', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_1', '87', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_2">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2838493358/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Thu, 20 Feb 2025 14:06:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_2', '86', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_2', '86', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_3">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3776980008/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Thu, 20 Feb 2025 09:52:44 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_3', '85', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_3', '85', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_4">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2720953284/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Tue, 11 Feb 2025 19:20:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_4', '84', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_4', '84', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_5">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1255605500/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Poji Records, who brought you Dana Weaver I Remember
+ Alt Mixes</strong><br>
+                <small>📅 Tue, 11 Feb 2025 03:34:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_5', '83', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_5', '83', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_6">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3735536793/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flevans</strong><br>
+                <small>📅 Fri, 07 Feb 2025 10:33:40 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_6', '82', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_6', '82', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_7">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2678253803/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 07 Feb 2025 06:17:17 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_7', '81', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_7', '81', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_8">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2802368221/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from eclectics</strong><br>
+                <small>📅 Sat, 28 Dec 2024 18:35:00 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_8', '80', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_8', '80', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_9">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=1387598949/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Poji Records, who brought you Dana Weaver I Remember
+ Alt Mixes</strong><br>
+                <small>📅 Fri, 20 Dec 2024 16:28:48 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_9', '79', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_9', '79', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_10">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2720953284/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Wed, 18 Dec 2024 22:30:59 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_10', '78', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_10', '78', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_11">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2901054682/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 16 Dec 2024 05:08:21 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_11', '77', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_11', '77', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_12">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2678253803/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 09 Dec 2024 02:19:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_12', '76', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_12', '76', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_13">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=2548831661/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flevans</strong><br>
+                <small>📅 Fri, 06 Dec 2024 09:36:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_13', '75', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_13', '75', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_14">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3764942225/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 06 Dec 2024 09:16:18 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_14', '74', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_14', '74', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_15">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1790333009/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 06 Dec 2024 03:23:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_15', '73', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_15', '73', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_16">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1403829691/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from De:tuned</strong><br>
+                <small>📅 Thu, 05 Dec 2024 19:23:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_16', '72', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_16', '72', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_17">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1849321526/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Claremont 56</strong><br>
+                <small>📅 Mon, 02 Dec 2024 20:43:47 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_17', '71', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_17', '71', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_18">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=938609686/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 25 Nov 2024 09:29:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_18', '68', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_18', '68', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_19">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616747361/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Fri, 22 Nov 2024 21:19:18 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_19', '67', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_19', '67', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_20">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1881444637/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 22 Nov 2024 09:47:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_20', '66', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_20', '66', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_21">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2726708004/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 22 Nov 2024 08:21:19 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_21', '65', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_21', '65', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_22">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2734188499/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from hobbesmusic</strong><br>
+                <small>📅 Thu, 21 Nov 2024 16:55:21 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_22', '64', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_22', '64', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_23">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3280759848/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 18 Nov 2024 10:08:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_23', '62', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_23', '62', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_24">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=719809021/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flevans</strong><br>
+                <small>📅 Fri, 15 Nov 2024 09:40:02 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_24', '61', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_24', '61', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_25">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2061591034/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 08 Nov 2024 08:30:33 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_25', '60', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_25', '60', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_26">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=245800584/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from De:tuned</strong><br>
+                <small>📅 Thu, 07 Nov 2024 19:17:04 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_26', '59', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_26', '59', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_27">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=1115669601/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Poji Records</strong><br>
+                <small>📅 Fri, 01 Nov 2024 19:24:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_27', '58', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_27', '58', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_28">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=330649466/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from hobbesmusic</strong><br>
+                <small>📅 Fri, 01 Nov 2024 15:46:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_28', '56', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_28', '56', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_29">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=330649466/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from hobbesmusic</strong><br>
+                <small>📅 Fri, 01 Nov 2024 15:46:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_29', '57', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_29', '57', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_30">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1790333009/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 28 Oct 2024 10:00:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_30', '55', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_30', '55', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_31">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3110044334/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Raz &amp; Afla</strong><br>
+                <small>📅 Fri, 25 Oct 2024 06:49:16 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_31', '54', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_31', '54', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_32">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1849321526/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Claremont 56</strong><br>
+                <small>📅 Wed, 23 Oct 2024 15:22:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_32', '53', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_32', '53', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_33">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3330564971/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 21 Oct 2024 08:25:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_33', '52', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_33', '52', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_34">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616747361/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Fri, 18 Oct 2024 07:33:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_34', '51', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_34', '51', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_35">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1881444637/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 14 Oct 2024 07:48:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_35', '50', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_35', '50', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_36">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2959774438/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from De:tuned</strong><br>
+                <small>📅 Thu, 10 Oct 2024 17:46:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_36', '49', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_36', '49', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_37">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2726708004/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Tue, 08 Oct 2024 07:40:48 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_37', '48', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_37', '48', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_38">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1872443276/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Mon, 07 Oct 2024 07:17:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_38', '47', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_38', '47', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_39">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3931687287/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 04 Oct 2024 07:38:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_39', '46', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_39', '46', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_40">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1831252194/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Thu, 03 Oct 2024 21:58:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_40', '45', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_40', '45', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_41">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4145329975/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Rhythm Section International: CLBELLIC, Limited Edition 12&quot;
+ Test Pressing by Clbrks &amp; NickyDiesel</strong><br>
+                <small>📅 Thu, 03 Oct 2024 16:35:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_41', '44', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_41', '44', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_42">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3764942225/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Rhythm Section International: Dalston Tapes Vol.1, Limited
+ Test Pressing 12&quot; Vinyl by Neue Grafik</strong><br>
+                <small>📅 Mon, 30 Sep 2024 16:12:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_42', '43', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_42', '43', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_43">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1675582815/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Sun, 29 Sep 2024 20:38:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_43', '42', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_43', '42', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_44">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4145329975/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 27 Sep 2024 08:13:01 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_44', '41', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_44', '41', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_45">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3764942225/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Thu, 26 Sep 2024 07:31:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_45', '40', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_45', '40', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_46">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=245800584/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from De:tuned</strong><br>
+                <small>📅 Mon, 23 Sep 2024 16:16:01 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_46', '39', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_46', '39', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_47">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4067774493/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 23 Sep 2024 08:10:31 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_47', '38', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_47', '38', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_48">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=824251246/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Mon, 23 Sep 2024 07:59:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_48', '37', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_48', '37', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_49">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=180572648/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Kirk Degiorgio</strong><br>
+                <small>📅 Fri, 20 Sep 2024 07:52:53 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_49', '36', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_49', '36', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_50">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2118124996/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 20 Sep 2024 06:46:22 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_50', '35', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_50', '35', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_51">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1872443276/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Tue, 17 Sep 2024 09:15:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_51', '31', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_51', '31', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_52">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=824251246/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Mon, 09 Sep 2024 19:51:04 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_52', '29', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_52', '29', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_53">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2061591034/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 09 Sep 2024 08:11:01 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_53', '28', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_53', '28', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_54">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3324104382/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Citizens Of Vice</strong><br>
+                <small>📅 Sat, 07 Sep 2024 07:10:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_54', '27', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_54', '27', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_55">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2654147777/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 06 Sep 2024 05:51:19 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_55', '26', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_55', '26', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_56">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3674910287/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Thu, 05 Sep 2024 07:13:14 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_56', '25', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_56', '25', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_57">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2959774438/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from De:tuned</strong><br>
+                <small>📅 Mon, 02 Sep 2024 16:54:29 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_57', '34', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_57', '34', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_58">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=180572648/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Kirk Degiorgio</strong><br>
+                <small>📅 Mon, 02 Sep 2024 09:47:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_58', '32', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_58', '32', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_59">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=248696367/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Claremont 56</strong><br>
+                <small>📅 Fri, 30 Aug 2024 09:30:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_59', '24', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_59', '24', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_60">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3893614910/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Fri, 30 Aug 2024 07:36:48 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_60', '23', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_60', '23', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_61">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3110044334/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Raz &amp; Afla</strong><br>
+                <small>📅 Fri, 30 Aug 2024 06:39:28 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_61', '33', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_61', '33', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_62">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1831252194/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 26 Aug 2024 06:12:10 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_62', '22', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_62', '22', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_63">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2858388202/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 16 Aug 2024 07:38:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_63', '21', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_63', '21', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_64">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3893614910/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Higher Love Recordings</strong><br>
+                <small>📅 Fri, 02 Aug 2024 22:04:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_64', '19', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_64', '19', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_65">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4115351140/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Chris Coco  Micko Roche</strong><br>
+                <small>📅 Fri, 02 Aug 2024 08:13:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_65', '18', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_65', '18', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_66">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3509053856/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Thu, 01 Aug 2024 22:13:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_66', '17', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_66', '17', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_67">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3608900389/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Claremont 56</strong><br>
+                <small>📅 Sat, 27 Jul 2024 11:46:57 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_67', '16', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_67', '16', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_68">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=473693780/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Citizens Of Vice, who brought you Lanowa - Seven
+ Seas</strong><br>
+                <small>📅 Fri, 26 Jul 2024 05:54:51 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_68', '15', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_68', '15', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_69">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1090727693/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Coyote</strong><br>
+                <small>📅 Fri, 19 Jul 2024 08:28:44 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_69', '14', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_69', '14', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_70">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1124643230/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Flexi Cuts</strong><br>
+                <small>📅 Fri, 19 Jul 2024 06:22:31 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_70', '13', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_70', '13', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_71">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4145329975/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Thu, 18 Jul 2024 08:12:33 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_71', '12', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_71', '12', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_72">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2654147777/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Mon, 15 Jul 2024 06:19:51 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_72', '11', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_72', '11', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_73">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3370387755/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Chris Coco  George Solar</strong><br>
+                <small>📅 Fri, 12 Jul 2024 07:46:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_73', '10', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_73', '10', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_74">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=959945097/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 12 Jul 2024 06:08:53 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_74', '9', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_74', '9', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_75">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=358004895/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Tue, 09 Jul 2024 15:12:33 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_75', '8', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_75', '8', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_76">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2993971226/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Fri, 05 Jul 2024 07:41:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_76', '6', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_76', '6', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_77">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=789713883/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Rhythm Section International</strong><br>
+                <small>📅 Thu, 04 Jul 2024 14:28:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_77', '5', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_77', '5', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_78">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2858388202/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Wed, 03 Jul 2024 07:37:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_78', '4', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_78', '4', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_79">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2959699194/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumberjacks In Hell, who brought you Sunrise</strong><br>
+                <small>📅 Mon, 01 Jul 2024 11:17:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_79', '3', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_79', '3', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_80">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2920400718/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Citizens Of Vice, who brought you Lanowa - Seven
+ Seas</strong><br>
+                <small>📅 Fri, 28 Jun 2024 06:55:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_80', '2', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_80', '2', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_81">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=433790019/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Toy Tonics</strong><br>
+                <small>📅 Fri, 28 Jun 2024 03:50:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_81', '1', 'Musica.Deep.Deep House')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_81', '1', 'Musica.Deep.Deep House')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        </div>
+
+        <div class="pagination"><button class="page-btn active" data-page="1">Página 1</button><button class="page-btn " data-page="2">Página 2</button><button class="page-btn " data-page="3">Página 3</button><button class="page-btn " data-page="4">Página 4</button><button class="page-btn " data-page="5">Página 5</button><button class="page-btn " data-page="6">Página 6</button><button class="page-btn " data-page="7">Página 7</button><button class="page-btn " data-page="8">Página 8</button><button class="page-btn " data-page="9">Página 9</button></div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Configuración de conexión IMAP
+        const imapConfig = {"server": "disroot.org", "port": 993, "email": "frodobolson@disroot.org"};
+
+        // Paginación
+        const pageButtons = document.querySelectorAll('.page-btn');
+        const embedItems = document.querySelectorAll('.embed-item');
+
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const page = button.dataset.page;
+
+                pageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                embedItems.forEach(item => {
+                    if (item.dataset.page === page) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Mostrar solo la primera página al cargar
+        if (pageButtons.length > 0) {
+            embedItems.forEach(item => {
+                if (item.dataset.page !== '1') {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Funciones de notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Función para marcar como leído
+        async function markAsRead(embedId, emailId, folder) {
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.mark-read-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Procesando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                // Por ahora simulamos la operación
+                const response = await fetch('/api/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    button.textContent = '✓ Leído';
+                    button.style.background = '#95d5b2';
+                    showNotification('Correo marcado como leído', 'success');
+                } else {
+                    throw new Error('Error al marcar como leído');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '📖 Marcar como leído';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Función para eliminar
+        async function deleteEmail(embedId, emailId, folder) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este correo? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.delete-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Eliminando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                const response = await fetch('/api/delete-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    embedElement.classList.add('removed');
+                    button.textContent = '✓ Eliminado';
+                    showNotification('Correo eliminado', 'success');
+
+                    setTimeout(() => {
+                        embedElement.style.display = 'none';
+                    }, 1000);
+                } else {
+                    throw new Error('Error al eliminar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '🗑️ Eliminar';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Aviso sobre el API
+        console.log('%c⚠️ NOTA: Los botones de acción requieren un servidor API backend', 'color: orange; font-size: 14px; font-weight: bold');
+        console.log('Para implementar la funcionalidad completa, necesitas crear un servidor que maneje las peticiones /api/mark-read y /api/delete-email');
+    </script>
+</body>
+</html>

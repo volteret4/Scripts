@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bandcamp - Colección por Género</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4c1da3;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .genre-section {
+            margin-bottom: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .genre-header {
+            background: linear-gradient(135deg, #4c1da3 0%, #6b2fb5 100%);
+            color: white;
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+
+        .genre-header:hover {
+            background: linear-gradient(135deg, #5c2db3 0%, #7b3fc5 100%);
+        }
+
+        .genre-header h2 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+
+        .genre-count {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .toggle-icon {
+            font-size: 1.5em;
+            transition: transform 0.3s;
+        }
+
+        .genre-section.active .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .genre-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+            padding: 0 20px;
+        }
+
+        .genre-section.active .genre-content {
+            max-height: 10000px;
+            padding: 20px;
+            transition: max-height 1s ease-in;
+        }
+
+        .embed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .embed-item {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .embed-item iframe {
+            width: 100%;
+            border-radius: 4px;
+        }
+
+        .embed-title {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #b0b0b0;
+        }
+
+        @media (max-width: 768px) {
+            .embed-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Bandcamp - Colección por Género</h1>
+
+        <div class="genre-section">
+            <div class="genre-header" onclick="toggleGenre(this)">
+                <h2>Ambient</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="genre-count">7 discos</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="genre-content">
+                <div class="embed-grid">
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=fantasy-zone/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://astrangelyisolatedplace.bandcamp.com/album/fantasy-zone">Fantasy Zone</a>
+                     </iframe>
+                        <div class="embed-title">New release from A Strangely Isolated Place</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=fantasy-zone/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://astrangelyisolatedplace.bandcamp.com/album/fantasy-zone">Fantasy Zone</a>
+                     </iframe>
+                        <div class="embed-title">New release from A Strangely Isolated Place</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=unfurl-refurl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hushhushrecords.bandcamp.com/album/unfurl-refurl">Unfurl Refurl</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hush Hush Records, who brought you Pratunam</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=refurl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hushhushrecords.bandcamp.com/album/refurl">Refurl</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hush Hush Records, who brought you Pratunam</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=refurl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hushhushrecords.bandcamp.com/album/refurl">Refurl</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hush Hush Records, who brought you Pratunam</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=unfurl-refurl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hushhushrecords.bandcamp.com/album/unfurl-refurl">Unfurl Refurl</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hush Hush Records, who brought you Pratunam</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=asip-2024-label-compilation-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://astrangelyisolatedplace.bandcamp.com/merch/asip-2024-label-compilation-listening-party">Asip 2024 Label Compilation Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from A Strangely Isolated Place</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="genre-section">
+            <div class="genre-header" onclick="toggleGenre(this)">
+                <h2>Deep</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="genre-count">3 discos</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="genre-content">
+                <div class="embed-grid">
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=modulate/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://samredmore.bandcamp.com/album/modulate">Modulate</a>
+                     </iframe>
+                        <div class="embed-title">New release from Sam Redmore</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=modulate/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://samredmore.bandcamp.com/album/modulate">Modulate</a>
+                     </iframe>
+                        <div class="embed-title">New release from Sam Redmore</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=modulate/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://samredmore.bandcamp.com/album/modulate">Modulate</a>
+                     </iframe>
+                        <div class="embed-title">New release from Sam Redmore</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="genre-section">
+            <div class="genre-header" onclick="toggleGenre(this)">
+                <h2>Jazz</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="genre-count">58 discos</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="genre-content">
+                <div class="embed-grid">
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=spring-2024-mondo-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/spring-2024-mondo-bundle-limited-edition-color-vinyl">Spring 2024 Mondo Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=mestizx/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/album/mestizx">Mestizx</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-mini-mondo-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-mini-mondo-limited-edition-color-vinyl">Summer Mini Mondo Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-mini-mondo-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-mini-mondo-limited-edition-color-vinyl">Summer Mini Mondo Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=small-medium-large-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/small-medium-large-listening-party">Small Medium Large Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-mini-mondo-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-mini-mondo-limited-edition-color-vinyl">Summer Mini Mondo Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-mini-mondo-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-mini-mondo-limited-edition-color-vinyl">Summer Mini Mondo Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Heritage of
+ the Invisible II</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=anna-butterss-mighty-vertebrate-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/anna-butterss-mighty-vertebrate-listening-party">Anna Butterss Mighty Vertebrate Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-24-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-24-bundle-limited-edition-color-vinyl">Fall 24 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ruth-goller-skylla-virtual-bandcamp-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ruth-goller-skylla-virtual-bandcamp-listening-party">Ruth Goller Skylla Virtual Bandcamp Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=impossibly-distant-impossibly-close/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://irisarri.bandcamp.com/album/impossibly-distant-impossibly-close">Impossibly Distant Impossibly Close</a>
+                     </iframe>
+                        <div class="embed-title">New release from Abul Mogard &amp; Rafael Anton Irisarri</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=impossibly-distant-impossibly-close/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://abulmogard.bandcamp.com/album/impossibly-distant-impossibly-close">Impossibly Distant Impossibly Close</a>
+                     </iframe>
+                        <div class="embed-title">New release from Abul Mogard &amp; Rafael Anton Irisarri</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=winter-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/winter-25-bundle-limited-edition-color-vinyl">Winter 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=winter-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/winter-25-bundle-limited-edition-color-vinyl">Winter 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=list-of-demands-virtual-bandcamp-listening-party-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/list-of-demands-virtual-bandcamp-listening-party-2">List Of Demands Virtual Bandcamp Listening Party 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=a-blade-because-a-blade-is-whole-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/a-blade-because-a-blade-is-whole-listening-party">A Blade Because A Blade Is Whole Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=uhlmann-johnson-wilkes-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/uhlmann-johnson-wilkes-listening-party">Uhlmann Johnson Wilkes Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=youll-come-around-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://drabqueen.bandcamp.com/merch/youll-come-around-listening-party">Youll Come Around Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from Girls of the Internet, James Alexander Bright</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=a-view-in-better-future/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://byrdout.bandcamp.com/album/a-view-in-better-future">A View In Better Future</a>
+                     </iframe>
+                        <div class="embed-title">New release from Byrd Out</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=when-the-distance-is-blue-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/when-the-distance-is-blue-listening-party">When The Distance Is Blue Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=spring-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/spring-25-bundle-limited-edition-color-vinyl">Spring 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=spring-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/spring-25-bundle-limited-edition-color-vinyl">Spring 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=spring-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/spring-25-bundle-limited-edition-color-vinyl">Spring 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=horizon-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/horizon-listening-party">Horizon Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=yowzers-listening-party/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/yowzers-listening-party">Yowzers Listening Party</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=spring-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/spring-25-bundle-limited-edition-color-vinyl">Spring 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-25-bundle-limited-edition-color-vinyl">Summer 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-25-bundle-limited-edition-color-vinyl">Summer 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=summer-25-bundle-limited-edition-color-vinyl/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/summer-25-bundle-limited-edition-color-vinyl">Summer 25 Bundle Limited Edition Color Vinyl</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-2">Ia11 Edition Lp Bundle Drop 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-3/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-3">Ia11 Edition Lp Bundle Drop 3</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-3/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-3">Ia11 Edition Lp Bundle Drop 3</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=skintone-edition-volume-1/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://susumuyokota.bandcamp.com/album/skintone-edition-volume-1">Skintone Edition Volume 1</a>
+                     </iframe>
+                        <div class="embed-title">New release from Lo Recordings</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record">Limited Edition White Vinyl 2Lp Makaya Mccraven Off The Record</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record">Limited Edition White Vinyl 2Lp Makaya Mccraven Off The Record</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/limited-edition-white-vinyl-2lp-makaya-mccraven-off-the-record">Limited Edition White Vinyl 2Lp Makaya Mccraven Off The Record</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=a-paris-state-of-mind/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://nutriasounds.bandcamp.com/album/a-paris-state-of-mind">A Paris State Of Mind</a>
+                     </iframe>
+                        <div class="embed-title">New release from NDATL Muzik</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-25-bundle-limited-edition-color/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-25-bundle-limited-edition-color">Fall 25 Bundle Limited Edition Color</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-3/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-3">Ia11 Edition Lp Bundle Drop 3</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-3/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-3">Ia11 Edition Lp Bundle Drop 3</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=the-persistence-of-doubt-2/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://byrdout.bandcamp.com/album/the-persistence-of-doubt-2">The Persistence Of Doubt 2</a>
+                     </iframe>
+                        <div class="embed-title">New release from Byrd Out</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=fall-25-bundle-limited-edition-color/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/fall-25-bundle-limited-edition-color">Fall 25 Bundle Limited Edition Color</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=dream-baby-dream/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hellyeahrec.bandcamp.com/album/dream-baby-dream">Dream Baby Dream</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hell Yeah Recordings</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/track=sleepwalking-wake-me-up-re-therapy-with-added-mix-in/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://doctorsoul.bandcamp.com/track/sleepwalking-wake-me-up-re-therapy-with-added-mix-in">Sleepwalking Wake Me Up Re Therapy With Added Mix In</a>
+                     </iframe>
+                        <div class="embed-title">New release from DOCTORSOUL</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/merch=ia11-edition-lp-bundle-drop-4/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://intlanthem.bandcamp.com/merch/ia11-edition-lp-bundle-drop-4">Ia11 Edition Lp Bundle Drop 4</a>
+                     </iframe>
+                        <div class="embed-title">New release from International Anthem, who brought you Force Majeure</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=dream-baby-dream/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://hellyeahrec.bandcamp.com/album/dream-baby-dream">Dream Baby Dream</a>
+                     </iframe>
+                        <div class="embed-title">New release from Hell Yeah Recordings</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="genre-section">
+            <div class="genre-header" onclick="toggleGenre(this)">
+                <h2>Musthave</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="genre-count">5 discos</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="genre-content">
+                <div class="embed-grid">
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=code-breakers/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://disidenciarecords.bandcamp.com/album/code-breakers">Code Breakers</a>
+                     </iframe>
+                        <div class="embed-title">New release from Filmmaker</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=death-lessons/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://lifeformsrec.bandcamp.com/album/death-lessons">Death Lessons</a>
+                     </iframe>
+                        <div class="embed-title">New release from Filmmaker</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=machinations/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://wavetensionrecords.bandcamp.com/album/machinations">Machinations</a>
+                     </iframe>
+                        <div class="embed-title">New release from Filmmaker</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=dds08/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://dalmatadaniel.bandcamp.com/album/dds08">Dds08</a>
+                     </iframe>
+                        <div class="embed-title">New release from Filmmaker &amp; Petros Spatharos</div>
+                    </div>
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=ghana-special-2-electronic-highlife-afro-sounds-in-the-diaspora-1980-93/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://soundwayrecords.bandcamp.com/album/ghana-special-2-electronic-highlife-afro-sounds-in-the-diaspora-1980-93">Ghana Special 2 Electronic Highlife Afro Sounds In The Diaspora 1980 93</a>
+                     </iframe>
+                        <div class="embed-title">New release from Soundway Records, who brought you Accuse
+ (Instrumental)</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="genre-section">
+            <div class="genre-header" onclick="toggleGenre(this)">
+                <h2>Soul Funk</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="genre-count">1 discos</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="genre-content">
+                <div class="embed-grid">
+
+                    <div class="embed-item">
+                        <iframe style="border: 0; width: 400px; height: 120px;"
+                     src="https://bandcamp.com/EmbeddedPlayer/album=soweto-disco-shanana-voodoocuts-edits/size=large/bgcol=181a1b/linkcol=4c1da3/tracklist=false/artwork=small/transparent=true/"
+                     seamless>
+                     <a href="https://voodoocuts.bandcamp.com/album/soweto-disco-shanana-voodoocuts-edits">Soweto Disco Shanana Voodoocuts Edits</a>
+                     </iframe>
+                        <div class="embed-title">New release from Matasuna Records</div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleGenre(header) {
+            const section = header.parentElement;
+            section.classList.toggle('active');
+        }
+
+        // Opcional: Abrir la primera sección por defecto
+        // document.querySelector('.genre-section')?.classList.add('active');
+    </script>
+</body>
+</html>

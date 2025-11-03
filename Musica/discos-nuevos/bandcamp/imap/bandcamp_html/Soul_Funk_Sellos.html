@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Soul Funk Sellos - Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        .embeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .embed-item.hidden {
+            display: none;
+        }
+
+        .embed-item.removed {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .embed-info {
+            margin-top: 15px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .embed-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .mark-read-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mark-read-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .mark-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .delete-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .embeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .action-btn {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Soul Funk Sellos</h1>
+            <p class="subtitle">📀 34 discos</p>
+            <a href="index.html" class="back-link">← Volver al índice</a>
+        </header>
+
+        <div class="embeds-grid">
+            
+        <div class="embed-item page-1" data-page="1" id="embed_0">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1918568811/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 15 Oct 2025 05:35:48 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_0', '34', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_0', '34', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_1">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=664023848/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 09 Oct 2025 18:25:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_1', '33', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_1', '33', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_2">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2051265283/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Thu, 09 Oct 2025 10:55:11 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_2', '32', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_2', '32', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_3">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2620341259/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 02 Oct 2025 11:04:31 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_3', '31', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_3', '31', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_4">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3246615876/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 01 Oct 2025 18:30:02 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_4', '30', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_4', '30', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_5">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1536040709/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 17 Sep 2025 19:59:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_5', '29', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_5', '29', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_6">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3246615876/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 04 Sep 2025 09:40:30 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_6', '28', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_6', '28', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_7">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2826905574/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 03 Sep 2025 18:22:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_7', '27', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_7', '27', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_8">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2620341259/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 01 Sep 2025 11:45:59 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_8', '26', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_8', '26', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_9">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=664023848/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Sun, 31 Aug 2025 07:10:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_9', '25', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_9', '25', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_10">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1536040709/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Sat, 30 Aug 2025 15:43:07 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_10', '24', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_10', '24', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_11">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1294545851/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 20 Aug 2025 18:26:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_11', '23', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_11', '23', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_12">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1691429712/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Fri, 15 Aug 2025 05:45:22 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_12', '22', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_12', '22', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_13">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=115205544/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 31 Jul 2025 08:54:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_13', '21', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_13', '21', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_14">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3500908738/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Tue, 29 Jul 2025 18:19:46 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_14', '20', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_14', '20', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_15">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2826905574/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Mon, 28 Jul 2025 06:43:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_15', '19', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_15', '19', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_16">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3818193695/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Thu, 17 Jul 2025 22:16:17 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_16', '18', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_16', '18', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_17">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3981163017/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 11 Jul 2025 08:31:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_17', '17', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_17', '17', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_18">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3818193695/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Thu, 10 Jul 2025 11:02:07 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_18', '16', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_18', '16', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_19">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=878982115/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 09 Jul 2025 19:41:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_19', '15', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_19', '15', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_20">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1294545851/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Tue, 08 Jul 2025 12:15:27 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_20', '14', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_20', '14', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_21">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3500908738/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Sun, 22 Jun 2025 10:24:27 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_21', '13', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_21', '13', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_22">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1691429712/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Sun, 22 Jun 2025 10:21:07 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_22', '12', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_22', '12', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_23">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3981163017/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 03 Jun 2025 11:40:37 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_23', '11', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_23', '11', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_24">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1084668735/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 30 May 2025 06:36:00 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_24', '10', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_24', '10', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_25">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=878982115/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Sun, 11 May 2025 11:25:29 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_25', '9', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_25', '9', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_26">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=942216623/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Wed, 23 Apr 2025 18:26:31 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_26', '8', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_26', '8', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_27">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2816861562/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 28 Mar 2025 11:01:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_27', '7', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_27', '7', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_28">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2181817229/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Fri, 21 Mar 2025 09:47:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_28', '6', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_28', '6', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_29">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1084668735/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 18 Mar 2025 14:37:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_29', '5', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_29', '5', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_30">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=942216623/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Tue, 11 Mar 2025 08:40:20 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_30', '4', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_30', '4', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_31">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2816861562/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 24 Feb 2025 13:21:11 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_31', '3', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_31', '3', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_32">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3950029959/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Tue, 21 Jan 2025 22:00:11 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_32', '2', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_32', '2', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_33">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2181817229/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Fri, 17 Jan 2025 08:51:29 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_33', '1', 'Musica.Soul Funk.Sellos')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_33', '1', 'Musica.Soul Funk.Sellos')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        </div>
+
+        <div class="pagination"><button class="page-btn active" data-page="1">Página 1</button><button class="page-btn " data-page="2">Página 2</button><button class="page-btn " data-page="3">Página 3</button><button class="page-btn " data-page="4">Página 4</button></div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Configuración de conexión IMAP
+        const imapConfig = {"server": "disroot.org", "port": 993, "email": "frodobolson@disroot.org"};
+
+        // Paginación
+        const pageButtons = document.querySelectorAll('.page-btn');
+        const embedItems = document.querySelectorAll('.embed-item');
+
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const page = button.dataset.page;
+
+                pageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                embedItems.forEach(item => {
+                    if (item.dataset.page === page) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Mostrar solo la primera página al cargar
+        if (pageButtons.length > 0) {
+            embedItems.forEach(item => {
+                if (item.dataset.page !== '1') {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Funciones de notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Función para marcar como leído
+        async function markAsRead(embedId, emailId, folder) {
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.mark-read-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Procesando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                // Por ahora simulamos la operación
+                const response = await fetch('/api/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    button.textContent = '✓ Leído';
+                    button.style.background = '#95d5b2';
+                    showNotification('Correo marcado como leído', 'success');
+                } else {
+                    throw new Error('Error al marcar como leído');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '📖 Marcar como leído';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Función para eliminar
+        async function deleteEmail(embedId, emailId, folder) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este correo? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.delete-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Eliminando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                const response = await fetch('/api/delete-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    embedElement.classList.add('removed');
+                    button.textContent = '✓ Eliminado';
+                    showNotification('Correo eliminado', 'success');
+
+                    setTimeout(() => {
+                        embedElement.style.display = 'none';
+                    }, 1000);
+                } else {
+                    throw new Error('Error al eliminar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '🗑️ Eliminar';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Aviso sobre el API
+        console.log('%c⚠️ NOTA: Los botones de acción requieren un servidor API backend', 'color: orange; font-size: 14px; font-weight: bold');
+        console.log('Para implementar la funcionalidad completa, necesitas crear un servidor que maneje las peticiones /api/mark-read y /api/delete-email');
+    </script>
+</body>
+</html>
