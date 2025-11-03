@@ -6,7 +6,7 @@ Repository: https://github.com/volteret4/
 License:
 TODO:
 Notes:
-    La idea de este script es poder tener en una carpeta aparte una selección de música con otro criterio (género por ej.)
+    La idea de este script es poder tener, en una carpeta aparte separada, una selección de música con otro criterio (género por ej.)
 """
 from PyQt6 import uic
 import os
@@ -361,6 +361,93 @@ class MusicMover:
             print(f"Error accediendo a la base de datos: {e}")
             return None, None
 
+    def add_to_lastfm_loved(self, artist, title):
+        """Añadir canción a las loved tracks de Last.fm usando la API"""
+        try:
+            # Cargar credenciales de Last.fm desde .env
+            load_dotenv()
+            LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
+            LASTFM_API_SECRET = os.getenv("LASTFM_API_SECRET")
+            LASTFM_USERNAME = os.getenv("LASTFM_USERNAME")
+            LASTFM_PASSWORD = os.getenv("LASTFM_PASSWORD")
+
+            if not all([LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_USERNAME, LASTFM_PASSWORD]):
+                print("Faltan credenciales de Last.fm en el archivo .env")
+                return False
+
+            # Obtener token de autenticación
+            auth_url = "https://ws.audioscrobbler.com/2.0/"
+            auth_params = {
+                "method": "auth.getMobileSession",
+                "username": LASTFM_USERNAME,
+                "password": LASTFM_PASSWORD,
+                "api_key": LASTFM_API_KEY,
+                "format": "json"
+            }
+
+            # Crear firma para autenticación
+            signature = self._create_lastfm_signature(auth_params, LASTFM_API_SECRET)
+            auth_params["api_sig"] = signature
+
+            # Realizar petición de autenticación
+            auth_response = requests.post(auth_url, data=auth_params)
+
+            if auth_response.status_code != 200:
+                print(f"Error de autenticación en Last.fm: {auth_response.text}")
+                return False
+
+            session_key = auth_response.json().get("session", {}).get("key")
+
+            if not session_key:
+                print("No se pudo obtener session key de Last.fm")
+                return False
+
+            # Añadir canción a loved tracks
+            love_params = {
+                "method": "track.love",
+                "artist": artist,
+                "track": title,
+                "api_key": LASTFM_API_KEY,
+                "sk": session_key,
+                "format": "json"
+            }
+
+            # Crear firma para petición love
+            love_signature = self._create_lastfm_signature(love_params, LASTFM_API_SECRET)
+            love_params["api_sig"] = love_signature
+
+            # Realizar petición para marcar como loved
+            love_response = requests.post(auth_url, data=love_params)
+
+            if love_response.status_code != 200:
+                print(f"Error añadiendo canción a loved tracks: {love_response.text}")
+                return False
+
+            print(f"Canción '{artist} - {title}' añadida a loved tracks de Last.fm")
+            return True
+
+        except Exception as e:
+            print(f"Error añadiendo canción a Last.fm: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _create_lastfm_signature(self, params, api_secret):
+        """Crear firma para peticiones a Last.fm API"""
+        # Ordenar parámetros alfabéticamente y crear string para firma
+        sorted_params = sorted(params.items())
+        signature_string = ""
+
+        for name, value in sorted_params:
+            if name != "format":  # Excluir format de la firma
+                signature_string += name + str(value)
+
+        # Añadir clave secreta
+        signature_string += api_secret
+
+        # Calcular MD5
+        return hashlib.md5(signature_string.encode("utf-8")).hexdigest()
+
     def download_from_airsonic(self, artist, title, album=None):
         """Descargar canción desde Airsonic Advanced"""
         try:
@@ -627,20 +714,137 @@ class MusicMover:
         return dest_file
 
     def set_tags(self, file_path, comment="", rename=True):
-        """Establecer tags usando tagutil"""
+        """Establecer tags y renombrar archivo con formato extendido"""
         try:
-            if comment:
-                # Limpiar comentario anterior
-                subprocess.run(['tagutil', '-Yp', 'clear:comment', file_path])
-                # Añadir nuevo comentario
-                subprocess.run(['tagutil', '-Yp', f'add:comment={comment}', file_path])
+            # Obtener directorio y extensión del archivo
+            dir_path = os.path.dirname(file_path)
+            file_ext = os.path.splitext(file_path)[1].lower()
+
+            # Intentar leer metadatos con ffprobe primero
+            try:
+                # Verificar si ffprobe está disponible
+                subprocess.run(['ffprobe', '-version'], capture_output=True, check=True)
+
+                # Leer metadatos
+                metadata_result = subprocess.run(
+                    ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', file_path],
+                    capture_output=True, text=True, check=True
+                )
+                metadata = json.loads(metadata_result.stdout)
+
+                # Extraer metadatos
+                tags = metadata.get('format', {}).get('tags', {})
+                artist = tags.get('artist', tags.get('ARTIST', ''))
+                title = tags.get('title', tags.get('TITLE', ''))
+                album = tags.get('album', tags.get('ALBUM', ''))
+                date = tags.get('date', tags.get('DATE', ''))
+                if not date:
+                    date = tags.get('year', tags.get('YEAR', ''))
+                label = tags.get('label', tags.get('LABEL', tags.get('publisher', tags.get('PUBLISHER', ''))))
+
+                # Si se especifica un comentario, añadirlo usando ffmpeg
+                if comment:
+                    # Crear archivo temporal
+                    temp_file = f"{file_path}.temp{file_ext}"
+
+                    # Añadir comentario con ffmpeg
+                    subprocess.run([
+                        'ffmpeg', '-i', file_path, '-map_metadata', '0',
+                        '-metadata', f'comment={comment}', '-c', 'copy', temp_file
+                    ], check=True)
+
+                    # Reemplazar archivo original
+                    os.replace(temp_file, file_path)
+
+            except (subprocess.SubprocessError, json.JSONDecodeError, FileNotFoundError):
+                # Si ffprobe falla, intentar con exiftool
+                try:
+                    # Verificar si exiftool está disponible
+                    subprocess.run(['exiftool', '-ver'], capture_output=True, check=True)
+
+                    # Leer metadatos
+                    artist_result = subprocess.run(['exiftool', '-Artist', '-s3', file_path],
+                                                capture_output=True, text=True)
+                    artist = artist_result.stdout.strip()
+
+                    title_result = subprocess.run(['exiftool', '-Title', '-s3', file_path],
+                                                capture_output=True, text=True)
+                    title = title_result.stdout.strip()
+
+                    album_result = subprocess.run(['exiftool', '-Album', '-s3', file_path],
+                                                capture_output=True, text=True)
+                    album = album_result.stdout.strip()
+
+                    date_result = subprocess.run(['exiftool', '-Year', '-s3', file_path],
+                                              capture_output=True, text=True)
+                    date = date_result.stdout.strip()
+
+                    label_result = subprocess.run(['exiftool', '-Label', '-s3', file_path],
+                                               capture_output=True, text=True)
+                    label = label_result.stdout.strip()
+
+                    # Si se especifica un comentario, añadirlo usando exiftool
+                    if comment:
+                        subprocess.run(['exiftool', f'-Comment={comment}', '-overwrite_original', file_path],
+                                     check=True)
+
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    # Si exiftool también falla, usar información del track_info
+                    print("No se pudieron leer los metadatos. Usando información básica disponible.")
+                    artist = self.track_info.get('artist', '')
+                    title = self.track_info.get('title', '')
+                    album = self.track_info.get('album', '')
+                    date = ''
+                    label = ''
 
             if rename:
-                # Renombrar archivo con formato: artist - title
-                subprocess.run(['tagutil', '-Yp', 'rename:%artist - %title', file_path])
+                # Usar información extraída para renombrar
+                if not artist and not title:
+                    # Si no hay metadatos suficientes, usar el nombre original
+                    return file_path
+
+                # Construir nuevo nombre de archivo
+                new_filename = f"{artist} - {title}"
+
+                # Añadir date y album si están disponibles
+                if date or album:
+                    date_album_part = ""
+                    if date:
+                        date_album_part += date
+                    if album:
+                        if date_album_part:
+                            date_album_part += " "
+                        date_album_part += album
+
+                    new_filename += f" ({date_album_part})"
+
+                # Añadir label si está disponible
+                if label:
+                    new_filename += f" [{label}]"
+
+                # Limpiar caracteres problemáticos del nombre de archivo
+                new_filename = re.sub(r'[/\\?%*:|"<>]', '-', new_filename)
+
+                # Añadir extensión
+                new_filename += file_ext
+
+                # Ruta completa del nuevo archivo
+                new_file_path = os.path.join(dir_path, new_filename)
+
+                print(f"Renombrando: {file_path} -> {new_file_path}")
+
+                # Renombrar usando os.rename
+                os.rename(file_path, new_file_path)
+
+                return new_file_path
+
+            return file_path
 
         except Exception as e:
-            print(f"Error estableciendo tags: {e}")
+            print(f"Error estableciendo tags o renombrando: {e}")
+            import traceback
+            traceback.print_exc()
+            return file_path
 
     def get_existing_comment(self, file_path):
         """Obtener comentario existente de un archivo"""
@@ -1795,7 +1999,13 @@ def main():
 
                         # Establecer tags
                         time.sleep(2)  # Esperar a que se complete la copia
-                        mover.set_tags(new_file, comment, rename=True)
+                        new_file = mover.set_tags(new_file, comment, rename=True)
+
+                        success = mover.add_to_lastfm_loved(track_info['artist'], track_info['title'])
+                        if success:
+                            show_notification("Last.fm", "Canción añadida a loved tracks")
+                        else:
+                            show_notification("Last.fm", "Error al añadir canción a loved tracks", urgent=True)
 
                     else:
                         # No hay duplicados, copiar normalmente
@@ -1804,7 +2014,13 @@ def main():
 
                         # Establecer tags
                         time.sleep(2)  # Esperar a que se complete la copia
-                        mover.set_tags(new_file, comment, rename=True)
+                        new_file = mover.set_tags(new_file, comment, rename=True)
+
+                        success = mover.add_to_lastfm_loved(track_info['artist'], track_info['title'])
+                        if success:
+                            show_notification("Last.fm", "Canción añadida a loved tracks")
+                        else:
+                            show_notification("Last.fm", "Error al añadir canción a loved tracks", urgent=True)
 
                     # Actualizar playlists
                     mover.update_playlists()

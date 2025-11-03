@@ -1,4 +1,0 @@
-2025-07-31 00:57:22,282 - INFO - ✅ Token obtenido exitosamente
-2025-07-31 00:57:22,360 - ERROR - HTTP Error for GET to https://api.spotify.com/v1/me/ with Params: {} returned 403 due to Check settings on developer.spotify.com/dashboard, the user may not be registered.
-2025-07-31 00:57:22,360 - ERROR - Error obteniendo información del usuario: http status: 403, code:-1 - https://api.spotify.com/v1/me/:
- Check settings on developer.spotify.com/dashboard, the user may not be registered., reason: None

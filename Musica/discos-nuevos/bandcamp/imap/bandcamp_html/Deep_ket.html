@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Deep ket - Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        .embeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .embed-item.hidden {
+            display: none;
+        }
+
+        .embed-item.removed {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .embed-info {
+            margin-top: 15px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .embed-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .mark-read-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mark-read-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .mark-read-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .delete-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .embeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .action-btn {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Deep ket</h1>
+            <p class="subtitle">📀 9 discos</p>
+            <a href="index.html" class="back-link">← Volver al índice</a>
+        </header>
+
+        <div class="embeds-grid">
+            
+        <div class="embed-item " data-page="1" id="embed_0">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3576038855/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 06 Jun 2025 05:28:57 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_0', '12', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_0', '12', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_1">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3576038855/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 23 May 2025 08:37:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_1', '11', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_1', '11', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_2">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1813848936/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 07 Feb 2025 11:34:27 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_2', '9', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_2', '9', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_3">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=4230184203/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 22 Nov 2024 08:08:27 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_3', '7', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_3', '7', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_4">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2469949751/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire</strong><br>
+                <small>📅 Fri, 25 Oct 2024 06:47:27 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_4', '5', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_4', '5', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_5">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=431227378/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 04 Oct 2024 08:34:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_5', '4', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_5', '4', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_6">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2469949751/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 27 Sep 2024 07:58:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_6', '3', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_6', '3', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_7">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=251000795/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 20 Sep 2024 17:15:53 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_7', '2', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_7', '2', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item " data-page="1" id="embed_8">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1572871070/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Lumière Noire, who brought you Diaoul (A Strange Wedding Remix)</strong><br>
+                <small>📅 Fri, 28 Jun 2024 08:13:47 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn mark-read-btn" onclick="markAsRead('embed_8', '1', 'Musica.Deep.Deep Keet')">
+                    📖 Marcar como leído
+                </button>
+                <button class="action-btn delete-btn" onclick="deleteEmail('embed_8', '1', 'Musica.Deep.Deep Keet')">
+                    🗑️ Eliminar
+                </button>
+            </div>
+        </div>
+        
+        </div>
+
+        
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Configuración de conexión IMAP
+        const imapConfig = {"server": "disroot.org", "port": 993, "email": "frodobolson@disroot.org"};
+
+        // Paginación
+        const pageButtons = document.querySelectorAll('.page-btn');
+        const embedItems = document.querySelectorAll('.embed-item');
+
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const page = button.dataset.page;
+
+                pageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                embedItems.forEach(item => {
+                    if (item.dataset.page === page) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Mostrar solo la primera página al cargar
+        if (pageButtons.length > 0) {
+            embedItems.forEach(item => {
+                if (item.dataset.page !== '1') {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Funciones de notificación
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Función para marcar como leído
+        async function markAsRead(embedId, emailId, folder) {
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.mark-read-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Procesando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                // Por ahora simulamos la operación
+                const response = await fetch('/api/mark-read', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    button.textContent = '✓ Leído';
+                    button.style.background = '#95d5b2';
+                    showNotification('Correo marcado como leído', 'success');
+                } else {
+                    throw new Error('Error al marcar como leído');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '📖 Marcar como leído';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Función para eliminar
+        async function deleteEmail(embedId, emailId, folder) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este correo? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            const embedElement = document.getElementById(embedId);
+            const button = embedElement.querySelector('.delete-btn');
+
+            button.disabled = true;
+            button.textContent = '⏳ Eliminando...';
+
+            try {
+                // Aquí llamarías a tu API backend
+                const response = await fetch('/api/delete-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        server: imapConfig.server,
+                        port: imapConfig.port,
+                        email: imapConfig.email,
+                        emailId: emailId,
+                        folder: folder
+                    })
+                });
+
+                if (response.ok) {
+                    embedElement.classList.add('removed');
+                    button.textContent = '✓ Eliminado';
+                    showNotification('Correo eliminado', 'success');
+
+                    setTimeout(() => {
+                        embedElement.style.display = 'none';
+                    }, 1000);
+                } else {
+                    throw new Error('Error al eliminar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                button.disabled = false;
+                button.textContent = '🗑️ Eliminar';
+                showNotification('Error: ' + error.message + ' (API no disponible)', 'error');
+            }
+        }
+
+        // Aviso sobre el API
+        console.log('%c⚠️ NOTA: Los botones de acción requieren un servidor API backend', 'color: orange; font-size: 14px; font-weight: bold');
+        console.log('Para implementar la funcionalidad completa, necesitas crear un servidor que maneje las peticiones /api/mark-read y /api/delete-email');
+    </script>
+</body>
+</html>

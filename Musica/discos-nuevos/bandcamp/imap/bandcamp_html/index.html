@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Mi Colección de Bandcamp</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            padding: 50px 20px;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3.5em;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+        }
+
+        .search-container {
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 15px 25px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            outline: none;
+            transition: box-shadow 0.3s;
+        }
+
+        .search-box:focus {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .genres-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .genre-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .genre-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .genre-card.hidden {
+            display: none;
+        }
+
+        .genre-card h2 {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .genre-count {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+        }
+
+        .genre-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: transform 0.3s;
+        }
+
+        .genre-link:hover {
+            transform: scale(1.05);
+        }
+
+        .no-results {
+            text-align: center;
+            color: white;
+            font-size: 1.3em;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            display: none;
+        }
+
+        .no-results.visible {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 30px;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5em;
+            }
+
+            .genres-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Mi Colección de Bandcamp</h1>
+            <p class="subtitle">Explora tu música por género</p>
+        </header>
+
+        <div class="search-container">
+            <input type="text" class="search-box" placeholder="🔍 Buscar género..." id="searchInput">
+        </div>
+
+        <div class="genres-grid" id="genresGrid">
+            
+        <div class="genre-card" data-genre="ambient">
+            <h2>🎵 Ambient</h2>
+            <p class="genre-count">📀 89 discos</p>
+            <a href="Ambient.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="deep house">
+            <h2>🎵 Deep House</h2>
+            <p class="genre-count">📀 82 discos</p>
+            <a href="Deep_House.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="deep ket">
+            <h2>🎵 Deep ket</h2>
+            <p class="genre-count">📀 9 discos</p>
+            <a href="Deep_ket.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="disco">
+            <h2>🎵 Disco</h2>
+            <p class="genre-count">📀 14 discos</p>
+            <a href="Disco.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="musthave">
+            <h2>🎵 MustHave</h2>
+            <p class="genre-count">📀 4 discos</p>
+            <a href="MustHave.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="musthave sellos">
+            <h2>🎵 MustHave Sellos</h2>
+            <p class="genre-count">📀 33 discos</p>
+            <a href="MustHave_Sellos.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="soul funk">
+            <h2>🎵 Soul Funk</h2>
+            <p class="genre-count">📀 83 discos</p>
+            <a href="Soul_Funk.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        <div class="genre-card" data-genre="soul funk sellos">
+            <h2>🎵 Soul Funk Sellos</h2>
+            <p class="genre-count">📀 34 discos</p>
+            <a href="Soul_Funk_Sellos.html" class="genre-link">Ver colección →</a>
+        </div>
+        
+        </div>
+
+        <div class="no-results" id="noResults">
+            No se encontraron géneros que coincidan con tu búsqueda
+        </div>
+
+        <footer>
+            <p>Generado con ❤️ para los amantes de Bandcamp</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">
+                Total de géneros: 8 |
+                Total de discos: 348
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const genreCards = document.querySelectorAll('.genre-card');
+        const noResults = document.getElementById('noResults');
+
+        // Búsqueda en tiempo real
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            genreCards.forEach(card => {
+                const genreName = card.dataset.genre;
+                const matches = genreName.includes(searchTerm);
+
+                card.classList.toggle('hidden', !matches);
+                if (matches) visibleCount++;
+            });
+
+            noResults.classList.toggle('visible', visibleCount === 0 && searchTerm !== '');
+        });
+
+        // Limpiar búsqueda con ESC
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        });
+    </script>
+</body>
+</html>

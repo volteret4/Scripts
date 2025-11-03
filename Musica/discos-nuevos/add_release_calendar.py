@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 #
 # Script Name: add_release_calendar.py
@@ -20,6 +19,20 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
+
+def determine_release_type(title):
+    """Determine if the release is an album or EP based on the title."""
+    title_lower = title.lower()
+
+    # Common EP indicators
+    ep_indicators = ['ep', ' - ep', 'extended play', 'mini album', 'single']
+
+    for indicator in ep_indicators:
+        if indicator in title_lower:
+            return "EP"
+
+    # Default to album if no EP indicators found
+    return "Album"
 
 def parse_atom_feed(feed_url):
     """Parse the Atom feed and extract album release information."""
@@ -48,7 +61,14 @@ def parse_atom_feed(feed_url):
             print(f"Skipping entry with unparsable date: {release_date_str}")
             continue
 
-        releases.append({"title": title, "release_date": release_date})
+        # Determine release type and add appropriate icon
+        release_type = determine_release_type(title)
+        if release_type == "EP":
+            formatted_title = f"🎤 {title}"
+        else:  # Album
+            formatted_title = f"💿 {title}"
+
+        releases.append({"title": formatted_title, "release_date": release_date})
 
     return releases
 
@@ -98,15 +118,22 @@ def create_caldav_event(client_url, username, password, calendar_name, event_dat
             print(f"Skipping duplicate event: {event_title} ({event_date})")
             continue
 
-        # Crear nuevo evento
+        # Crear nuevo evento de todo el día
         cal_event = Event()
         cal_event.add("summary", event_title)
-        cal_event.add("dtstart", datetime(event_date.year, event_date.month, event_date.day, tzinfo=timezone.utc))
-        cal_event.add("dtend", datetime(event_date.year, event_date.month, event_date.day, tzinfo=timezone.utc))
+
+        # Para eventos de todo el día, usar solo la fecha sin hora ni timezone
+        cal_event.add("dtstart", event_date)
+        cal_event.add("dtend", event_date)
+
+        # Marcar como evento de todo el día
+        cal_event['dtstart'].params['VALUE'] = 'DATE'
+        cal_event['dtend'].params['VALUE'] = 'DATE'
+
         cal_event.add("description", f"Release Date for {event_title}")
 
         calendar.save_event(cal_event.to_ical())
-        print(f"Added event: {event_title} ({event_date})")
+        print(f"Added all-day event: {event_title} ({event_date})")
 
 # ELIMINAR DUPLICADOS
 def get_calendar(client_url, username, password, calendar_name):
@@ -154,11 +181,11 @@ def find_duplicate_events(calendar):
 def remove_duplicate_events(calendar):
     """Remove duplicate events from the calendar."""
     duplicate_events = find_duplicate_events(calendar)
-    
+
     if not duplicate_events:
         print("No duplicate events found.")
         return
-    
+
     for event in duplicate_events:
         try:
             event.delete()

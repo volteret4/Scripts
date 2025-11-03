@@ -60,3 +60,8 @@ Musica/orpheus-api/buscar_ausentes_en_orpheus.py
 Musica/blog/vvmm/.content/logs/hugo_server.log
 Musica/conciertos/artist_tracker.db
 Musica/artist_tracker.db
+Musica/playlists/.content/cache/
+**/*.db
+**/*.data
+**/*.log
+Musica/playlists/airsonic_sync_state.json
