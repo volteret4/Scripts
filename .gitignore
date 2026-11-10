@@ -65,3 +65,6 @@ Musica/playlists/.content/cache/
 **/*.data
 **/*.log
 Musica/playlists/airsonic_sync_state.json
+**/*.log
+*.egg-info/
+kopia/_archived_legacy_configs/
