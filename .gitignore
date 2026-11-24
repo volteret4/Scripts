@@ -76,3 +76,6 @@ kopia/_archived_legacy_configs/
 utilities/calendarios/*.ics
 utilities/trabajo/
 menus/vm/*.xml
+
+*.ics
+menus/dotfiles/dotfiles.db
