@@ -78,4 +78,4 @@ utilities/trabajo/
 menus/vm/*.xml
 
 *.ics
-menus/dotfiles/dotfiles.db
+menus/dotfiles/dotfiles.db*
