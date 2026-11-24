@@ -3,16 +3,24 @@
 sync_music.py — Script unificado de sincronización musical
 ===========================================================
 
+Fuente de verdad: los VTODOs del calendario de tareas (CALENDAR_TASKS).
+  · SUMMARY   → artist / album
+  · DTSTART   → purchase_date
+  · COMPLETED → listened_date  (si ya está en el VTODO, no se consulta Last.fm)
+
 Flujo:
-  1. Lee VEVENTs del calendario de lanzamientos (CALENDAR_NAME) en el rango --since.
-  2. Lee VTODOs del calendario de tareas (CALENDAR_TASKS).
-  3. Para VTODOs sin DTSTART pero con DUE → asigna DTSTART = DUE − 3 meses.
-  4. Para cada VEVENT en rango:
-       a. Si no existe VTODO → lo crea en CALENDAR_TASKS + añade al CSV + inserta en DB.
-       b. Actualiza la DB con los datos disponibles (release, purchase, listened).
-  5. Busca en MusicBrainz el tracklist de cada álbum sin fecha de escucha.
-  6. Compara contra lastfm_stats.db → si hay escucha, marca el VTODO COMPLETED y
-     actualiza la DB.
+  1. Lee TODOS los VTODOs del calendario de tareas (CALENDAR_TASKS).
+  2. Lee VEVENTs del calendario de lanzamientos (CALENDAR_NAME) en el rango --since,
+     solo para obtener release_date y detectar álbumes sin VTODO.
+  3. Para VTODOs sin DUE → asigna DUE = DTSTART + 3 meses.
+  4. Para cada VEVENT en rango sin VTODO correspondiente → crea VTODO en CALENDAR_TASKS.
+  5. Para cada VTODO (loop principal):
+       a. Cruza con VEVENTs para obtener release_date (puede ser None).
+       b. Si purchase_date falta y Airsonic está configurado → consulta Airsonic.
+       c. Actualiza la DB con (release, purchase, listened) del VTODO.
+       d. Si el VTODO ya tiene COMPLETED → saltar paso Last.fm.
+       e. Si no tiene listened_date → busca tracklist en MusicBrainz y compara
+          contra lastfm_stats.db; si hay escucha, marca VTODO COMPLETED + actualiza DB.
 
 Uso:
     python sync_music.py              # solo hoy (--since 0)
@@ -945,11 +953,12 @@ def upsert_album(conn: sqlite3.Connection,
 def main():
     parser = argparse.ArgumentParser(
         description="Sincroniza lanzamientos del calendario con tareas, "
-                    "Last.fm y la base de datos."
+                    "Last.fm y la base de datos. "
+                    "Fuente de verdad: VTODOs del calendario de tareas."
     )
     parser.add_argument(
         "--since", type=int, default=0, metavar="DÍAS",
-        help="Días hacia atrás a consultar (defecto: 0 = solo hoy)"
+        help="Días hacia atrás a consultar para VEVENTs (defecto: 0 = solo hoy)"
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -970,14 +979,6 @@ def main():
         sys.exit(1)
 
     # ── 1. Descargar calendarios ──────────────────────────────────────────────
-    print(f"\n📅 Leyendo calendario de lanzamientos ({CALENDAR_NAME})...")
-    try:
-        raw_events = fetch_calendar_items(CALENDAR_NAME)
-        print(f"   {len(raw_events)} ítems descargados")
-    except Exception as e:
-        print(f"  ❌ Error CalDAV (eventos): {e}")
-        sys.exit(1)
-
     print(f"\n📋 Leyendo calendario de tareas ({CALENDAR_TASKS})...")
     try:
         raw_tasks = fetch_calendar_items(CALENDAR_TASKS)
@@ -986,21 +987,27 @@ def main():
         print(f"  ❌ Error CalDAV (tareas): {e}")
         sys.exit(1)
 
+    print(f"\n📅 Leyendo calendario de lanzamientos ({CALENDAR_NAME})...")
+    try:
+        raw_events = fetch_calendar_items(CALENDAR_NAME)
+        print(f"   {len(raw_events)} ítems descargados")
+    except Exception as e:
+        print(f"  ❌ Error CalDAV (eventos): {e}")
+        sys.exit(1)
+
     # ── 2. Parsear ────────────────────────────────────────────────────────────
     print("\n🔍 Clasificando VEVENTs y VTODOs...")
-    events = parse_events(raw_events, since_date)
-    tasks  = parse_tasks(raw_tasks)
-    print(f"   VEVENTs en rango: {len(events)}")
-    print(f"   VTODOs total:     {len(tasks)}")
+    # VEVENTs: todos (sin filtro de fecha) para poder cruzar release_date con
+    # cualquier VTODO, no solo los del rango --since.
+    events_all = parse_events(raw_events, date.min)   # sin filtro de fecha
+    events_in_range = {k: v for k, v in events_all.items()
+                       if v["release_date"] >= since_date.isoformat()}
+    tasks = parse_tasks(raw_tasks)
+    print(f"   VEVENTs en rango:   {len(events_in_range)}")
+    print(f"   VEVENTs total:      {len(events_all)}")
+    print(f"   VTODOs total:       {len(tasks)}")
 
-    # ── 3. Reparar VTODOs sin DTSTART ────────────────────────────────────────
-    # print("\n🔧 Comprobando VTODOs sin DTSTART...")
-    # fixed = fix_missing_dtstart(tasks, dry_run=args.dry_run)
-    # if fixed:
-    #     print(f"   {fixed} VTODO(s) corregidos (DTSTART = DUE − 3 meses)")
-    # else:
-    #     print("   Sin VTODOs que reparar")
-
+    # ── 3. Reparar VTODOs sin DUE ────────────────────────────────────────────
     print("\n🔧 Comprobando VTODOs sin DUE...")
     fixed_due = fix_missing_due(tasks, dry_run=args.dry_run)
     if fixed_due:
@@ -1008,7 +1015,45 @@ def main():
     else:
         print("   Sin VTODOs que reparar")
 
-    # ── 4. Abrir DBs ──────────────────────────────────────────────────────────
+    # ── 4. Crear VTODOs para VEVENTs en rango sin tarea ──────────────────────
+    print(f"\n➕ Comprobando VEVENTs en rango sin VTODO...")
+    stats = {"vtodo_created": 0, "listened_updated": 0, "already_ok": 0,
+             "no_listen": 0, "airsonic_found": 0, "db_updated": 0}
+
+    for key, ev in events_in_range.items():
+        if key in tasks:
+            continue  # ya existe VTODO, nada que crear
+
+        artist       = ev["artist"]
+        album        = ev["album"]
+        release_date = ev["release_date"]
+
+        print(f"  ➕ Sin VTODO → {artist} — {album} ({release_date})")
+        if not args.dry_run:
+            href = create_vtodo(artist, album, release_date)
+            if href:
+                print(f"    ✅ VTODO creado: {href}")
+                new_task = {
+                    "artist":        artist,
+                    "album":         album,
+                    "purchase_date": release_date,
+                    "listened_date": None,
+                    "completed":     False,
+                    "href":          href,
+                    "uid":           "",
+                    "ical_text":     "",
+                    "has_dtstart":   True,
+                    "due":           None,
+                }
+                tasks[key] = new_task
+                stats["vtodo_created"] += 1
+            else:
+                print("    ❌ Error creando VTODO, se salta")
+        else:
+            print(f"    [DRY RUN] crearía VTODO")
+            stats["vtodo_created"] += 1
+
+    # ── 5. Abrir DBs ──────────────────────────────────────────────────────────
     lastfm_conn: Optional[sqlite3.Connection] = None
     if os.path.exists(LASTFM_DB):
         lastfm_conn = sqlite3.connect(LASTFM_DB)
@@ -1022,107 +1067,84 @@ def main():
     music_conn.execute("PRAGMA journal_mode=WAL")
     init_db(music_conn)
 
-    # ── 5. Procesar eventos ───────────────────────────────────────────────────
-    print(f"\n⚙️  Procesando {len(events)} evento(s)...")
-    stats = {"vtodo_created": 0, "listened_updated": 0, "already_ok": 0, "no_listen": 0, "airsonic_found": 0}
+    # ── 6. Loop principal: un VTODO a la vez ─────────────────────────────────
+    print(f"\n⚙️  Procesando {len(tasks)} VTODO(s) como fuente de verdad...")
 
-    for key, ev in events.items():
-        artist       = ev["artist"]
-        album        = ev["album"]
-        release_date = ev["release_date"]
-        task         = tasks.get(key)
+    for key, task in tasks.items():
+        artist        = task["artist"]
+        album         = task["album"]
+        # Fechas directamente del VTODO (fuente de verdad)
+        purchase_date = task.get("purchase_date")   # DTSTART del VTODO
+        listened_date = task.get("listened_date")   # COMPLETED del VTODO
+        is_completed  = task.get("completed", False)
 
-        print(f"\n  🎸 {artist} — {album}  ({release_date})")
+        # release_date: del VEVENT cruzado por nombre (puede ser None)
+        ev            = events_all.get(key)
+        release_date  = ev["release_date"] if ev else None
 
-        # ── 5a. Crear VTODO si no existe ─────────────────────────────────────
-        if task is None:
-            print(f"    ➕ Sin VTODO → creando (DTSTART={release_date})")
-            if not args.dry_run:
-                href = create_vtodo(artist, album, release_date)
-                if href:
-                    print(f"    ✅ VTODO creado: {href}")
-                    task = {
-                        "artist":        artist,
-                        "album":         album,
-                        "purchase_date": release_date,
-                        "listened_date": None,
-                        "completed":     False,
-                        "href":          href,
-                        "uid":           "",
-                        "ical_text":     "",
-                        "has_dtstart":   True,
-                        "due":           None,
-                    }
-                    tasks[key] = task
-                    stats["vtodo_created"] += 1
-                    append_to_csv(STORE_CSV, artist, album, release_date)
-                    upsert_album(music_conn, artist, album, release_date, release_date, None)
-                    music_conn.commit()
-                else:
-                    print("    ❌ Error creando VTODO, se salta")
-                    continue
-            else:
-                print(f"    [DRY RUN] crearía VTODO + CSV + DB")
-                stats["vtodo_created"] += 1
-        else:
-            # Actualizar DB con datos existentes
-            purchase = task.get("purchase_date") or release_date
-            upsert_album(music_conn, artist, album,
-                         release_date, purchase, task.get("listened_date"))
-            music_conn.commit()
+        print(f"\n  🎸 {artist} — {album}"
+              f"  (release={release_date or '?'}"
+              f"  purchase={purchase_date or '?'}"
+              f"  listened={listened_date or '?'})")
 
-        # ── 5b. Fecha de compra desde Airsonic (si falta purchase_date) ────────
-        if task and not task.get("purchase_date") and AIRSONIC_URL:
-            print(f"    🔍 Sin fecha de compra → consultando Airsonic...")
+        # ── 6a. CSV: registrar si no existe ──────────────────────────────────
+        if purchase_date and not args.dry_run:
+            append_to_csv(STORE_CSV, artist, album, purchase_date)
+
+        # ── 6b. Fecha de compra desde Airsonic (solo si DTSTART falta) ───────
+        if not purchase_date and AIRSONIC_URL:
+            print(f"    🔍 Sin DTSTART/purchase → consultando Airsonic...")
             airsonic_date = search_airsonic(artist, album)
             if airsonic_date:
                 print(f"    🛒 Airsonic: añadido el {airsonic_date.isoformat()}")
-                if not args.dry_run:
-                    # Actualizar DTSTART del VTODO con la fecha de Airsonic
-                    if task.get("ical_text"):
-                        try:
-                            cal = Calendar.from_ical(task["ical_text"])
-                            updated_cal = Calendar()
-                            for k, v in cal.items():
-                                updated_cal.add(k, v)
-                            for comp in cal.walk():
-                                if hasattr(comp, "name") and comp.name == "VTODO":
-                                    comp["DTSTART"] = vDatetime(
-                                        datetime.combine(airsonic_date,
-                                                         datetime.min.time(),
-                                                         tzinfo=timezone.utc)
-                                    )
-                                    comp["LAST-MODIFIED"] = vDatetime(
-                                        datetime.now(tz=timezone.utc))
-                                    updated_cal.add_component(comp)
-                                elif hasattr(comp, "name") and comp.name != "VCALENDAR":
-                                    updated_cal.add_component(comp)
-                            new_ical = updated_cal.to_ical().decode("utf-8")
-                            if put_ical(task["href"], new_ical, cal_name=CALENDAR_TASKS):
-                                task["ical_text"]     = new_ical
-                                task["purchase_date"] = airsonic_date.isoformat()
-                                task["has_dtstart"]   = True
-                                print(f"    ✅ VTODO DTSTART actualizado con fecha Airsonic")
-                        except Exception as e:
-                            print(f"    ⚠️  Error actualizando VTODO con fecha Airsonic: {e}")
-                    # Actualizar DB
-                    upsert_album(music_conn, artist, album,
-                                 release_date, airsonic_date.isoformat(),
-                                 task.get("listened_date"))
-                    music_conn.commit()
+                if not args.dry_run and task.get("ical_text"):
+                    try:
+                        cal = Calendar.from_ical(task["ical_text"])
+                        updated_cal = Calendar()
+                        for k, v in cal.items():
+                            updated_cal.add(k, v)
+                        for comp in cal.walk():
+                            if hasattr(comp, "name") and comp.name == "VTODO":
+                                comp["DTSTART"] = vDatetime(
+                                    datetime.combine(airsonic_date,
+                                                     datetime.min.time(),
+                                                     tzinfo=timezone.utc)
+                                )
+                                comp["LAST-MODIFIED"] = vDatetime(
+                                    datetime.now(tz=timezone.utc))
+                                updated_cal.add_component(comp)
+                            elif hasattr(comp, "name") and comp.name != "VCALENDAR":
+                                updated_cal.add_component(comp)
+                        new_ical = updated_cal.to_ical().decode("utf-8")
+                        if put_ical(task["href"], new_ical, cal_name=CALENDAR_TASKS):
+                            task["ical_text"]     = new_ical
+                            task["purchase_date"] = airsonic_date.isoformat()
+                            task["has_dtstart"]   = True
+                            purchase_date         = airsonic_date.isoformat()
+                            print(f"    ✅ VTODO DTSTART actualizado con fecha Airsonic")
+                    except Exception as e:
+                        print(f"    ⚠️  Error actualizando VTODO con fecha Airsonic: {e}")
                     append_to_csv(STORE_CSV, artist, album, airsonic_date.isoformat())
-                else:
-                    print(f"    [DRY RUN] pondría purchase_date={airsonic_date.isoformat()} en VTODO + DB")
+                elif args.dry_run:
+                    print(f"    [DRY RUN] pondría DTSTART={airsonic_date.isoformat()} en VTODO")
+                    purchase_date = airsonic_date.isoformat()
                 stats["airsonic_found"] += 1
             else:
                 print(f"    ℹ️  No encontrado en Airsonic")
 
-        # ── 5c. Fecha de escucha ──────────────────────────────────────────────
-        if task and task.get("completed"):
-            print(f"    ✔️  Ya completado: {task.get('listened_date')}")
+        # ── 6c. Actualizar DB con lo que tenemos del VTODO ───────────────────
+        upsert_album(music_conn, artist, album,
+                     release_date, purchase_date, listened_date)
+        music_conn.commit()
+        stats["db_updated"] += 1
+
+        # ── 6d. Si el VTODO ya está completado → no consultar Last.fm ────────
+        if is_completed:
+            print(f"    ✔️  Ya completado: {listened_date}")
             stats["already_ok"] += 1
             continue
 
+        # ── 6e. Buscar primera escucha en Last.fm ─────────────────────────────
         if lastfm_conn is None:
             stats["no_listen"] += 1
             continue
@@ -1132,10 +1154,9 @@ def main():
             stats["no_listen"] += 1
             continue
 
-        first_listen = find_first_listen(
-            lastfm_conn, artist, tracks,
-            min_date=date.fromisoformat(release_date)   # ← nuevo parámetro
-        )
+        min_date = date.fromisoformat(release_date) if release_date else None
+        first_listen = find_first_listen(lastfm_conn, artist, tracks, min_date=min_date)
+
         if first_listen is None:
             print(f"    ℹ️  Sin escuchas en Last.fm todavía")
             stats["no_listen"] += 1
@@ -1143,28 +1164,27 @@ def main():
 
         print(f"    🎧 Primera escucha: {first_listen.isoformat()}")
 
-        if not args.dry_run and task and task.get("ical_text"):
+        if not args.dry_run and task.get("ical_text"):
             ok = update_vtodo_completed(task, first_listen)
             if ok:
                 print(f"    ✅ VTODO marcado COMPLETED")
                 stats["listened_updated"] += 1
-                purchase = task.get("purchase_date") or release_date
                 upsert_album(music_conn, artist, album,
-                             release_date, purchase, first_listen.isoformat())
+                             release_date, purchase_date, first_listen.isoformat())
                 music_conn.commit()
         elif args.dry_run:
             print(f"    [DRY RUN] pondría COMPLETED={first_listen.isoformat()}")
             stats["listened_updated"] += 1
 
-    # ── 6. Resumen ────────────────────────────────────────────────────────────
+    # ── 7. Resumen ────────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("📊 Resumen:")
+    print(f"   VTODOs procesados:         {stats['db_updated']}")
     print(f"   VTODOs creados:            {stats['vtodo_created']}")
     print(f"   Fechas de escucha nuevas:  {stats['listened_updated']}")
     print(f"   Ya completados:            {stats['already_ok']}")
     print(f"   Sin escucha en Last.fm:    {stats['no_listen']}")
     print(f"   Fecha compra de Airsonic:  {stats['airsonic_found']}")
-    #print(f"   DTSTART reparados:         {fixed}")
     print(f"   DUE reparados:             {fixed_due}")
 
     if lastfm_conn:

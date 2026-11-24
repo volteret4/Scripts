@@ -13,4 +13,4 @@
 vdirsyncer sync
 
 # Copiar a Obsidian
-rsync -avh /home/huan/.config/vdirsyncer/calendars/tareas/ /mnt/windows/FTP/wiki/Obsidian/calendars/tareas
+rsync -avh /home/huan/.config/vdirsyncer/calendars/tareas/ /home/huan/notes/calendars/tareas

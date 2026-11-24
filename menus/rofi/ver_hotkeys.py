@@ -1,0 +1,1 @@
+/home/huan/gits/pollo/hotkeyz/scripts/ver_hotkeys.py

@@ -365,11 +365,11 @@ class MarkdownSearchViewer(QMainWindow):
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
         self.root_folders = root_folders or [
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts",
-            "/mnt/windows/FTP/wiki/Obsidian/Recortes"
+            "/home/huan/notes/Spaces/Wiki",
+            "/home/huan/notes/Spaces/Blogs",
+            "/home/huan/notes/Spaces/Proyectos Interesantes",
+            "/home/huan/notes/Spaces/Scripts",
+            "/home/huan/notes/Recortes"
         ]
         self.selected_folders = []
         # Primero cargar las carpetas seleccionadas antes de iniciar búsquedas
@@ -850,11 +850,11 @@ class MarkdownSearchViewer(QMainWindow):
         
         # Rutas prioritarias para contenido
         priority_paths = [
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Comandos/",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Tutoriales/",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Linux/Apps/",
-            "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki/Python/",
-            "/mnt/windows/FTP/wiki/Obsidian/Recortes/"
+            "/home/huan/notes/Spaces/Wiki/Linux/Comandos/",
+            "/home/huan/notes/Spaces/Wiki/Linux/Tutoriales/",
+            "/home/huan/notes/Spaces/Wiki/Linux/Apps/",
+            "/home/huan/notes/Spaces/Wiki/Python/",
+            "/home/huan/notes/Recortes/"
         ]
         
         categorized = {
@@ -1031,11 +1031,11 @@ def main():
     
     # Lista de carpetas raíz para el filtro
     root_folders = [
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts",
-        "/mnt/windows/FTP/wiki/Obsidian/Recortes"
+        "/home/huan/notes/Spaces/Wiki",
+        "/home/huan/notes/Spaces/Blogs",
+        "/home/huan/notes/Spaces/Proyectos Interesantes",
+        "/home/huan/notes/Spaces/Scripts",
+        "/home/huan/notes/Recortes"
     ]
     
     viewer = MarkdownSearchViewer(db_path, root_folders)

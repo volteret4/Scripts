@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Módulo de búsqueda y gestión de conciertos
-Contiene todas las funciones relacionadas con la búsqueda y formateo de conciertos
+MÃ³dulo de bÃºsqueda y gestiÃ³n de conciertos
+Contiene todas las funciones relacionadas con la bÃºsqueda y formateo de conciertos
 """
 
 import asyncio
@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 
 async def search_concerts_for_artist(artist_name, user_services_config, user_id=None, services=None, database=None):
     """
-    Versión asíncrona de búsqueda de conciertos con mejor manejo de base de datos
+    VersiÃ³n asÃ­ncrona de bÃºsqueda de conciertos con mejor manejo de base de datos
 
     Args:
         artist_name (str): Nombre del artista
-        user_services_config (dict): Configuración de servicios del usuario
+        user_services_config (dict): ConfiguraciÃ³n de servicios del usuario
         user_id (int): ID del usuario
         services (dict): Servicios disponibles
         database: Instancia de base de datos (thread-safe)
@@ -32,15 +32,15 @@ async def search_concerts_for_artist(artist_name, user_services_config, user_id=
 
     all_concerts = []
 
-    # Configurar países para la búsqueda
+    # Configurar paÃ­ses para la bÃºsqueda
     user_countries = user_services_config.get('countries', set())
     if not user_countries:
         country_filter = user_services_config.get('country_filter', 'ES')
         user_countries = {country_filter}
 
-    logger.info(f"Buscando conciertos para {artist_name} en países: {user_countries}")
+    logger.info(f"Buscando conciertos para {artist_name} en paÃ­ses: {user_countries}")
 
-    # Crear tareas asíncronas para cada servicio
+    # Crear tareas asÃ­ncronas para cada servicio
     tasks = []
 
     # TICKETMASTER
@@ -51,17 +51,18 @@ async def search_concerts_for_artist(artist_name, user_services_config, user_id=
 
     # SPOTIFY
     if user_services_config.get('spotify', True) and services.get('spotify_service'):
-        task = search_spotify_async(artist_name, services['spotify_service'])
-        tasks.append(('spotify', task))
+        for country_code in user_countries:
+            task = search_spotify_async(artist_name, country_code, services['spotify_service'])
+            tasks.append(('spotify', task))
 
-    # SETLISTFM (si está disponible)
+    # SETLISTFM (si estÃ¡ disponible)
     if user_services_config.get('setlistfm', True) and services.get('setlistfm_service'):
         task = search_setlistfm_async(artist_name, services['setlistfm_service'])
         tasks.append(('setlistfm', task))
 
-    # Ejecutar todas las búsquedas concurrentemente
+    # Ejecutar todas las bÃºsquedas concurrentemente
     if tasks:
-        logger.info(f"Ejecutando {len(tasks)} búsquedas concurrentes para {artist_name}")
+        logger.info(f"Ejecutando {len(tasks)} bÃºsquedas concurrentes para {artist_name}")
 
         # Extraer solo las tareas
         task_list = [task for service_name, task in tasks]
@@ -83,19 +84,19 @@ async def search_concerts_for_artist(artist_name, user_services_config, user_id=
                     logger.warning(f"Resultado inesperado de {service_name}: {type(result)}")
 
         except Exception as e:
-            logger.error(f"Error en búsqueda concurrente para {artist_name}: {e}")
+            logger.error(f"Error en bÃºsqueda concurrente para {artist_name}: {e}")
 
     # Guardar conciertos en base de datos de forma thread-safe
     if database and all_concerts:
         logger.info(f"Guardando {len(all_concerts)} conciertos para {artist_name}")
         await save_concerts_thread_safe(database, all_concerts)
 
-    logger.info(f"Búsqueda completada para {artist_name}: {len(all_concerts)} conciertos")
+    logger.info(f"BÃºsqueda completada para {artist_name}: {len(all_concerts)} conciertos")
     return all_concerts
 
 
 async def search_ticketmaster_async(artist_name, country_code, ticketmaster_service):
-    """Búsqueda asíncrona en Ticketmaster"""
+    """BÃºsqueda asÃ­ncrona en Ticketmaster"""
     try:
         # Ejecutar en thread pool para no bloquear el loop
         loop = asyncio.get_event_loop()
@@ -112,26 +113,26 @@ async def search_ticketmaster_async(artist_name, country_code, ticketmaster_serv
         return []
 
 
-async def search_spotify_async(artist_name, spotify_service):
-    """Búsqueda asíncrona en Spotify"""
+async def search_spotify_async(artist_name, country_code, spotify_service):
+    """Búsqueda asíncrona en Spotify con filtro de país"""
     try:
         # Ejecutar en thread pool para no bloquear el loop
         loop = asyncio.get_event_loop()
 
         def search_sync():
-            return spotify_service.search_artist_and_concerts(artist_name)
+            return spotify_service.search_artist_and_concerts(artist_name, country_code)
 
         concerts, message = await loop.run_in_executor(None, search_sync)
-        logger.debug(f"Spotify: {len(concerts)} conciertos para {artist_name}")
+        logger.debug(f"Spotify {country_code}: {len(concerts)} conciertos para {artist_name}")
         return concerts
 
     except Exception as e:
-        logger.error(f"Error en Spotify para {artist_name}: {e}")
+        logger.error(f"Error en Spotify para {artist_name} ({country_code}): {e}")
         return []
 
 
 async def search_setlistfm_async(artist_name, setlistfm_service):
-    """Búsqueda asíncrona en SetlistFM"""
+    """BÃºsqueda asÃ­ncrona en SetlistFM"""
     try:
         # Ejecutar en thread pool para no bloquear el loop
         loop = asyncio.get_event_loop()
@@ -176,7 +177,7 @@ async def save_concerts_thread_safe(database, concerts):
 async def update_concerts_database(database, services: Dict = None):
     """
     Actualiza la base de datos con nuevos conciertos
-    VERSIÓN MEJORADA: Guarda todos los conciertos globalmente con pausas
+    VERSIÃ“N MEJORADA: Guarda todos los conciertos globalmente con pausas
 
     Args:
         database: Instancia de la base de datos
@@ -188,7 +189,7 @@ async def update_concerts_database(database, services: Dict = None):
 
     logger.info("Actualizando base de datos de conciertos...")
 
-    # Obtener todos los artistas únicos de la base de datos
+    # Obtener todos los artistas Ãºnicos de la base de datos
     conn = database.get_connection()
     cursor = conn.cursor()
 
@@ -200,7 +201,7 @@ async def update_concerts_database(database, services: Dict = None):
         total_all_concerts = 0
         processed_artists = 0
 
-        logger.info(f"Iniciando actualización para {len(artists)} artistas")
+        logger.info(f"Iniciando actualizaciÃ³n para {len(artists)} artistas")
 
         for artist_name in artists:
             processed_artists += 1
@@ -210,12 +211,12 @@ async def update_concerts_database(database, services: Dict = None):
 
             logger.debug(f"Buscando conciertos globalmente para {artist_name}")
 
-            # Buscar con configuración global (todos los servicios activos)
+            # Buscar con configuraciÃ³n global (todos los servicios activos)
             global_services = {
                 'ticketmaster': True,
                 'spotify': True,
                 'setlistfm': True,
-                'countries': {'ES', 'US', 'FR', 'DE', 'IT', 'GB', 'CA', 'AU', 'JP', 'BR'}  # Países principales
+                'countries': {'ES', 'US', 'FR', 'DE', 'IT', 'GB', 'CA', 'AU', 'JP', 'BR'}  # PaÃ­ses principales
             }
 
             concerts = await search_concerts_for_artist(artist_name, global_services, services=services, database=database)
@@ -232,7 +233,7 @@ async def update_concerts_database(database, services: Dict = None):
             # Pausa de 1 segundo para no sobrecargar las APIs
             await asyncio.sleep(1.0)
 
-        logger.info(f"Actualización completada: {total_new_concerts} nuevos conciertos de {total_all_concerts} encontrados")
+        logger.info(f"ActualizaciÃ³n completada: {total_new_concerts} nuevos conciertos de {total_all_concerts} encontrados")
         logger.info(f"Total artistas procesados: {processed_artists}")
 
     except Exception as e:
@@ -240,15 +241,15 @@ async def update_concerts_database(database, services: Dict = None):
     finally:
         conn.close()
 
-def format_concerts_message(concerts: List[Dict], title: str = "🎵 Conciertos encontrados",
+def format_concerts_message(concerts: List[Dict], title: str = "ðŸŽµ Conciertos encontrados",
                           show_notified: bool = False, show_expand_buttons: bool = False,
                           user_id: int = None) -> Tuple[str, Optional[InlineKeyboardMarkup]]:
     """
     Formatea una lista de conciertos para mostrar en Telegram
-    MANTIENE LA FUNCIONALIDAD ORIGINAL pero con opción de botones
+    MANTIENE LA FUNCIONALIDAD ORIGINAL pero con opciÃ³n de botones
     """
     if not concerts:
-        return f"{title}\n\n❌ No se encontraron conciertos.", None
+        return f"{title}\n\nâŒ No se encontraron conciertos.", None
 
     message_lines = [f"{title}\n"]
 
@@ -287,7 +288,7 @@ def format_concerts_message(concerts: List[Dict], title: str = "🎵 Conciertos 
 
             location = f"{safe_venue}, {safe_city}" if safe_city else safe_venue
 
-            concert_line = f"• {date}: "
+            concert_line = f"â€¢ {date}: "
 
             if url and url.startswith(('http://', 'https://')):
                 url = url.replace(")", "\\)")
@@ -299,58 +300,58 @@ def format_concerts_message(concerts: List[Dict], title: str = "🎵 Conciertos 
                 concert_line += f" _{source}_"
 
             if show_notified and concert.get('notified'):
-                concert_line += " ✅"
+                concert_line += " âœ…"
 
             message_lines.append(concert_line)
 
         if len(artist_concerts) > 5:
             remaining = len(artist_concerts) - 5
-            message_lines.append(f"_...y {remaining} más_")
+            message_lines.append(f"_...y {remaining} mÃ¡s_")
 
         message_lines.append("")
 
-    message_lines.append(f"📊 Total: {len(concerts)} conciertos")
+    message_lines.append(f"ðŸ“Š Total: {len(concerts)} conciertos")
 
-    # Crear botones solo si se solicita Y hay más de 5 conciertos por artista
+    # Crear botones solo si se solicita Y hay mÃ¡s de 5 conciertos por artista
     keyboard = None
     if show_expand_buttons and user_id:
         buttons = []
 
-        # Botón para expandir todos los conciertos
-        buttons.append([InlineKeyboardButton("📋 Ver todos los conciertos", callback_data=f"expand_all_{user_id}")])
+        # BotÃ³n para expandir todos los conciertos
+        buttons.append([InlineKeyboardButton("ðŸ“‹ Ver todos los conciertos", callback_data=f"expand_all_{user_id}")])
 
-        # Botones para artistas con más de 5 conciertos
+        # Botones para artistas con mÃ¡s de 5 conciertos
         for artist, artist_concerts in concerts_by_artist.items():
             if len(artist_concerts) > 5:
-                button_text = f"🎵 Ver todos los de {artist}"
+                button_text = f"ðŸŽµ Ver todos los de {artist}"
                 if len(button_text) > 35:
-                    button_text = f"🎵 {artist}"
+                    button_text = f"ðŸŽµ {artist}"
                     if len(button_text) > 35:
                         button_text = button_text[:32] + "..."
 
                 # Usar el mismo sistema de callback que ya existe
                 buttons.append([InlineKeyboardButton(button_text, callback_data=f"expand_artist_{artist}_{user_id}")])
 
-        if len(buttons) > 1:  # Solo crear teclado si hay más que el botón "ver todos"
+        if len(buttons) > 1:  # Solo crear teclado si hay mÃ¡s que el botÃ³n "ver todos"
             keyboard = InlineKeyboardMarkup(buttons)
 
     return "\n".join(message_lines), keyboard
 
 def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: str, show_notified: bool = False) -> str:
     """
-    Formatea todos los conciertos de un artista específico
-    VERSIÓN MEJORADA: Filtra y muestra solo conciertos futuros (SIN filtrar por notificaciones)
+    Formatea todos los conciertos de un artista especÃ­fico
+    VERSIÃ“N MEJORADA: Filtra y muestra solo conciertos futuros (SIN filtrar por notificaciones)
 
     Args:
         concerts: Lista de conciertos del artista
         artist_name: Nombre del artista
-        show_notified: Si mostrar información de notificación (no filtra, solo muestra)
+        show_notified: Si mostrar informaciÃ³n de notificaciÃ³n (no filtra, solo muestra)
 
     Returns:
         Mensaje formateado con todos los conciertos futuros del artista
     """
     if not concerts:
-        return f"🎵 *{artist_name}*\n\n❌ No se encontraron conciertos."
+        return f"ðŸŽµ *{artist_name}*\n\nâŒ No se encontraron conciertos."
 
     # Filtrar solo conciertos futuros (NO filtrar por notificaciones)
     today = datetime.now().date()
@@ -371,14 +372,14 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
             future_concerts.append(concert)
 
     if not future_concerts:
-        return f"🎵 *{artist_name}*\n\n📅 No hay conciertos futuros programados."
+        return f"ðŸŽµ *{artist_name}*\n\nðŸ“… No hay conciertos futuros programados."
 
     # Escapar caracteres especiales del nombre del artista
     safe_artist = artist_name.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
 
-    message_lines = [f"🎵 *{safe_artist} - Próximos conciertos*\n"]
+    message_lines = [f"ðŸŽµ *{safe_artist} - PrÃ³ximos conciertos*\n"]
 
-    # Ordenar conciertos por fecha (más próximos primero)
+    # Ordenar conciertos por fecha (mÃ¡s prÃ³ximos primero)
     sorted_concerts = sorted(future_concerts, key=lambda x: x.get('date', '9999-12-31'))
 
     for i, concert in enumerate(sorted_concerts, 1):
@@ -397,14 +398,14 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
                 date_obj = datetime.strptime(date[:10], '%Y-%m-%d')
                 formatted_date = date_obj.strftime('%d/%m/%Y')
 
-                # Calcular días hasta el concierto
+                # Calcular dÃ­as hasta el concierto
                 days_until = (date_obj.date() - today).days
                 if days_until == 0:
-                    formatted_date += " (¡HOY!)"
+                    formatted_date += " (Â¡HOY!)"
                 elif days_until == 1:
-                    formatted_date += " (mañana)"
+                    formatted_date += " (maÃ±ana)"
                 elif days_until <= 7:
-                    formatted_date += f" (en {days_until} días)"
+                    formatted_date += f" (en {days_until} dÃ­as)"
             except ValueError:
                 pass
 
@@ -412,7 +413,7 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
         safe_venue = str(venue).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
         safe_city = str(city).replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
 
-        # Construir línea del concierto
+        # Construir lÃ­nea del concierto
         concert_line = f"*{i}.* {formatted_date}"
 
         if time:
@@ -420,7 +421,7 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
 
         concert_line += "\n"
 
-        # Ubicación con enlace si está disponible
+        # UbicaciÃ³n con enlace si estÃ¡ disponible
         location_parts = []
         if safe_venue:
             location_parts.append(safe_venue)
@@ -429,44 +430,44 @@ def format_single_artist_concerts_complete(concerts: List[Dict], artist_name: st
         if country:
             location_parts.append(f"({country})")
 
-        location = ", ".join(location_parts) if location_parts else "Ubicación desconocida"
+        location = ", ".join(location_parts) if location_parts else "UbicaciÃ³n desconocida"
 
         if url and url.startswith(('http://', 'https://')):
-            # Escapar paréntesis en URL
+            # Escapar parÃ©ntesis en URL
             escaped_url = url.replace(")", "\\)")
-            concert_line += f"   📍 [{location}]({escaped_url})"
+            concert_line += f"   ðŸ“ [{location}]({escaped_url})"
         else:
-            concert_line += f"   📍 {location}"
+            concert_line += f"   ðŸ“ {location}"
 
-        # Información adicional
+        # InformaciÃ³n adicional
         if source:
-            concert_line += f"\n   🔗 _{source}_"
+            concert_line += f"\n   ðŸ”— _{source}_"
 
-        # OPCIONAL: Mostrar información de notificación (solo informativo, no filtra)
+        # OPCIONAL: Mostrar informaciÃ³n de notificaciÃ³n (solo informativo, no filtra)
         if show_notified:
             if concert.get('notified'):
-                concert_line += " ✅"  # Ya notificado
-            # No mostrar nada si no está notificado (evitar spam visual)
+                concert_line += " âœ…"  # Ya notificado
+            # No mostrar nada si no estÃ¡ notificado (evitar spam visual)
 
         message_lines.append(concert_line)
-        message_lines.append("")  # Línea en blanco entre conciertos
+        message_lines.append("")  # LÃ­nea en blanco entre conciertos
 
-    # Estadísticas finales
+    # EstadÃ­sticas finales
     total_concerts = len(future_concerts)
-    message_lines.append(f"📊 *Total: {total_concerts} conciertos futuros*")
+    message_lines.append(f"ðŸ“Š *Total: {total_concerts} conciertos futuros*")
 
-    # OPCIONAL: Mostrar estadísticas de notificación solo si se solicita y hay datos
+    # OPCIONAL: Mostrar estadÃ­sticas de notificaciÃ³n solo si se solicita y hay datos
     if show_notified:
         notified_count = sum(1 for c in future_concerts if c.get('notified'))
         if notified_count > 0:
-            message_lines.append(f"✅ Previamente notificados: {notified_count}")
+            message_lines.append(f"âœ… Previamente notificados: {notified_count}")
 
     return "\n".join(message_lines)
 
 def format_expanded_concerts_message_original(concerts: List[Dict], title: str) -> str:
-    """Formatea todos los conciertos usando el formato ORIGINAL pero sin límite"""
+    """Formatea todos los conciertos usando el formato ORIGINAL pero sin lÃ­mite"""
     if not concerts:
-        return f"{title}\n\n❌ No se encontraron conciertos."
+        return f"{title}\n\nâŒ No se encontraron conciertos."
 
     message_lines = [f"{title}\n"]
 
@@ -483,7 +484,7 @@ def format_expanded_concerts_message_original(concerts: List[Dict], title: str) 
         safe_artist = artist.replace("*", "\\*").replace("_", "\\_").replace("`", "\\`").replace("[", "\\[")
         message_lines.append(f"*{safe_artist}*:")
 
-        # Mostrar TODOS los conciertos (sin límite de 5)
+        # Mostrar TODOS los conciertos (sin lÃ­mite de 5)
         for concert in artist_concerts:
             venue = concert.get('venue', 'Lugar desconocido')
             city = concert.get('city', '')
@@ -505,7 +506,7 @@ def format_expanded_concerts_message_original(concerts: List[Dict], title: str) 
 
             location = f"{safe_venue}, {safe_city}" if safe_city else safe_venue
 
-            concert_line = f"• {date}: "
+            concert_line = f"â€¢ {date}: "
 
             if url and url.startswith(('http://', 'https://')):
                 url = url.replace(")", "\\)")
@@ -520,14 +521,14 @@ def format_expanded_concerts_message_original(concerts: List[Dict], title: str) 
 
         message_lines.append("")
 
-    message_lines.append(f"📊 Total: {len(concerts)} conciertos")
+    message_lines.append(f"ðŸ“Š Total: {len(concerts)} conciertos")
 
     return "\n".join(message_lines)
 
 def format_expanded_concerts_message(concerts: List[Dict], title: str) -> str:
-    """Formatea todos los conciertos sin límite"""
+    """Formatea todos los conciertos sin lÃ­mite"""
     if not concerts:
-        return f"{title}\n\n❌ No se encontraron conciertos."
+        return f"{title}\n\nâŒ No se encontraron conciertos."
 
     message_lines = [f"{title}\n"]
 
@@ -566,7 +567,7 @@ def format_expanded_concerts_message(concerts: List[Dict], title: str) -> str:
 
             location = f"{safe_venue}, {safe_city}" if safe_city else safe_venue
 
-            concert_line = f"• {date}: "
+            concert_line = f"â€¢ {date}: "
 
             if url and url.startswith(('http://', 'https://')):
                 url = url.replace(")", "\\)")
@@ -581,14 +582,14 @@ def format_expanded_concerts_message(concerts: List[Dict], title: str) -> str:
 
         message_lines.append("")
 
-    message_lines.append(f"📊 Total: {len(concerts)} conciertos")
+    message_lines.append(f"ðŸ“Š Total: {len(concerts)} conciertos")
 
     return "\n".join(message_lines)
 
 def format_artist_concerts_detailed(concerts: List[Dict], artist_name: str, show_notified: bool = False) -> str:
-    """Formatea conciertos de un artista de manera detallada - FUNCIÓN FALTANTE"""
+    """Formatea conciertos de un artista de manera detallada - FUNCIÃ“N FALTANTE"""
     if not concerts:
-        return f"📭 No hay conciertos para {artist_name}"
+        return f"ðŸ“­ No hay conciertos para {artist_name}"
 
     # Filtrar solo conciertos futuros
     today = datetime.now().date()
@@ -607,12 +608,12 @@ def format_artist_concerts_detailed(concerts: List[Dict], artist_name: str, show
             future_concerts.append(concert)
 
     if not future_concerts:
-        return f"📭 No hay conciertos futuros para {artist_name}"
+        return f"ðŸ“­ No hay conciertos futuros para {artist_name}"
 
     # Ordenar por fecha
     future_concerts.sort(key=lambda x: x.get('date', ''))
 
-    message_lines = [f"🎵 *Conciertos de {artist_name}*\n"]
+    message_lines = [f"ðŸŽµ *Conciertos de {artist_name}*\n"]
 
     for i, concert in enumerate(future_concerts, 1):
         venue = concert.get('venue', 'Venue TBA')
@@ -632,10 +633,10 @@ def format_artist_concerts_detailed(concerts: List[Dict], artist_name: str, show
         else:
             formatted_date = 'Fecha TBA'
 
-        # Crear línea del concierto
+        # Crear lÃ­nea del concierto
         line = f"{i}. *{venue}*"
 
-        # Añadir ubicación
+        # AÃ±adir ubicaciÃ³n
         location_parts = []
         if city:
             location_parts.append(city)
@@ -647,27 +648,27 @@ def format_artist_concerts_detailed(concerts: List[Dict], artist_name: str, show
 
         line += f" ({formatted_date})"
 
-        # Añadir enlace si está disponible
+        # AÃ±adir enlace si estÃ¡ disponible
         if url:
-            line += f" [🎫]({url})"
+            line += f" [ðŸŽ«]({url})"
 
         # Mostrar fuente
         if source:
             line += f" _{source}_"
 
-        # Mostrar si ya se notificó
+        # Mostrar si ya se notificÃ³
         if show_notified and concert.get('notified'):
-            line += " ✅"
+            line += " âœ…"
 
         message_lines.append(line)
 
-    message_lines.append(f"\n📊 Total: {len(future_concerts)} conciertos futuros")
+    message_lines.append(f"\nðŸ“Š Total: {len(future_concerts)} conciertos futuros")
 
     return "\n".join(message_lines)
 
 
 def split_long_message(message: str, max_length: int = 4000) -> List[str]:
-    """Divide un mensaje largo en chunks más pequeños"""
+    """Divide un mensaje largo en chunks mÃ¡s pequeÃ±os"""
     if len(message) <= max_length:
         return [message]
 
@@ -677,7 +678,7 @@ def split_long_message(message: str, max_length: int = 4000) -> List[str]:
     current_length = 0
 
     for line in lines:
-        line_length = len(line) + 1  # +1 para el salto de línea
+        line_length = len(line) + 1  # +1 para el salto de lÃ­nea
 
         if current_length + line_length > max_length and current_chunk:
             # Guardar chunk actual y empezar uno nuevo
@@ -688,7 +689,7 @@ def split_long_message(message: str, max_length: int = 4000) -> List[str]:
             current_chunk.append(line)
             current_length += line_length
 
-    # Añadir el último chunk
+    # AÃ±adir el Ãºltimo chunk
     if current_chunk:
         chunks.append('\n'.join(current_chunk))
 

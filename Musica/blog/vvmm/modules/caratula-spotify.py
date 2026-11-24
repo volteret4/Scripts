@@ -24,19 +24,21 @@ token_script = script_dir / "sp_playlist.py"
 #Path(covers_dir).mkdir(parents=True, exist_ok=True)
 
 def renovar_token():
-    """Ejecuta el script de renovación de token"""
+    """Ejecuta el script de renovación permitiendo interacción con el usuario"""
     try:
-        print("Renovando token...")
-        resultado = subprocess.run(['python3', token_script], capture_output=True, text=True)
+        print("\n--- Iniciando proceso de renovación de credenciales ---")
+        # Quitamos capture_output para que el usuario vea los prints y pueda escribir el input
+        resultado = subprocess.run(['python3', str(token_script)], check=True)
+
         if resultado.returncode == 0:
-            print("Token renovado exitosamente")
+            print("Token verificado/renovado exitosamente.")
             return True
-        else:
-            print("Error al renovar el token:")
-            print(resultado.stderr)
-            return False
+        return False
+    except subprocess.CalledProcessError:
+        print("Error: El script de renovación falló.")
+        return False
     except Exception as e:
-        print(f"Error al ejecutar el script de renovación: {e}")
+        print(f"Error inesperado al ejecutar la renovación: {e}")
         return False
 
 def configurar_spotify(intentar_renovar=True):

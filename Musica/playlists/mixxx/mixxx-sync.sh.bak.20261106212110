@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#
+# Script Name: mixxx-sync.sh
+# Description: Abre Mixxx con los cajones sincronizados con los .m3u de la carpeta Mix.
+#              Sincroniza antes de abrir y otra vez al cerrar (para meter en sus cajones
+#              las canciones nuevas que Mixxx ha añadido en el escaneo de inicio).
+# Author: volteret4
+# Repository: https://github.com/volteret4/
+# License:
+# Notes:
+#   Dependencies: - mixxx
+#                 - sync_crates.py (mismo directorio)
+
+sync_crates="$(dirname "$(readlink -f "$0")")/sync_crates.py"
+
+python3 "$sync_crates" --quiet --notify
+pasuspender -- mixxx "$@" || mixxx "$@"
+python3 "$sync_crates" --quiet

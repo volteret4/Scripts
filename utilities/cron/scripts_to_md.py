@@ -61,7 +61,7 @@ def add_todos_to_task_file(todos, filename):
         todos (list): List of TODO lines
         filename (str): Source filename
     """
-    task_file_path = "/mnt/windows/FTP/Obsidian/Important/Tareas.md"
+    task_file_path = "/home/huan/notes/Important/Tareas.md"
     
     # Get current and future dates
     today = datetime.now().date()
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     # destination = input("Introduce la ruta de la carpeta destino: ")
     # exclude = input("Introduce las carpetas a excluir (separadas por comas): ").split(',')
     source = "/home/huan/Scripts"
-    destination = "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts"
+    destination = "/home/huan/notes/Spaces/Scripts"
     exclude = [
         "/home/huan/Scripts/.git",
         "/home/huan/Scripts/.content",
@@ -263,8 +263,8 @@ if __name__ == "__main__":
         "/home/huan/Scripts/menus/mmusica/__pycache__/",
         "/home/huan/Scripts/menus/mmusica/modules/__pycache__",
         "/home/huan/Scripts/menus/mmusica/.content",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts/utilities/tiddlywiki/wiki_obsidian.sqlite",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Scripts/utilities/tiddlywiki/wiki_obsidian_plus.sqlite",
+        "/home/huan/notes/Spaces/Scripts/utilities/tiddlywiki/wiki_obsidian.sqlite",
+        "/home/huan/notes/Spaces/Scripts/utilities/tiddlywiki/wiki_obsidian_plus.sqlite",
         "/home/huan/Scripts/.stignore",
     ]
     exclude_extensions = ["tmp", "bak", "log", "swp", "pyc", "db", "sqlite"]

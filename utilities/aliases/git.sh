@@ -1,8 +1,14 @@
 #!/bin/bash
 
-# Pedir al usuario el mensaje del commit
-echo "Introduce el mensaje del commit:"
-read commit_message
+git status
+
+if [ -z "$1" ]; then
+    echo "Introduce el mensaje del commit:"
+    read commit_message
+else
+    commit_message="$1"
+fi
+
 
 # Añadir todos los archivos al área de preparación
 git add .

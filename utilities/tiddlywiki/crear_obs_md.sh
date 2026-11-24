@@ -29,7 +29,7 @@
 
 # Comprobar si la ventana activa pertenece a uno de estos navegadores.
 browser="$(xdotool getactivewindow getwindowname)"
-dir="/mnt/Datos/FTP/Wiki/Obsidian/Spaces/Wiki"
+dir="$HOME/notes/Spaces/Wiki"
 
 # Crear nuevas variables para título y contenido.
 titulo=$(copyq read 1)

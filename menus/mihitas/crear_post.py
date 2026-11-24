@@ -29,7 +29,7 @@ from PyQt6 import uic
 class ThemeManager:
     """Gestor de temas dinámicos"""
 
-    def __init__(self, themes_file: str = "themes.yml"):
+    def __init__(self, themes_file: str = "/home/huan/Scripts/menus/mihitas/themes.yml"):
         self.themes_file = Path(themes_file)
         self.themes = self.load_themes()
         self.current_theme = "tokyo-night"  # Tema por defecto

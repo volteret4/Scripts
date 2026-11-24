@@ -68,3 +68,11 @@ Musica/playlists/airsonic_sync_state.json
 **/*.log
 *.egg-info/
 kopia/_archived_legacy_configs/
+.secrets
+
+*.bak.*
+*.bak-*
+.env.bak*
+utilities/calendarios/*.ics
+utilities/trabajo/
+menus/vm/*.xml

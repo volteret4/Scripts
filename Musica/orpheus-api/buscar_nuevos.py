@@ -106,7 +106,7 @@ def main():
     filas_csv = []
     with open(CSV_FILENAME, "r", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
-        filas_csv = list(reader)
+        filas_csv = list(reader)[1:]
 
     # 3. Procesar y actualizar
     cambios_realizados = False

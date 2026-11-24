@@ -132,7 +132,7 @@ class DotfilesIndexer:
 
     def setup_database(self):
         """Crea las tablas de la base de datos con índices optimizados"""
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, timeout=30)
         self.conn.execute('PRAGMA foreign_keys = ON')
         self.conn.execute('PRAGMA journal_mode = WAL')  # Mejor rendimiento
         self.conn.execute('PRAGMA synchronous = NORMAL')

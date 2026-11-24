@@ -36,15 +36,21 @@ token_script = script_dir / "sp_playlist.py"
 
 
 def renovar_token():
-    """Ejecuta el script de renovación de token"""
+    """Ejecuta el script de renovación permitiendo interacción con el usuario"""
     try:
-        print("Renovando token...", file=sys.stderr)
-        resultado = subprocess.run(['python3', token_script], capture_output=True, text=True)
+        print("\n--- Iniciando proceso de renovación de credenciales ---")
+        # Quitamos capture_output para que el usuario vea los prints y pueda escribir el input
+        resultado = subprocess.run(['python3', str(token_script)], check=True)
+
         if resultado.returncode == 0:
+            print("Token verificado/renovado exitosamente.")
             return True
         return False
+    except subprocess.CalledProcessError:
+        print("Error: El script de renovación falló.")
+        return False
     except Exception as e:
-        print(f"Error al ejecutar el script de renovación: {e}", file=sys.stderr)
+        print(f"Error inesperado al ejecutar la renovación: {e}")
         return False
 
 def configurar_spotify(intentar_renovar=True):
@@ -55,21 +61,21 @@ def configurar_spotify(intentar_renovar=True):
     scope = "playlist-read-private playlist-read-collaborative"
 
     sp_oauth = SpotifyOAuth(
-        CLIENT_ID, 
-        CLIENT_SECRET, 
-        redirect_uri, 
-        scope=scope, 
-        open_browser=False, 
+        CLIENT_ID,
+        CLIENT_SECRET,
+        redirect_uri,
+        scope=scope,
+        open_browser=False,
         cache_path=cache_path
     )
 
     token_info = sp_oauth.get_cached_token()
-    
+
     if not token_info and intentar_renovar:
         if renovar_token():
             return configurar_spotify(intentar_renovar=False)
         sys.exit(1)
-    
+
     if not token_info:
         sys.exit(1)
 
@@ -88,11 +94,11 @@ def buscar_album(sp, artista, album):
     try:
         query = f"artist:{artista} album:{album}"
         resultados = sp.search(query, type='album', limit=1)
-        
+
         if resultados['albums']['items']:
             return resultados['albums']['items'][0]['external_urls']['spotify']
         return None
-        
+
     except Exception as e:
         if "token" in str(e).lower():
             sp = configurar_spotify()
@@ -113,7 +119,7 @@ def main():
 
     # Buscar el álbum
     album_url = buscar_album(sp, artist_name, album_name)
-    
+
     # Solo imprimir la URL si se encuentra (sin mensajes adicionales)
     if album_url:
         print(album_url)

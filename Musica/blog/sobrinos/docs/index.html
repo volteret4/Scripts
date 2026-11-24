@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Mi Colección Musical</title>
+        <meta
+            name="description"
+            content="Colección personal de álbumes musicales generada con Album Web Generator"
+        />
+        <meta
+            name="keywords"
+            content="música, álbumes, colección, discografía"
+        />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="" />
+        <meta property="og:title" content="Mi Colección Musical" />
+        <meta
+            property="og:description"
+            content="Explora mi colección personal de álbumes musicales"
+        />
+        <meta property="og:image" content="" />
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:title" content="Mi Colección Musical" />
+        <meta
+            property="twitter:description"
+            content="Explora mi colección personal de álbumes musicales"
+        />
+        <meta property="twitter:image" content="" />
+
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+
+        <!-- Favicon -->
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%233b82f6'/%3E%3Ccircle cx='50' cy='50' r='15' fill='white'/%3E%3C/svg%3E"
+        />
+    </head>
+    <body>
+        <!-- Header de navegación -->
+        <header class="site-header">
+            <div class="container">
+                <nav class="site-nav">
+                    <div class="site-logo">🎵 Mi Colección Musical</div>
+                    <div class="nav-links">
+                        <a href="#albums" class="nav-link">Álbumes</a>
+                        <a href="#stats" class="nav-link">Estadísticas</a>
+                        <a
+                            href="https://github.com/tu-usuario/tu-repo"
+                            target="_blank"
+                            class="nav-link"
+                            >GitHub</a
+                        >
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <div class="container">
+                <!-- Hero Section -->
+                <section
+                    class="hero-section"
+                    style="
+                        text-align: center;
+                        padding: 4rem 0;
+                        background: linear-gradient(
+                            135deg,
+                            var(--color-primary),
+                            var(--color-secondary)
+                        );
+                        color: white;
+                        border-radius: 16px;
+                        margin-bottom: 3rem;
+                    "
+                >
+                    <h1
+                        style="
+                            font-size: 3rem;
+                            margin-bottom: 1rem;
+                            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+                        "
+                    >
+                        Mi Colección Musical
+                    </h1>
+                    <p
+                        style="
+                            font-size: 1.25rem;
+                            opacity: 0.9;
+                            margin-bottom: 2rem;
+                        "
+                    >
+                        Explora mi biblioteca personal de álbumes favoritos
+                    </p>
+                    <div
+                        style="
+                            display: flex;
+                            justify-content: center;
+                            gap: 2rem;
+                            flex-wrap: wrap;
+                        "
+                    >
+                        <div
+                            style="
+                                background: rgba(255, 255, 255, 0.15);
+                                padding: 1rem;
+                                border-radius: 8px;
+                                backdrop-filter: blur(10px);
+                            "
+                        >
+                            <div
+                                style="font-size: 2rem; font-weight: bold"
+                                id="albums-count"
+                            >
+                                0
+                            </div>
+                            <div style="font-size: 0.875rem">Álbumes</div>
+                        </div>
+                        <div
+                            style="
+                                background: rgba(255, 255, 255, 0.15);
+                                padding: 1rem;
+                                border-radius: 8px;
+                                backdrop-filter: blur(10px);
+                            "
+                        >
+                            <div
+                                style="font-size: 2rem; font-weight: bold"
+                                id="artists-count"
+                            >
+                                0
+                            </div>
+                            <div style="font-size: 0.875rem">Artistas</div>
+                        </div>
+                        <div
+                            style="
+                                background: rgba(255, 255, 255, 0.15);
+                                padding: 1rem;
+                                border-radius: 8px;
+                                backdrop-filter: blur(10px);
+                            "
+                        >
+                            <div
+                                style="font-size: 2rem; font-weight: bold"
+                                id="genres-count"
+                            >
+                                0
+                            </div>
+                            <div style="font-size: 0.875rem">Géneros</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Buscador -->
+                <section class="search-section" style="margin-bottom: 3rem">
+                    <div style="max-width: 600px; margin: 0 auto">
+                        <div style="position: relative">
+                            <input
+                                type="text"
+                                class="search-input"
+                                placeholder="Buscar álbumes o artistas..."
+                                style="
+                                    width: 100%;
+                                    padding: 1rem 1rem 1rem 3rem;
+                                    border: 1px solid var(--color-gray-light);
+                                    border-radius: 12px;
+                                    font-size: 1rem;
+                                    background: white;
+                                    box-shadow: var(--shadow-sm);
+                                "
+                            />
+                            <span
+                                style="
+                                    position: absolute;
+                                    left: 1rem;
+                                    top: 50%;
+                                    transform: translateY(-50%);
+                                    color: var(--color-gray-medium);
+                                    font-size: 1.25rem;
+                                "
+                                >🔍</span
+                            >
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Grid de álbumes -->
+                <section id="albums" class="albums-section">
+                    <h2
+                        style="
+                            font-size: 2rem;
+                            margin-bottom: 2rem;
+                            text-align: center;
+                            color: var(--color-dark);
+                        "
+                    >
+                        Álbumes en mi Colección
+                    </h2>
+
+                    <!-- Filtros -->
+                    <div
+                        class="filters"
+                        style="
+                            display: flex;
+                            gap: 1rem;
+                            margin-bottom: 2rem;
+                            flex-wrap: wrap;
+                            justify-content: center;
+                        "
+                    >
+                        <button
+                            class="filter-btn active"
+                            data-filter="all"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 2px solid var(--color-primary);
+                                background: var(--color-primary);
+                                color: white;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                            "
+                        >
+                            Todos
+                        </button>
+                        <button
+                            class="filter-btn"
+                            data-filter="rock"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 2px solid var(--color-primary);
+                                background: white;
+                                color: var(--color-primary);
+                                border-radius: 6px;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                            "
+                        >
+                            Rock
+                        </button>
+                        <button
+                            class="filter-btn"
+                            data-filter="pop"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 2px solid var(--color-primary);
+                                background: white;
+                                color: var(--color-primary);
+                                border-radius: 6px;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                            "
+                        >
+                            Pop
+                        </button>
+                        <button
+                            class="filter-btn"
+                            data-filter="electronic"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 2px solid var(--color-primary);
+                                background: white;
+                                color: var(--color-primary);
+                                border-radius: 6px;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                            "
+                        >
+                            Electronic
+                        </button>
+                        <button
+                            class="filter-btn"
+                            data-filter="jazz"
+                            style="
+                                padding: 0.5rem 1rem;
+                                border: 2px solid var(--color-primary);
+                                background: white;
+                                color: var(--color-primary);
+                                border-radius: 6px;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                            "
+                        >
+                            Jazz
+                        </button>
+                    </div>
+
+                    <!-- Grid de álbumes -->
+                    <div class="albums-grid">
+                        <!-- Los álbumes se cargarán dinámicamente aquí -->
+
+                        <!-- Álbumes de ejemplo para demo -->
+                        <a href="albums/ejemplo-album.html" class="album-card">
+                            <div class="album-card-cover">
+                                <img
+                                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%236366f1'/%3E%3Ccircle cx='150' cy='150' r='100' fill='none' stroke='white' stroke-width='4'/%3E%3Ccircle cx='150' cy='150' r='20' fill='white'/%3E%3Ctext x='150' y='250' text-anchor='middle' fill='white' font-family='Arial' font-size='16'%3EDemo%3C/text%3E%3C/svg%3E"
+                                    alt="Portada de Álbum Demo"
+                                    loading="lazy"
+                                />
+                            </div>
+                            <h3 class="album-card-title">Álbum Demo</h3>
+                            <p class="album-card-artist">Artista Demo</p>
+                            <p class="album-card-year">2024</p>
+                        </a>
+
+                        <!-- Más álbumes de ejemplo -->
+                        <div
+                            class="album-card"
+                            style="
+                                background: var(--color-gray-light);
+                                border: 2px dashed var(--color-gray-medium);
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                                text-align: center;
+                                color: var(--color-gray-medium);
+                            "
+                        >
+                            <div style="font-size: 3rem; margin-bottom: 1rem">
+                                ➕
+                            </div>
+                            <p>Agrega más álbumes usando el generador</p>
+                        </div>
+                    </div>
+
+                    <!-- Mensaje si no hay álbumes -->
+                    <div
+                        class="empty-state"
+                        style="
+                            text-align: center;
+                            padding: 4rem 2rem;
+                            display: none;
+                        "
+                    >
+                        <div style="font-size: 4rem; margin-bottom: 1rem">
+                            🎵
+                        </div>
+                        <h3 style="margin-bottom: 1rem">
+                            No se encontraron álbumes
+                        </h3>
+                        <p style="color: var(--color-gray-medium)">
+                            Usa el generador para añadir tu primer álbum a la
+                            colección.
+                        </p>
+                        <button
+                            style="
+                                margin-top: 2rem;
+                                padding: 1rem 2rem;
+                                background: var(--color-primary);
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 1rem;
+                            "
+                        >
+                            Agregar Álbum
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Sección de estadísticas -->
+                <section
+                    id="stats"
+                    class="stats-section"
+                    style="
+                        margin-top: 4rem;
+                        padding: 3rem 0;
+                        background: var(--color-white);
+                        border-radius: 16px;
+                        box-shadow: var(--shadow-md);
+                    "
+                >
+                    <div style="text-align: center; margin-bottom: 3rem">
+                        <h2 style="font-size: 2rem; margin-bottom: 1rem">
+                            Estadísticas de la Colección
+                        </h2>
+                        <p style="color: var(--color-gray-medium)">
+                            Información sobre tu biblioteca musical
+                        </p>
+                    </div>
+
+                    <div
+                        style="
+                            display: grid;
+                            grid-template-columns: repeat(
+                                auto-fit,
+                                minmax(250px, 1fr)
+                            );
+                            gap: 2rem;
+                            padding: 0 2rem;
+                        "
+                    >
+                        <!-- Géneros más comunes -->
+                        <div
+                            style="
+                                text-align: center;
+                                padding: 2rem;
+                                background: var(--color-light);
+                                border-radius: 12px;
+                            "
+                        >
+                            <h3
+                                style="
+                                    margin-bottom: 1rem;
+                                    color: var(--color-primary);
+                                "
+                            >
+                                📊 Géneros Favoritos
+                            </h3>
+                            <div id="top-genres">
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>Rock</span>
+                                    <div
+                                        style="
+                                            background: var(--color-primary);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>Pop</span>
+                                    <div
+                                        style="
+                                            background: var(--color-secondary);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>Electronic</span>
+                                    <div
+                                        style="
+                                            background: var(--color-accent);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Décadas -->
+                        <div
+                            style="
+                                text-align: center;
+                                padding: 2rem;
+                                background: var(--color-light);
+                                border-radius: 12px;
+                            "
+                        >
+                            <h3
+                                style="
+                                    margin-bottom: 1rem;
+                                    color: var(--color-primary);
+                                "
+                            >
+                                📅 Por Décadas
+                            </h3>
+                            <div id="decades-chart">
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>2020s</span>
+                                    <div
+                                        style="
+                                            background: var(--color-primary);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>2010s</span>
+                                    <div
+                                        style="
+                                            background: var(--color-secondary);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                                <div
+                                    style="
+                                        margin: 0.5rem 0;
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    "
+                                >
+                                    <span>2000s</span>
+                                    <div
+                                        style="
+                                            background: var(--color-accent);
+                                            color: white;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 12px;
+                                            font-size: 0.75rem;
+                                        "
+                                    >
+                                        0
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información adicional -->
+                        <div
+                            style="
+                                text-align: center;
+                                padding: 2rem;
+                                background: var(--color-light);
+                                border-radius: 12px;
+                            "
+                        >
+                            <h3
+                                style="
+                                    margin-bottom: 1rem;
+                                    color: var(--color-primary);
+                                "
+                            >
+                                📈 Crecimiento
+                            </h3>
+                            <p
+                                style="
+                                    color: var(--color-gray-medium);
+                                    margin-bottom: 1rem;
+                                "
+                            >
+                                Álbumes añadidos recientemente
+                            </p>
+                            <div
+                                style="
+                                    font-size: 2rem;
+                                    font-weight: bold;
+                                    color: var(--color-primary);
+                                "
+                                id="recent-additions"
+                            >
+                                0
+                            </div>
+                            <div
+                                style="
+                                    font-size: 0.875rem;
+                                    color: var(--color-gray-medium);
+                                "
+                            >
+                                Este mes
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="album-footer">
+            <div class="container">
+                <p>
+                    Generado con ❤️ usando <strong>Album Web Generator</strong>
+                </p>
+                <p
+                    style="
+                        margin-top: 0.5rem;
+                        font-size: 0.875rem;
+                        opacity: 0.7;
+                    "
+                >
+                    <a
+                        href="https://github.com/tu-usuario/album-web-generator"
+                        target="_blank"
+                        style="color: inherit"
+                        >Ver en GitHub</a
+                    >
+                </p>
+            </div>
+        </footer>
+
+        <script src="script.js"></script>
+        <script>
+            // Script específico para la página índice
+            document.addEventListener("DOMContentLoaded", function () {
+                // Configurar filtros
+                const filterBtns = document.querySelectorAll(".filter-btn");
+                filterBtns.forEach((btn) => {
+                    btn.addEventListener("click", function () {
+                        // Remover active de todos
+                        filterBtns.forEach((b) => {
+                            b.classList.remove("active");
+                            b.style.background = "white";
+                            b.style.color = "var(--color-primary)";
+                        });
+
+                        // Activar el clickeado
+                        this.classList.add("active");
+                        this.style.background = "var(--color-primary)";
+                        this.style.color = "white";
+
+                        // Filtrar álbumes (implementar según necesidad)
+                        const filter = this.dataset.filter;
+                        console.log("Filtrar por:", filter);
+                    });
+                });
+
+                // Actualizar estadísticas (valores de ejemplo)
+                document.getElementById("albums-count").textContent = "1";
+                document.getElementById("artists-count").textContent = "1";
+                document.getElementById("genres-count").textContent = "1";
+                document.getElementById("recent-additions").textContent = "1";
+
+                console.log("🏠 Página índice inicializada");
+            });
+        </script>
+    </body>
+</html>

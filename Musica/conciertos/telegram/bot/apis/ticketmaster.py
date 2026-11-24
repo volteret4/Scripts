@@ -64,6 +64,10 @@ class TicketmasterService:
                 if venue_info['city'] == 'Unknown city' or not venue_info['city']:
                     continue
 
+                # FILTRO DE PAÍS: Verificar que el código de país coincida
+                if venue_info['country_code'] and venue_info['country_code'] != country_code:
+                    continue
+
                 concert = {
                     'artist': artist_name,
                     'name': event.get('name', 'No title'),

@@ -1,26 +1,30 @@
 #!/bin/bash
 
+# Usamos 'set -a' para que todas las variables definidas en el env se exporten automáticamente
+set -a
+eval "$(sops --decrypt .encrypted.env)"
+set +a
+
 # Configuración de Telegram
-BOT_TOKEN="tu_token_de_bot"
-CHAT_ID="tu_chat_id"
+BOT_TOKEN="$TELEGRAM_BOT_TOKEN"
+CHAT_ID="$TELEGRAM_CHAT_ID"
 LOG_FILE="/var/log/telegram-notify.log"
 
 # Función para enviar mensajes a Telegram
 send_telegram_message() {
-    MESSAGE="$1"
-    
-    echo "Enviando mensaje a Telegram: $MESSAGE" >> $LOG_FILE
-    
+    MESSAGE="📜 Arco: $1"
+
     curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
          -d chat_id="$CHAT_ID" \
          -d text="$MESSAGE" \
-         -d parse_mode="HTML" >> $LOG_FILE 2>&1
-    
-    if [ $? -eq 0 ]; then
-        echo "Mensaje enviado correctamente" >> $LOG_FILE
-    else
-        echo "Error al enviar mensaje" >> $LOG_FILE
-    fi
+         -d parse_mode="HTML"
+
+    notify-send "Telegram Notification" "$MESSAGE"
+    # if [ $? -eq 0 ]; then
+    #     echo "Mensaje enviado correctamente: $1" >> $LOG_FILE
+    # else
+    #     echo "Error al enviar mensaje: $1" >> $LOG_FILE
+    # fi
 }
 
 # Verificar si se proporcionó un mensaje

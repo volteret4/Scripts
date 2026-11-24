@@ -1337,7 +1337,11 @@ download_cover_from_database() {
 
     # Si hay una ruta local de carátula, copiarla
     if [[ -n "$DB_COVER_PATH" && "$DB_COVER_PATH" != "NULL" && "$DB_COVER_PATH" != "" ]]; then
-        if [[ -f "$DB_COVER_PATH" ]]; then
+        # La BD puede tener la carátula de otro disco con el mismo título (Grimes - Visions con la de Norah Jones)
+        activate_python_env
+        if ! python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); from online_info import cover_matches_artist; sys.exit(0 if cover_matches_artist(sys.argv[2], sys.argv[3]) else 1)' "$SCRIPT_DIR" "$DB_COVER_PATH" "$ARTIST"; then
+            log_warn "Carátula de BD descartada, no es de $ARTIST: $DB_COVER_PATH"
+        elif [[ -f "$DB_COVER_PATH" ]]; then
             cp "$DB_COVER_PATH" "image.jpeg"
             log_info "Carátula copiada desde ruta local: $DB_COVER_PATH"
             return 0

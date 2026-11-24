@@ -11,22 +11,34 @@
 #
 
 # Variables
-INVIDIOUS_URL="http://localhost:3000"
+INVIDIOUS_URL="https://youtube.com"
 motor="$1"  # donde se realizara la busqueda
 busqueda="$(xclip -o)"
 busqueda="${busqueda//&/and}"    # elementos a buscar
+
+# Copiado de un chart de RateYourMusic: «Disco \n fecha \n Artista» -> «Artista Disco»
+fecha_re='^([0-9]{1,2} +)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[.]?( +[0-9]{1,2},?)? +[0-9]{4}$|^[0-9]{4}(-[0-9]{2}){0,2}$'
+if [[ "$busqueda" == *$'\n'* ]] && grep -qiE "$fecha_re" <<< "$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$busqueda")"; then
+    busqueda="$(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' <<< "$busqueda" | grep -v '^$' | awk -v IGNORECASE=1 -v re="$fecha_re" '
+        $0 ~ re { fecha = NR; next }
+        { lineas[++n] = $0 }
+        END {
+            if (n == 2 && fecha == 2) print lineas[2] " " lineas[1]
+            else { for (i = 1; i <= n; i++) printf "%s%s", lineas[i], (i < n ? " " : "\n") }
+        }')"
+fi
 #busqueda="${busqueda//–/}"
 
 app="$(bash "${HOME}/Scripts/snippets/if_firefox_active.sh")"  # obtener app activa
 enlace="$(awk 'NR == 2 {print $NF}' $app)"
-notify-send -t 10000 "bandcamp $enlace"
-
+#notify-send -t 10000 "bandcamp $enlace"
+record="record.club"
 # Quitar \n by de algunas busquedas
 if [[ "${enlace}" =~ 'bandcamp' ]]; then
-    busqueda="$(echo $busqueda | sed ':a;N;$!ba;s/\n[b]y/ /g')"
+    busqueda="$(echo $busqueda | sed ':a;N;$!ba;s/\n[b]y/ /g' | tr '\n' ' ')"
 
-elif [[ ${enlace} =~ 'record.club' ]]; then
-    busqueda="$(echo $busqueda | sed 's/\nby / /')"
+elif [[ ${enlace} =~ $record ]]; then
+    busqueda="$(echo "$busqueda" | sed 's/\nby / /' | tr '\n' ' ')"
 fi
 
 # selecciona url apropiada al motor
@@ -35,7 +47,7 @@ if [[ -z $motor ]]; then
 
 elif [[ $motor =~ 'youtube' ]]; then
     busqueda="$(echo $busqueda | sed 's/ /%20/g' )"
-    url="https://yt.pollete.duckdns.org/search?q=${busqueda}"
+    url="https://youtube.com/search?q=${busqueda}"
 
     # Usar script local en lugar del servidor remoto
     url_api="$("$HOME"/Scripts/python_venv/bin/python "${HOME}/Scripts/utilities/open_search_links/busqueda_api/youtube-1arg.py" "${busqueda}")"
@@ -86,7 +98,8 @@ elif [[ $motor =~ 'google' ]]; then
     url="https://www.google.com/search?q=${busqueda}"
 
 elif [[ $motor =~ 'orpheus' ]]; then
-    url="https://orpheus.network/torrents.php?searchstr=${busqueda}"
+    busqueda_or="${busqueda//:/}"
+    url="https://orpheus.network/torrents.php?searchstr=${busqueda_or}"
 
 elif [[ $motor =~ 'rutracker' ]]; then
     url="https://rutracker.org/forum/tracker.php?nm=${busqueda}"
@@ -103,6 +116,11 @@ elif [[ $motor =~ 'spotify' ]]; then
     echo e-"${url}"
     echo d-"${url_decoded}"
     spotify "${url_decoded}"
+    exit 0
+
+elif [[ $motor =~ 'nicotine' ]]; then
+    source "${HOME}/Scripts/utilities/open_search_links/music_player/_comun.sh"
+    buscar_nicotine "$(echo "$busqueda" | tr '\n' ' ')"
     exit 0
 
 elif [[ $motor =~ 'wikipedia' ]]; then
@@ -123,6 +141,8 @@ elif [[ ${app} =~ 'Firefox' ]]; then
 elif [[ ${app} =~ 'Chromium' ]]; then
     chromium "${url}" &
 elif [[ ${app} =~ "Floorp" ]]; then
+    floorp "${url}" &
+elif [[ ${app} =~ 'Zen Browser' ]]; then
     floorp "${url}" &
 else
     echo "${busqueda}"

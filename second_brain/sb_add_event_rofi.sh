@@ -1,0 +1,1 @@
+/home/huan/gits/pollo/second_brain/scripts/hotkeys/sb_add_event_rofi.sh

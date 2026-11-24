@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Soul Funk - Bandcamp Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+        }
+
+        .reset-btn {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 8px 16px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .stats {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            color: #333;
+        }
+
+        .embeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s;
+        }
+
+        .embed-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .embed-item.hidden {
+            display: none;
+        }
+
+        .embed-item.listened {
+            opacity: 0;
+            transform: scale(0.8);
+            pointer-events: none;
+        }
+
+        .embed-info {
+            margin-top: 15px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .embed-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .listened-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .listened-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .listened-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .embeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .action-btn {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Soul Funk</h1>
+            <p class="subtitle">💿 <span id="visible-count">82</span> de 82 discos</p>
+            <div class="stats">
+                <strong>📊 Estadísticas:</strong>
+                <div style="margin-top: 8px;">
+                    ✓ Escuchados: <span id="listened-count">0</span> |
+                    👂 Pendientes: <span id="pending-count">82</span>
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <a href="index.html" class="back-link">← Volver al índice</a>
+                <button class="reset-btn" onclick="resetListened()">🔄 Restaurar todos</button>
+            </div>
+        </header>
+
+        <div class="embeds-grid" id="embeds-container">
+            
+        <div class="embed-item page-1" data-page="1" id="embed_4635639559879814183" data-embed-id="embed_4635639559879814183">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=440440189/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 18 Nov 2024 14:15:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4635639559879814183')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_68220735527647333" data-embed-id="embed_68220735527647333">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2040959058/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Tue, 29 Oct 2024 07:26:46 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_68220735527647333')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_7912325577188014320" data-embed-id="embed_7912325577188014320">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=428806227/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 17 Oct 2024 10:21:23 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7912325577188014320')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_4635639559879814183" data-embed-id="embed_4635639559879814183">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=440440189/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Wed, 16 Oct 2024 12:56:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4635639559879814183')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_3017227646318150208" data-embed-id="embed_3017227646318150208">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=728552579/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 14 Oct 2024 09:07:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3017227646318150208')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_9132039344886116105" data-embed-id="embed_9132039344886116105">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1295286540/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 11 Oct 2024 07:08:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_9132039344886116105')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_4530316449313704330" data-embed-id="embed_4530316449313704330">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2936051067/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:02:36 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4530316449313704330')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_2899302507442539390" data-embed-id="embed_2899302507442539390">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=54435843/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:02:17 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2899302507442539390')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_201215486778890980" data-embed-id="embed_201215486778890980">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1098402799/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 04 Oct 2024 10:01:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_201215486778890980')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-1" data-page="1" id="embed_3017113146223292727" data-embed-id="embed_3017113146223292727">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Thee Sacred Souls</strong><br>
+                <small>📅 Fri, 04 Oct 2024 04:09:42 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3017113146223292727')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_3017113146223292727" data-embed-id="embed_3017113146223292727">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Thee Sacred Souls: Got A Story To Tell, Standard LP &amp; &quot;Lucid
+ Girl&quot; 45</strong><br>
+                <small>📅 Wed, 02 Oct 2024 20:06:32 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3017113146223292727')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_9059334772593222827" data-embed-id="embed_9059334772593222827">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2178426280/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 30 Sep 2024 10:46:29 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_9059334772593222827')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_3267676300835274709" data-embed-id="embed_3267676300835274709">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=726754222/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Tue, 24 Sep 2024 12:15:07 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3267676300835274709')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_4046223727690539502" data-embed-id="embed_4046223727690539502">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2933266146/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Tue, 24 Sep 2024 12:14:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4046223727690539502')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_5166851277257781344" data-embed-id="embed_5166851277257781344">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1524628784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 24 Sep 2024 11:24:34 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5166851277257781344')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_8450930939474289778" data-embed-id="embed_8450930939474289778">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1005580961/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 20 Sep 2024 08:47:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8450930939474289778')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_6151838960066254367" data-embed-id="embed_6151838960066254367">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3007541183/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Mon, 16 Sep 2024 11:50:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6151838960066254367')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_7191532727726792621" data-embed-id="embed_7191532727726792621">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=104246849/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Thu, 12 Sep 2024 17:38:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7191532727726792621')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_8295783385075105220" data-embed-id="embed_8295783385075105220">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=728552579/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 12 Sep 2024 07:23:15 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8295783385075105220')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-2" data-page="2" id="embed_1249743512477250274" data-embed-id="embed_1249743512477250274">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3080969890/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 06 Sep 2024 12:48:54 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1249743512477250274')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_5166851277257781344" data-embed-id="embed_5166851277257781344">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1524628784/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Tue, 03 Sep 2024 14:58:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5166851277257781344')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_6151838960066254367" data-embed-id="embed_6151838960066254367">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3007541183/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:25:21 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6151838960066254367')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_4046223727690539502" data-embed-id="embed_4046223727690539502">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2933266146/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:23:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4046223727690539502')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_3267676300835274709" data-embed-id="embed_3267676300835274709">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=726754222/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Fri, 30 Aug 2024 10:22:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3267676300835274709')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_1393661773372134877" data-embed-id="embed_1393661773372134877">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=255081097/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Fri, 30 Aug 2024 07:13:37 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1393661773372134877')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_7191532727726792621" data-embed-id="embed_7191532727726792621">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=104246849/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 26 Aug 2024 06:31:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7191532727726792621')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_8867855506850306825" data-embed-id="embed_8867855506850306825">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1928337752/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Thu, 22 Aug 2024 07:51:20 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8867855506850306825')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_9029725402213747110" data-embed-id="embed_9029725402213747110">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2254254929/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 09 Aug 2024 05:47:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_9029725402213747110')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_6810875524893467120" data-embed-id="embed_6810875524893467120">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=101676645/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 25 Jul 2024 22:53:01 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6810875524893467120')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-3" data-page="3" id="embed_1407504519668564720" data-embed-id="embed_1407504519668564720">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2270721748/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 12 Jul 2024 07:00:39 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1407504519668564720')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_8902703383275419387" data-embed-id="embed_8902703383275419387">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3484929252/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from Athens Of The North: Cool Cool, Limited Edition Cassette
+ (Pre-Order, released 26th July) by James Alexander Bright</strong><br>
+                <small>📅 Thu, 11 Jul 2024 12:58:30 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8902703383275419387')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_8435898820878483227" data-embed-id="embed_8435898820878483227">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=289200919/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 05 Jul 2024 07:55:50 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8435898820878483227')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_5002264519215643406" data-embed-id="embed_5002264519215643406">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3374288917/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Fri, 28 Jun 2024 07:28:58 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5002264519215643406')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_1574739985287992781" data-embed-id="embed_1574739985287992781">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616095870/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 28 Jun 2024 06:09:20 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1574739985287992781')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_1762020576329813845" data-embed-id="embed_1762020576329813845">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2148931197/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 24 Jun 2024 10:44:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1762020576329813845')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_8435898820878483227" data-embed-id="embed_8435898820878483227">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=289200919/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 21 Jun 2024 06:12:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8435898820878483227')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_3017113146223292727" data-embed-id="embed_3017113146223292727">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3647519098/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Thee Sacred Souls</strong><br>
+                <small>📅 Tue, 18 Jun 2024 12:57:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3017113146223292727')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_339154773527480024" data-embed-id="embed_339154773527480024">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=41088538/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 14 Jun 2024 03:36:04 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_339154773527480024')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_579579008512958174" data-embed-id="embed_579579008512958174">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=688692261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from 180 Proof Records</strong><br>
+                <small>📅 Wed, 12 Jun 2024 14:32:56 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_579579008512958174')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-4" data-page="4" id="embed_628810925531070261" data-embed-id="embed_628810925531070261">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2486647924/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 07 Jun 2024 05:43:45 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_628810925531070261')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_5179029981934223575" data-embed-id="embed_5179029981934223575">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3960774498/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Thu, 06 Jun 2024 13:36:28 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5179029981934223575')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_4158726788395704406" data-embed-id="embed_4158726788395704406">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1955487190/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 30 May 2024 09:36:43 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4158726788395704406')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_628810925531070261" data-embed-id="embed_628810925531070261">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2486647924/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Wed, 29 May 2024 22:30:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_628810925531070261')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_3398279154561865225" data-embed-id="embed_3398279154561865225">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=804395902/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 17 May 2024 09:47:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3398279154561865225')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_5002264519215643406" data-embed-id="embed_5002264519215643406">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3374288917/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul</strong><br>
+                <small>📅 Thu, 16 May 2024 22:30:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5002264519215643406')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_1574739985287992781" data-embed-id="embed_1574739985287992781">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2616095870/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Thu, 09 May 2024 23:33:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1574739985287992781')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_4888670861281011139" data-embed-id="embed_4888670861281011139">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=762203925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 09 May 2024 21:02:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4888670861281011139')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_8902703383275419387" data-embed-id="embed_8902703383275419387">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3484929252/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 08 May 2024 08:00:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8902703383275419387')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_4407416034973033254" data-embed-id="embed_4407416034973033254">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=2455845827/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 08 May 2024 06:26:59 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4407416034973033254')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-5" data-page="5" id="embed_4466960583236720750" data-embed-id="embed_4466960583236720750">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3525285357/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sun, 05 May 2024 09:19:34 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4466960583236720750')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_7797548160925940548" data-embed-id="embed_7797548160925940548">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=665396436/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New releases from Athens Of The North</strong><br>
+                <small>📅 Fri, 03 May 2024 13:36:11 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7797548160925940548')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_339154773527480024" data-embed-id="embed_339154773527480024">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=41088538/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 03 May 2024 06:25:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_339154773527480024')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_4466960583236720750" data-embed-id="embed_4466960583236720750">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3525285357/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sat, 27 Apr 2024 10:53:25 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4466960583236720750')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_2773057087099640827" data-embed-id="embed_2773057087099640827">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2168755038/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Sat, 27 Apr 2024 10:05:47 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2773057087099640827')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_3398279154561865225" data-embed-id="embed_3398279154561865225">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=804395902/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 12 Apr 2024 12:08:12 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_3398279154561865225')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_4752416195121773736" data-embed-id="embed_4752416195121773736">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=810457650/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Thu, 04 Apr 2024 22:51:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4752416195121773736')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_4158726788395704406" data-embed-id="embed_4158726788395704406">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1955487190/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 29 Mar 2024 12:00:55 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4158726788395704406')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_6054361281698466715" data-embed-id="embed_6054361281698466715">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=1606989583/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 29 Mar 2024 07:57:41 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6054361281698466715')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_5190941165710189951" data-embed-id="embed_5190941165710189951">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=677416272/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 25 Mar 2024 10:43:10 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5190941165710189951')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-6" data-page="6" id="embed_4888670861281011139" data-embed-id="embed_4888670861281011139">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=762203925/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Mon, 25 Mar 2024 07:55:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4888670861281011139')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_8851518719733741280" data-embed-id="embed_8851518719733741280">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1544418261/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 22 Mar 2024 08:48:14 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8851518719733741280')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_2585364889378491915" data-embed-id="embed_2585364889378491915">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2963023740/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Thu, 14 Mar 2024 15:50:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2585364889378491915')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_4720626651407282750" data-embed-id="embed_4720626651407282750">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2573078737/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 08 Mar 2024 08:18:33 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4720626651407282750')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_7723741103818979495" data-embed-id="embed_7723741103818979495">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3858939787/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 08 Mar 2024 08:12:46 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7723741103818979495')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_2950584529267563424" data-embed-id="embed_2950584529267563424">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1263822551/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from BurningSoleRecords, who brought you MEXICO (PT.1)</strong><br>
+                <small>📅 Mon, 04 Mar 2024 10:59:24 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2950584529267563424')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_761261002433968506" data-embed-id="embed_761261002433968506">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=288906048/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North, who brought you The Time is
+ Right</strong><br>
+                <small>📅 Fri, 01 Mar 2024 13:08:19 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_761261002433968506')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_4720626651407282750" data-embed-id="embed_4720626651407282750">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2573078737/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Fri, 01 Mar 2024 00:05:09 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4720626651407282750')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_2968022134687602894" data-embed-id="embed_2968022134687602894">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=607311152/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Thu, 29 Feb 2024 18:46:52 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2968022134687602894')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_4616518468426600029" data-embed-id="embed_4616518468426600029">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=760081823/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Mon, 26 Feb 2024 11:11:30 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4616518468426600029')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-7" data-page="7" id="embed_7454407091018009413" data-embed-id="embed_7454407091018009413">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1201830598/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Wed, 14 Feb 2024 10:01:38 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7454407091018009413')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_5783237529894027362" data-embed-id="embed_5783237529894027362">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=3393420387/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Athens Of The North</strong><br>
+                <small>📅 Wed, 14 Feb 2024 07:47:08 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_5783237529894027362')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_4752416195121773736" data-embed-id="embed_4752416195121773736">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=810457650/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 09 Feb 2024 10:47:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4752416195121773736')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_1680769415293135321" data-embed-id="embed_1680769415293135321">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1953225681/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 01 Feb 2024 13:28:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_1680769415293135321')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_8885630122565450739" data-embed-id="embed_8885630122565450739">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=2056042828/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 19 Jan 2024 07:15:41 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8885630122565450739')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_4616518468426600029" data-embed-id="embed_4616518468426600029">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=760081823/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Thu, 18 Jan 2024 14:39:03 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4616518468426600029')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_7454407091018009413" data-embed-id="embed_7454407091018009413">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1201830598/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Olindo Records</strong><br>
+                <small>📅 Fri, 12 Jan 2024 11:42:35 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_7454407091018009413')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_2968022134687602894" data-embed-id="embed_2968022134687602894">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=607311152/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from NuNorthern Soul, who brought you Summer Selections
+ Three</strong><br>
+                <small>📅 Sun, 17 Dec 2023 09:12:06 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2968022134687602894')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_8435278250382487688" data-embed-id="embed_8435278250382487688">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/track=686476144/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Wed, 13 Dec 2023 08:20:00 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_8435278250382487688')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_6828208491043561312" data-embed-id="embed_6828208491043561312">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1708127488/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Wed, 22 Nov 2023 12:37:40 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6828208491043561312')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-8" data-page="8" id="embed_2676530647650878491" data-embed-id="embed_2676530647650878491">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=933666424/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Favorite Recordings</strong><br>
+                <small>📅 Fri, 17 Nov 2023 12:01:26 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_2676530647650878491')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_6452651559337587169" data-embed-id="embed_6452651559337587169">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1210091727/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Wah Wah 45s</strong><br>
+                <small>📅 Fri, 17 Nov 2023 06:46:05 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_6452651559337587169')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        <div class="embed-item page-9" data-page="9" id="embed_4907438926933440284" data-embed-id="embed_4907438926933440284">
+            <iframe style="border: 0; width: 400px; height: 120px;" src="https://bandcamp.com/EmbeddedPlayer/album=1282816462/size=large/bgcol=333333/linkcol=9a64ff/tracklist=false/artwork=small/transparent=true/" seamless></iframe>
+            <div class="embed-info">
+                <strong>New release from Matasuna Records</strong><br>
+                <small>📅 Thu, 16 Nov 2023 23:01:22 +0000 (UTC)</small>
+            </div>
+            <div class="embed-actions">
+                <button class="action-btn listened-btn" onclick="markAsListened('embed_4907438926933440284')">
+                    🎧 Marcar como escuchado
+                </button>
+            </div>
+        </div>
+        
+        </div>
+
+        <div class="pagination"><button class="page-btn active" data-page="1">Página 1</button><button class="page-btn " data-page="2">Página 2</button><button class="page-btn " data-page="3">Página 3</button><button class="page-btn " data-page="4">Página 4</button><button class="page-btn " data-page="5">Página 5</button><button class="page-btn " data-page="6">Página 6</button><button class="page-btn " data-page="7">Página 7</button><button class="page-btn " data-page="8">Página 8</button><button class="page-btn " data-page="9">Página 9</button></div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        const STORAGE_KEY = 'bandcamp_listened_Soul_Funk';
+        const TOTAL_ITEMS = 82;
+
+        // Cargar estado guardado al iniciar
+        function loadListenedState() {
+            const listened = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            let hiddenCount = 0;
+
+            listened.forEach(embedId => {
+                const element = document.querySelector(`[data-embed-id="${embedId}"]`);
+                if (element) {
+                    element.classList.add('listened');
+                    setTimeout(() => {
+                        element.style.display = 'none';
+                    }, 500);
+                    hiddenCount++;
+                }
+            });
+
+            updateStats(hiddenCount);
+        }
+
+        // Actualizar estadísticas
+        function updateStats(listenedCount) {
+            const pending = TOTAL_ITEMS - listenedCount;
+            document.getElementById('listened-count').textContent = listenedCount;
+            document.getElementById('pending-count').textContent = pending;
+            document.getElementById('visible-count').textContent = pending;
+        }
+
+        // Marcar como escuchado
+        function markAsListened(embedId) {
+            const element = document.getElementById(embedId);
+            const button = element.querySelector('.listened-btn');
+
+            // Deshabilitar botón
+            button.disabled = true;
+            button.textContent = '✓ Escuchado';
+
+            // Guardar en localStorage
+            const listened = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            if (!listened.includes(embedId)) {
+                listened.push(embedId);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(listened));
+            }
+
+            // Animar desaparición
+            element.classList.add('listened');
+
+            setTimeout(() => {
+                element.style.display = 'none';
+                updateStats(listened.length);
+            }, 500);
+
+            showNotification('¡Marcado como escuchado!', 'success');
+        }
+
+        // Resetear todos los escuchados
+        function resetListened() {
+            if (!confirm('¿Restaurar todos los discos? Aparecerán de nuevo los que marcaste como escuchados.')) {
+                return;
+            }
+
+            localStorage.removeItem(STORAGE_KEY);
+
+            // Mostrar todos los elementos
+            document.querySelectorAll('.embed-item').forEach(item => {
+                item.classList.remove('listened');
+                item.style.display = '';
+                const button = item.querySelector('.listened-btn');
+                button.disabled = false;
+                button.textContent = '🎧 Marcar como escuchado';
+            });
+
+            updateStats(0);
+            showNotification('Todos los discos restaurados', 'success');
+        }
+
+        // Paginación
+        const pageButtons = document.querySelectorAll('.page-btn');
+        const embedItems = document.querySelectorAll('.embed-item');
+
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const page = button.dataset.page;
+
+                pageButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                embedItems.forEach(item => {
+                    // No mostrar si está escuchado
+                    if (item.classList.contains('listened')) {
+                        return;
+                    }
+
+                    if (item.dataset.page === page) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Mostrar solo la primera página al cargar
+        if (pageButtons.length > 0) {
+            embedItems.forEach(item => {
+                if (item.dataset.page !== '1' && !item.classList.contains('listened')) {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Notificaciones
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification show ${type}`;
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Cargar estado al iniciar la página
+        loadListenedState();
+
+        console.log('💾 Los datos se guardan localmente en tu navegador');
+        console.log('🔑 Storage key:', STORAGE_KEY);
+    </script>
+</body>
+</html>

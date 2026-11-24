@@ -1,9 +1,8 @@
 {
-    "selected_folders": [
-        "/mnt/windows/FTP/Obsidian/Spaces/Wiki",
-        "/mnt/windows/FTP/Obsidian/Spaces/Blogs",
-        "/mnt/windows/FTP/Obsidian/Spaces/Proyectos Interesantes",
-        "/mnt/windows/FTP/Obsidian/Spaces/Scripts",
-        "/mnt/windows/FTP/Obsidian/Recortes"
+    "root_dirs": [
+        "/home/huan/notes/Spaces/Wiki",
+        "/home/huan/notes/Spaces/Blogs",
+        "/home/huan/notes/Spaces/Proyectos Interesantes",
+        "/home/huan/notes/Recortes"
     ]
 }

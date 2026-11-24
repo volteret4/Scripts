@@ -7,12 +7,13 @@ Funciona tanto para crear como para actualizar la playlist
 import os
 import requests
 import time
-from dotenv import load_dotenv, dotenv_values
+from sopsdotenv import load_sops_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from urllib.parse import quote
 import json
 from pathlib import Path
+import sys
 
 class LastFmSpotifySync:
     def __init__(self):
@@ -21,17 +22,17 @@ class LastFmSpotifySync:
         project_root = script_dir.parent
 
         # Cargar variables de entorno SOLO del .env (no del sistema)
-        env_file = project_root / ".env"
+        env_file = project_root / ".encrypted.env"
         if env_file.exists():
             # Opción 1: Usar dotenv_values para cargar solo del archivo
-            env_vars = dotenv_values(env_file)
+            load_sops_dotenv()
 
             # Obtener credenciales
-            self.lastfm_api_key = env_vars.get('LASTFM_API_KEY')
-            self.lastfm_username = env_vars.get('LASTFM_USERNAME')
-            self.spotify_client_id = env_vars.get('SPOTIFY_CLIENT')
-            self.spotify_client_secret = env_vars.get('SPOTIFY_SECRET')
-            self.spotify_redirect_uri = env_vars.get('SPOTIFY_REDIRECT', 'http://localhost:8888/callback')
+            self.lastfm_api_key = os.getenv('LASTFM_API_KEY')
+            self.lastfm_username = os.getenv('LASTFM_USERNAME')
+            self.spotify_client_id = os.getenv('SPOTIFY_CLIENT')
+            self.spotify_client_secret = os.getenv('SPOTIFY_SECRET')
+            self.spotify_redirect_uri = os.getenv('SPOTIFY_REDIRECT', 'http://localhost:8888/callback')
 
 
             # O alternativamente, Opción 2: usar load_dotenv con override=True

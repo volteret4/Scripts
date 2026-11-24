@@ -8,9 +8,10 @@ Lee los metadatos de los archivos de audio directamente en lugar de parsear nomb
 import os
 import re
 import sqlite3
+from dotenv.main import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from dotenv import load_dotenv, dotenv_values
+from sopsdotenv import load_sops_dotenv
 from pathlib import Path
 import logging
 import time
@@ -40,10 +41,10 @@ script_dir = Path(__file__).parent.absolute()
 project_root = script_dir.parent
 
 # Cargar variables de entorno SOLO del .env (no del sistema)
-env_file = project_root / ".env"
+env_file = project_root / ".encrypted.env"
 if env_file.exists():
     # Opción 1: Usar dotenv_values para cargar solo del archivo
-    env_vars = dotenv_values(env_file)
+    load_sops_dotenv()
 
     # O alternativamente, Opción 2: usar load_dotenv con override=True
     # load_dotenv(env_file, override=True)
@@ -56,9 +57,9 @@ CACHE_DIR = project_root / ".content/cache/vvmm"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Variables de entorno - SOLO del archivo .env
-CLIENT_ID = env_vars.get('SPOTIFY_CLIENT')
-CLIENT_SECRET = env_vars.get('SPOTIFY_SECRET')
-REDIRECT_URI = env_vars.get('SPOTIFY_REDIRECT')
+CLIENT_ID = os.getenv('SPOTIFY_CLIENT')
+CLIENT_SECRET = os.getenv('SPOTIFY_SECRET')
+REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT')
 
 # Si prefieres la Opción 2, entonces usa:
 # CLIENT_ID = os.getenv('SPOTIFY_CLIENT')

@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""tg_run — ejecuta un comando y avisa por Telegram de cómo terminó.
+
+  tg_run -n NOMBRE -i ICONO [opciones] -- comando [args...]
+
+  ✅ terminó bien        → un mensaje silencioso: «ICONO ✅ NOMBRE» + últimas líneas
+  ⚠️ bien, pero la salida trae líneas de error
+  ❌ código de salida ≠ 0
+                         → primero el ICONO solo (Telegram lo pinta en grande y
+                           suena), luego el detalle en silencio
+
+La salida del comando se sigue mostrando tal cual (los logs de cron no cambian)
+y tg_run termina con el mismo código de salida que el comando.
+
+Opciones:
+  -n NOMBRE         nombre del lanzador en el mensaje (obligatorio)
+  -i ICONO          emoji que identifica al lanzador (🎙️, 🌐, 💾…)
+  -b BOT            clave del bot en el yaml de tokens (RUNNER)
+  -c CHAT           chat de destino (TG_RUN_CHAT o el privado por defecto)
+  -e, --solo-errores  no avisar cuando todo va bien (para tareas frecuentes)
+  --sin-avisos-ok   alias de --solo-errores
+
+Tokens: ~/Scripts/.secrets/telegram.yaml (líneas «NOMBRE: token»), o TG_RUN_TOKENS.
+Solo usa la biblioteca estándar.
+"""
+import argparse
+import html
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections import deque
+
+CHAT_POR_DEFECTO = "905051261"
+YAML = os.environ.get("TG_RUN_TOKENS", os.path.expanduser("~/Scripts/.secrets/telegram.yaml"))
+PATRON = re.compile(
+    os.environ.get("TG_RUN_PATRON_ERROR")
+    or r"traceback|\w*exception\b|\w*error\b|\bfatal\b|\bfailed\b|\bfall[oó]\b|no se pudo|errno",
+    re.IGNORECASE,
+)
+MAX_MSG = 3900
+
+
+def token_de(bot):
+    try:
+        for linea in open(YAML, encoding="utf-8"):
+            m = re.match(r"\s*([A-Za-z0-9_]+)\s*:\s*[\"']?([0-9]+:[A-Za-z0-9_-]+)", linea)
+            if m and m.group(1).upper() == bot.upper():
+                return m.group(2)
+    except OSError as e:
+        print(f"[tg_run] no se pudo leer {YAML}: {e}", file=sys.stderr)
+    return ""
+
+
+def enviar(token, chat, texto, sonido, html_ok=True):
+    datos = {"chat_id": chat, "text": texto, "disable_notification": "false" if sonido else "true",
+             "disable_web_page_preview": "true"}
+    if html_ok:
+        datos["parse_mode"] = "HTML"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    for intento in range(4):
+        try:
+            with urllib.request.urlopen(url, data=urllib.parse.urlencode(datos).encode(), timeout=20):
+                return True
+        except urllib.error.HTTPError as e:
+            cuerpo = e.read().decode("utf-8", "replace")[:300]
+            if e.code == 400 and html_ok and "parse" in cuerpo.lower():
+                return enviar(token, chat, html.unescape(re.sub(r"<[^>]+>", "", texto)), sonido, False)
+            if e.code == 429:
+                time.sleep(5)
+                continue
+            print(f"[tg_run] Telegram {e.code}: {cuerpo}", file=sys.stderr)
+            return False
+        except (urllib.error.URLError, OSError) as e:
+            print(f"[tg_run] sin conexión con Telegram ({e})", file=sys.stderr)
+            time.sleep(3 * (intento + 1))
+    return False
+
+
+def duracion(s):
+    if s < 60:
+        return f"{s:.1f} s"
+    m, s = divmod(int(s), 60)
+    return f"{m} min {s} s" if m < 60 else f"{m // 60} h {m % 60} min"
+
+
+def recortar(texto, maximo):
+    return texto if len(texto) <= maximo else "…\n" + texto[-maximo:]
+
+
+def main():
+    if "--" not in sys.argv:
+        print(__doc__, file=sys.stderr)
+        return 2
+    corte = sys.argv.index("--")
+    p = argparse.ArgumentParser(prog="tg_run", add_help=True)
+    p.add_argument("-n", "--nombre", required=True)
+    p.add_argument("-i", "--icono", default="⚙️")
+    p.add_argument("-b", "--bot", default=os.environ.get("TG_RUN_BOT", "RUNNER"))
+    p.add_argument("-c", "--chat", default=os.environ.get("TG_RUN_CHAT", CHAT_POR_DEFECTO))
+    p.add_argument("-e", "--solo-errores", "--sin-avisos-ok", action="store_true")
+    a = p.parse_args(sys.argv[1:corte])
+    cmd = sys.argv[corte + 1:]
+    if not cmd:
+        p.error("falta el comando después de --")
+
+    cola = deque(maxlen=400)
+    inicio = time.time()
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError as e:
+        codigo, cola = 127, deque([f"no se pudo ejecutar: {e}"])
+    else:
+        def copiar(origen, destino):
+            for linea in iter(origen.readline, b""):
+                destino.buffer.write(linea)
+                destino.flush()
+                cola.append(linea.decode("utf-8", "replace").rstrip("\n"))
+        hilos = [threading.Thread(target=copiar, args=(proc.stdout, sys.stdout)),
+                 threading.Thread(target=copiar, args=(proc.stderr, sys.stderr))]
+        for h in hilos:
+            h.start()
+        codigo = proc.wait()
+        for h in hilos:
+            h.join()
+    seg = time.time() - inicio
+
+    lineas = [l for l in cola if l.strip()]
+    malas = [l for l in lineas if PATRON.search(l)]
+    tb = [i for i, l in enumerate(lineas) if l.startswith("Traceback (most recent call last)")]
+    if tb:
+        malas = lineas[tb[-1]:]
+    estado = "❌" if codigo != 0 else ("⚠️" if malas else "✅")
+    if estado == "✅" and a.solo_errores:
+        return codigo
+
+    token = token_de(a.bot)
+    if not token:
+        print(f"[tg_run] no hay token para el bot {a.bot}", file=sys.stderr)
+        return codigo
+
+    cab = f"{a.icono} {estado} <b>{html.escape(a.nombre)}</b> · {duracion(seg)}"
+    if codigo != 0:
+        cab += f"\n<b>FALLÓ</b> (código {codigo})"
+    partes = [cab]
+    resto = MAX_MSG - len(cab) - 60
+    if estado != "✅" and malas:
+        bloque = recortar("\n".join(malas[-20:]), min(1800, resto // 2))
+        partes.append("<b>Errores:</b>\n<pre>" + html.escape(bloque) + "</pre>")
+        resto -= len(bloque) + 30
+    n = 30 if estado != "✅" else 6
+    contexto = lineas[-n:]
+    if malas and lineas[-len(malas):] == malas:
+        contexto = lineas[:-len(malas)][-n:]
+    if contexto:
+        titulo = "<b>Salida:</b>\n" if estado != "✅" else ""
+        partes.append(titulo + "<pre>" + html.escape(recortar("\n".join(contexto), max(200, resto))) + "</pre>")
+    elif not lineas:
+        partes.append("<i>sin salida</i>")
+
+    if estado == "✅":
+        enviar(token, a.chat, "\n".join(partes), sonido=False)
+    else:
+        enviar(token, a.chat, a.icono, sonido=True)  # emoji solo: se ve en grande
+        enviar(token, a.chat, "\n".join(partes), sonido=False)
+    return codigo
+
+
+if __name__ == "__main__":
+    sys.exit(main())

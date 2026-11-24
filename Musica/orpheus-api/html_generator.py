@@ -95,25 +95,40 @@ def fetch_bandcamp_embed(artist, album):
     # Visitar la página del álbum para extraer el album_id
     album_page = _get(album_url)
 
-    # Método 1: TralbumData (igual que en freshrss_html_generator.py)
-    tralbum_match = re.search(
-        r'var\s+TralbumData\s*=\s*\{.+?"id"\s*:\s*(\d+)', album_page, re.DOTALL
-    )
-    if tralbum_match:
-        album_id = tralbum_match.group(1)
-    else:
-        # Método 2: data-item-id en la página
-        item_id_match = re.search(r'data-item-id="(\d+)"', album_page)
-        if item_id_match:
-            album_id = item_id_match.group(1)
-        else:
-            # Método 3: album_id explícito
-            album_id_match = re.search(r'"album_id"\s*:\s*(\d+)', album_page)
-            if album_id_match:
-                album_id = album_id_match.group(1)
-            else:
-                print(f"      ⚠️  No se pudo extraer album_id de {album_url}")
-                return ""
+    album_id = None
+
+    # Método 1: "album_id" explícito — el más fiable, nunca se confunde con track_id
+    m = re.search(r'"album_id"\s*:\s*(\d+)', album_page)
+    if m:
+        album_id = m.group(1)
+
+    # Método 2: TralbumData.current.id cuando item_type es "album"
+    if not album_id:
+        m = re.search(r'"current"\s*:\s*\{[^}]*"id"\s*:\s*(\d+)', album_page)
+        if m:
+            item_type = re.search(r'"item_type"\s*:\s*"(\w+)"', album_page)
+            if not item_type or item_type.group(1) == "album":
+                album_id = m.group(1)
+
+    # Método 3: data-item-id junto a data-item-type="album"
+    if not album_id:
+        m = re.search(
+            r'data-item-type=["\']album["\'][^>]*data-item-id=["\'](\d+)["\']'
+            r'|data-item-id=["\'](\d+)["\'][^>]*data-item-type=["\']album["\']',
+            album_page,
+        )
+        if m:
+            album_id = m.group(1) or m.group(2)
+
+    # Método 4: EmbeddedPlayer iframe ya presente en la página
+    if not album_id:
+        m = re.search(r'EmbeddedPlayer/album=(\d+)', album_page)
+        if m:
+            album_id = m.group(1)
+
+    if not album_id:
+        print(f"      ⚠️  No se pudo extraer album_id de {album_url}")
+        return ""
 
     print(f"      ✅ Bandcamp album_id: {album_id}")
     embed_url = (

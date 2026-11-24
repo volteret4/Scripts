@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""
+Muestra ~/.config/hotkeys/hotkeys.csv en rofi para búsqueda.
+Si el entry tiene 'action' lo copia al portapapeles al seleccionar.
+"""
+
+import csv, subprocess, sys
+from pathlib import Path
+
+CSV_PATH = Path.home() / '.config/hotkeys/hotkeys.csv'
+
+
+def main():
+    if not CSV_PATH.exists():
+        subprocess.run(['notify-send', 'Hotkeys', f'Falta {CSV_PATH}\nEjecuta generar_hotkeys_csv.py'])
+        sys.exit(1)
+
+    rows = []
+    with open(CSV_PATH, newline='') as f:
+        for r in csv.DictReader(f):
+            if r['enabled'] == '1':
+                rows.append(r)
+
+    lines = [
+        f"{r['source']:<26} {r['key']:<22} {r['description']}"
+        for r in rows
+    ]
+
+    proc = subprocess.run(
+        ['rofi', '-dmenu', '-i', '-p', 'Hotkeys:',
+         '-theme-str', 'window {width: 1200px;} listview {lines: 20;}'],
+        input='\n'.join(lines),
+        capture_output=True, text=True
+    )
+
+    sel = proc.stdout.strip()
+    if not sel:
+        sys.exit(0)
+
+    for line, row in zip(lines, rows):
+        if line == sel and row['action']:
+            subprocess.run(['xclip', '-selection', 'clipboard'],
+                           input=row['action'], text=True)
+            break
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🔧 Herramientas de Sincronización - Bandcamp Collection</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    sans-serif;
+                background: linear-gradient(135deg, #14141e 0%, #2d1b4e 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+
+            .container {
+                max-width: 900px;
+                margin: 0 auto;
+            }
+
+            .card {
+                background: rgba(30, 30, 45, 0.95);
+                border-radius: 15px;
+                padding: 30px;
+                margin-bottom: 20px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            }
+
+            h1 {
+                color: #e0e0e0;
+                margin-bottom: 10px;
+            }
+
+            h2 {
+                color: #9d7dff;
+                margin-top: 20px;
+                margin-bottom: 15px;
+                font-size: 1.3em;
+            }
+
+            h3 {
+                color: #c0c0c0;
+                margin-top: 15px;
+                margin-bottom: 10px;
+            }
+
+            p {
+                color: #b0b0b0;
+                line-height: 1.6;
+                margin-bottom: 15px;
+            }
+
+            .btn {
+                display: inline-block;
+                padding: 12px 24px;
+                background: linear-gradient(135deg, #9d7dff 0%, #7c5ce0 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 1em;
+                text-decoration: none;
+                transition: all 0.3s;
+                margin: 5px;
+                box-shadow: 0 4px 15px rgba(157, 125, 255, 0.3);
+            }
+
+            .btn:hover {
+                background: linear-gradient(135deg, #b99dff 0%, #9d7dff 100%);
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(157, 125, 255, 0.4);
+            }
+
+            .btn-success {
+                background: #4caf50;
+            }
+
+            .btn-success:hover {
+                background: #45a049;
+            }
+
+            .btn-danger {
+                background: #f44336;
+            }
+
+            .btn-danger:hover {
+                background: #da190b;
+            }
+
+            .code-block {
+                background: rgba(20, 20, 30, 0.8);
+                border-left: 4px solid #9d7dff;
+                padding: 15px;
+                border-radius: 5px;
+                overflow-x: auto;
+                margin: 15px 0;
+                font-family: "Courier New", monospace;
+                font-size: 0.9em;
+                color: #e0e0e0;
+            }
+
+            .bookmarklet {
+                background: rgba(255, 193, 7, 0.2);
+                border-left: 4px solid #ff9800;
+                padding: 15px;
+                border-radius: 5px;
+                margin: 15px 0;
+            }
+
+            .bookmarklet a {
+                display: inline-block;
+                padding: 10px 20px;
+                background: #ff9800;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+
+            .bookmarklet a:hover {
+                background: #f57c00;
+            }
+
+            .stats {
+                background: rgba(157, 125, 255, 0.15);
+                padding: 15px;
+                border-radius: 8px;
+                margin: 15px 0;
+                border: 1px solid rgba(157, 125, 255, 0.3);
+            }
+
+            .stats-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(157, 125, 255, 0.2);
+                color: #e0e0e0;
+            }
+
+            .stats-item:last-child {
+                border-bottom: none;
+            }
+
+            .warning {
+                background: rgba(255, 152, 0, 0.15);
+                border-left: 4px solid #ff9800;
+                padding: 15px;
+                border-radius: 5px;
+                margin: 15px 0;
+            }
+
+            ol,
+            ul {
+                margin-left: 20px;
+                color: #b0b0b0;
+            }
+
+            li {
+                margin: 8px 0;
+            }
+
+            #output {
+                min-height: 100px;
+                background: rgba(20, 20, 30, 0.8);
+                padding: 15px;
+                border-radius: 5px;
+                font-family: monospace;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                color: #e0e0e0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="card">
+                <h1>🔧 Herramientas de Sincronización</h1>
+                <p>Exporta tus álbumes escuchados y sincroniza tu colección</p>
+            </div>
+
+            <div class="card">
+                <h2>📊 Estado Actual</h2>
+                <div id="stats" class="stats">
+                    <div class="stats-item">
+                        <strong>Estado:</strong>
+                        <span id="status">Cargando...</span>
+                    </div>
+                </div>
+                <button class="btn" onclick="loadStats()">🔄 Actualizar</button>
+            </div>
+
+            <div class="card">
+                <h2>💾 Método 1: Exportar con un Click</h2>
+                <p>La forma más fácil de exportar tus álbumes escuchados.</p>
+
+                <button class="btn btn-success" onclick="exportLocalStorage()">
+                    📥 Exportar localStorage
+                </button>
+
+                <p style="margin-top: 15px; font-size: 0.9em; color: #888">
+                    Esto descargará un archivo
+                    <code>browser_data.json</code> con todos tus álbumes
+                    escuchados.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2>🔖 Método 2: Bookmarklet</h2>
+                <p>
+                    Arrastra este botón a tu barra de marcadores. Luego puedes
+                    hacer click en él desde cualquier página de tu colección.
+                </p>
+
+                <div class="bookmarklet">
+                    <p>
+                        <strong>Arrastra esto a tu barra de marcadores:</strong>
+                    </p>
+                    <a
+                        href="javascript:(function(){const data={};Object.keys(localStorage).filter(k=>k.startsWith('bandcamp_listened_')).forEach(k=>{data[k]=JSON.parse(localStorage.getItem(k))});const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='browser_data.json';a.click();alert('¡Exportado! Revisa tus descargas.')})();"
+                    >
+                        📥 Exportar Bandcamp
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🖥️ Método 3: Consola del Navegador</h2>
+                <p>Para usuarios avanzados.</p>
+
+                <ol>
+                    <li>Presiona <kbd>F12</kbd> para abrir DevTools</li>
+                    <li>Ve a la pestaña "Console"</li>
+                    <li>Copia y pega este código:</li>
+                </ol>
+
+                <div class="code-block">
+                    const data = {}; Object.keys(localStorage) .filter(key =>
+                    key.startsWith('bandcamp_listened_')) .forEach(key => {
+                    data[key] = JSON.parse(localStorage.getItem(key)); }); //
+                    Descargar como archivo const blob = new
+                    Blob([JSON.stringify(data, null, 2)], {type:
+                    'application/json'}); const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url;
+                    a.download = 'browser_data.json'; a.click();
+                    console.log('Exportado:', data);
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔄 Flujo de Sincronización</h2>
+                <p>Una vez tengas el archivo exportado:</p>
+
+                <ol>
+                    <li>
+                        <strong>Exporta localStorage</strong> (usando cualquier
+                        método anterior)
+                    </li>
+                    <li>
+                        <strong>Ejecuta el script de sincronización:</strong>
+                        <div class="code-block">
+                            python3 bc_sync.py --localStorage-file
+                            browser_data.json --interactive \ --folders
+                            "INBOX/Rock:Rock" "INBOX/Jazz:Jazz"
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Regenera el sitio:</strong>
+                        <div class="code-block">
+                            python3 bc_static_generator.py --input
+                            bandcamp_data_synced.json
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Sube los cambios:</strong>
+                        <div class="code-block">
+                            git add docs/ git commit -m "Sync: removed listened,
+                            added new" git push
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="card">
+                <h2>⚙️ Opciones Avanzadas</h2>
+
+                <h3>Solo eliminar escuchados (sin buscar nuevos)</h3>
+                <div class="code-block">
+                    python3 bc_sync.py --localStorage-file browser_data.json
+                    --no-fetch
+                </div>
+
+                <h3>Ver qué se eliminará sin hacer cambios</h3>
+                <p>Compara tú mismo los archivos antes de sincronizar.</p>
+
+                <h3>Hacer backup antes de sincronizar</h3>
+                <div class="code-block">
+                    cp bandcamp_data.json bandcamp_data_backup.json python3
+                    bc_sync.py --localStorage-file browser_data.json ...
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🛠️ Herramientas Útiles</h2>
+
+                <button class="btn" onclick="viewLocalStorage()">
+                    👀 Ver localStorage
+                </button>
+                <button class="btn btn-danger" onclick="clearListened()">
+                    🗑️ Limpiar escuchados
+                </button>
+                <button class="btn" onclick="importData()">
+                    📤 Importar datos
+                </button>
+
+                <div id="output" style="margin-top: 15px; display: none"></div>
+            </div>
+
+            <div class="card">
+                <h2>❓ Preguntas Frecuentes</h2>
+
+                <h3>¿Con qué frecuencia debo sincronizar?</h3>
+                <p>
+                    Cuando quieras actualizar tu colección en el servidor. Por
+                    ejemplo, una vez al mes o cuando hayas escuchado muchos
+                    álbumes.
+                </p>
+
+                <h3>¿Pierdo mis datos al sincronizar?</h3>
+                <p>
+                    No. El archivo JSON se actualiza, pero tu localStorage en el
+                    navegador NO cambia. Puedes hacer backup del JSON antes.
+                </p>
+
+                <h3>
+                    ¿Qué pasa si dos dispositivos tienen diferentes estados?
+                </h3>
+                <p>
+                    Cada dispositivo tiene su propio localStorage. Exporta desde
+                    el que quieras como "fuente de verdad".
+                </p>
+
+                <h3>¿Puedo combinar datos de múltiples dispositivos?</h3>
+                <p>
+                    Sí, pero requiere fusionar los archivos JSON manualmente o
+                    ejecutar el script varias veces.
+                </p>
+            </div>
+        </div>
+
+        <script>
+            function loadStats() {
+                const statsDiv = document.getElementById("stats");
+                const statusSpan = document.getElementById("status");
+
+                try {
+                    const genres = {};
+                    let total = 0;
+
+                    Object.keys(localStorage)
+                        .filter((key) => key.startsWith("bandcamp_listened_"))
+                        .forEach((key) => {
+                            const genre = key.replace("bandcamp_listened_", "");
+                            const listened = JSON.parse(
+                                localStorage.getItem(key),
+                            );
+                            genres[genre] = listened.length;
+                            total += listened.length;
+                        });
+
+                    if (total === 0) {
+                        statusSpan.textContent = "Sin álbumes escuchados";
+                        statsDiv.innerHTML = `
+                        <div class="stats-item">
+                            <strong>Estado:</strong>
+                            <span>Sin datos de escuchados</span>
+                        </div>
+                    `;
+                        return;
+                    }
+
+                    let html = `
+                    <div class="stats-item">
+                        <strong>Total escuchados:</strong>
+                        <span>${total}</span>
+                    </div>
+                `;
+
+                    Object.entries(genres).forEach(([genre, count]) => {
+                        html += `
+                        <div class="stats-item">
+                            <strong>${genre}:</strong>
+                            <span>${count} escuchados</span>
+                        </div>
+                    `;
+                    });
+
+                    statsDiv.innerHTML = html;
+                    statusSpan.textContent = "Activo";
+                } catch (error) {
+                    statusSpan.textContent = "Error al cargar";
+                    console.error(error);
+                }
+            }
+
+            function exportLocalStorage() {
+                try {
+                    const data = {};
+                    Object.keys(localStorage)
+                        .filter((key) => key.startsWith("bandcamp_listened_"))
+                        .forEach((key) => {
+                            data[key] = JSON.parse(localStorage.getItem(key));
+                        });
+
+                    if (Object.keys(data).length === 0) {
+                        alert(
+                            "⚠️ No hay datos de escuchados para exportar.\n\nPrueba a marcar algunos álbumes como escuchados primero.",
+                        );
+                        return;
+                    }
+
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {
+                        type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "browser_data.json";
+                    a.click();
+                    URL.revokeObjectURL(url);
+
+                    alert(
+                        "✅ ¡Exportado exitosamente!\n\nRevisa tu carpeta de descargas: browser_data.json",
+                    );
+                } catch (error) {
+                    alert("❌ Error al exportar:\n" + error.message);
+                    console.error(error);
+                }
+            }
+
+            function viewLocalStorage() {
+                const output = document.getElementById("output");
+                output.style.display = "block";
+
+                try {
+                    const data = {};
+                    Object.keys(localStorage)
+                        .filter((key) => key.startsWith("bandcamp_listened_"))
+                        .forEach((key) => {
+                            data[key] = JSON.parse(localStorage.getItem(key));
+                        });
+
+                    output.textContent = JSON.stringify(data, null, 2);
+                } catch (error) {
+                    output.textContent = "Error: " + error.message;
+                }
+            }
+
+            function clearListened() {
+                if (
+                    !confirm(
+                        "⚠️ ¿Estás seguro de que quieres BORRAR todos los álbumes escuchados?\n\nEsta acción no se puede deshacer.",
+                    )
+                ) {
+                    return;
+                }
+
+                if (
+                    !confirm(
+                        "⚠️ ÚLTIMA CONFIRMACIÓN\n\nEsto borrará PERMANENTEMENTE tu progreso local.\n\n¿Continuar?",
+                    )
+                ) {
+                    return;
+                }
+
+                try {
+                    const keys = Object.keys(localStorage).filter((key) =>
+                        key.startsWith("bandcamp_listened_"),
+                    );
+
+                    keys.forEach((key) => localStorage.removeItem(key));
+
+                    alert(
+                        `✅ ${keys.length} géneros limpiados.\n\nRecarga la página para ver los cambios.`,
+                    );
+                    loadStats();
+                } catch (error) {
+                    alert("❌ Error: " + error.message);
+                }
+            }
+
+            function importData() {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".json";
+
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
+
+                    reader.onload = (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+
+                            Object.entries(data).forEach(([key, value]) => {
+                                if (key.startsWith("bandcamp_listened_")) {
+                                    localStorage.setItem(
+                                        key,
+                                        JSON.stringify(value),
+                                    );
+                                }
+                            });
+
+                            alert(
+                                "✅ Datos importados exitosamente.\n\nRecarga la página para ver los cambios.",
+                            );
+                            loadStats();
+                        } catch (error) {
+                            alert("❌ Error al importar:\n" + error.message);
+                        }
+                    };
+
+                    reader.readAsText(file);
+                };
+
+                input.click();
+            }
+
+            // Cargar stats al iniciar
+            loadStats();
+        </script>
+    </body>
+</html>

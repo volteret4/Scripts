@@ -1,0 +1,434 @@
+#!/usr/bin/env python3
+"""
+Script Name: yt_sync_mixxx.py
+Description: Sincroniza las playlists .m3u de Mix con playlists de YouTube (una por .m3u)
+Author: volteret4
+Notes:
+    - La búsqueda de vídeos se hace con yt-dlp (no gasta cuota de la API).
+    - La API de YouTube solo se usa para crear playlists y añadir/quitar vídeos
+      (50 unidades cada operación, cuota diaria de 10.000). Si se agota la
+      cuota se guarda el estado y la siguiente ejecución continúa donde se quedó.
+    - Solo se quitan de YouTube los vídeos que añadió este script; lo que metas
+      a mano en la playlist no se toca.
+    - Primera vez: ejecutarlo a mano para autorizar en el navegador.
+
+Uso:
+    yt_sync_mixxx.py                  # sincroniza todas las playlists
+    yt_sync_mixxx.py --only house     # solo la playlist "house"
+    yt_sync_mixxx.py --dry-run        # muestra qué haría, sin tocar YouTube
+    yt_sync_mixxx.py --retry-missing  # vuelve a buscar canciones no encontradas
+    yt_sync_mixxx.py --no-sync --publish  # solo genera el listado .md y actualiza el gist
+    yt_sync_mixxx.py --telegram       # avisa por Telegram (TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID)
+
+En pepecono corre a diario una hora antes de que se renueve la cuota (yt_sync_nocturno.sh),
+con YT_SYNC_MIX apuntando a su copia de Mix por syncthing.
+"""
+import os
+import sys
+import json
+import re
+import fcntl
+import time
+from datetime import datetime
+import argparse
+import subprocess
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+from mutagen import File as MutagenFile
+import yt_dlp
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+MIX_PATH = Path(os.environ.get("YT_SYNC_MIX", "/mnt/windows/Mix"))
+CONFIG_DIR = Path.home() / ".config" / "yt_sync"
+MARKDOWN_FILE = CONFIG_DIR / "Mix.md"
+CLIENT_SECRET = Path(os.environ.get("YT_CLIENT_SECRET", CONFIG_DIR / "client_secret.json"))
+TOKEN_FILE = CONFIG_DIR / "token.json"
+STATE_FILE = CONFIG_DIR / "state.json"
+LOCK_FILE = CONFIG_DIR / "sync.lock"
+SCOPES = ["https://www.googleapis.com/auth/youtube"]
+PLAYLIST_PREFIX = "Mix - "  # Para no mezclarlas con otras playlists del canal
+PRIVACY = "private"
+DAILY_QUOTA = 10000
+TELEGRAM = False  # --telegram: avisos por Telegram en vez de notify-send
+
+
+class QuotaExceeded(Exception):
+    pass
+
+
+def notify(title, message, urgent=False, enabled=True):
+    print(f"{title}: {message}")
+    if enabled and TELEGRAM:
+        data = urllib.parse.urlencode({"chat_id": os.environ["TELEGRAM_CHAT_ID"],
+                                       "text": f"{'⚠️' if urgent else '🎵'} {title}: {message}"}).encode()
+        try:
+            urllib.request.urlopen(f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage",
+                                   data, timeout=30)
+        except Exception as e:
+            print(f"No se pudo avisar por Telegram: {e}")
+    elif enabled:
+        subprocess.run(["notify-send", "-u", "critical" if urgent else "normal", title, message],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def load_state():
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        state = {}
+    state.setdefault("videos", {})  # "artista|título" -> videoId o None (no encontrado)
+    state.setdefault("added", {})   # nombre playlist -> {videoId: playlistItemId}
+    state.setdefault("playlists", {})  # nombre playlist -> id de la playlist en YouTube
+    return state
+
+
+def save_state(state):
+    tmp = STATE_FILE.with_suffix(".tmp")
+    with open(tmp, "w") as f:
+        json.dump(state, f, indent=1, ensure_ascii=False)
+    tmp.replace(STATE_FILE)
+
+
+def get_youtube(interactive):
+    creds = None
+    if TOKEN_FILE.exists():
+        creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    if creds and creds.valid:
+        return build("youtube", "v3", credentials=creds)
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception:
+            creds = None
+    if not creds or not creds.valid:
+        if not interactive:
+            return None
+        if not CLIENT_SECRET.exists():
+            sys.exit(f"No existe {CLIENT_SECRET} (descárgalo de Google Cloud Console)")
+        flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET), SCOPES)
+        creds = flow.run_local_server(port=0)
+    TOKEN_FILE.write_text(creds.to_json())
+    return build("youtube", "v3", credentials=creds)
+
+
+def call(request, retries=4):
+    """Ejecutar una petición de la API convirtiendo el error de cuota en QuotaExceeded.
+
+    Los 409 (típicos justo después de crear una playlist) y los 5xx son
+    transitorios: se reintentan con espera creciente.
+    """
+    for attempt in range(retries + 1):
+        try:
+            return request.execute()
+        except HttpError as e:
+            if e.resp.status == 403 and "quota" in str(e).lower():
+                raise QuotaExceeded() from e
+            if e.resp.status in (409, 500, 503) and attempt < retries:
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise
+
+
+def read_tracks(m3u_path):
+    """Devolver [(artista, título)] de un .m3u, leyendo los tags de cada fichero."""
+    tracks = []
+    for line in m3u_path.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        file_path = MIX_PATH / line
+        artist = title = ""
+        try:
+            audio = MutagenFile(file_path, easy=True)
+            if audio and audio.tags:
+                artist = (audio.tags.get("artist") or [""])[0].strip()
+                title = (audio.tags.get("title") or [""])[0].strip()
+        except Exception:
+            pass
+        if not (artist and title):
+            stem = file_path.stem
+            if " - " in stem:
+                artist, title = [s.strip() for s in stem.split(" - ", 1)]
+            else:
+                title = title or stem
+        tracks.append((artist, title))
+    return tracks
+
+
+def search_video(ydl, artist, title):
+    query = f"{artist} - {title}" if artist else title
+    try:
+        info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+    except Exception as e:
+        print(f"  ! Error buscando '{query}': {e}")
+        return None
+    entries = (info or {}).get("entries") or []
+    return entries[0].get("id") if entries else None
+
+
+def get_my_playlists(youtube):
+    playlists, token = {}, None
+    while True:
+        resp = call(youtube.playlists().list(part="snippet", mine=True, maxResults=50, pageToken=token))
+        for item in resp.get("items", []):
+            playlists[item["snippet"]["title"]] = item["id"]
+        token = resp.get("nextPageToken")
+        if not token:
+            return playlists
+
+
+def get_playlist_items(youtube, playlist_id):
+    """Devolver {videoId: playlistItemId} de lo que hay ahora en la playlist."""
+    items, token = {}, None
+    while True:
+        resp = call(youtube.playlistItems().list(part="snippet", playlistId=playlist_id,
+                                                 maxResults=50, pageToken=token))
+        for item in resp.get("items", []):
+            items[item["snippet"]["resourceId"]["videoId"]] = item["id"]
+        token = resp.get("nextPageToken")
+        if not token:
+            return items
+
+
+def sync_playlist(youtube, ydl, name, m3u_path, state, my_playlists, args):
+    tracks = read_tracks(m3u_path)
+    print(f"\n== {name} ({len(tracks)} canciones)")
+
+    wanted = []
+    for artist, title in tracks:
+        key = f"{artist}|{title}".lower()
+        if key not in state["videos"] or (state["videos"][key] is None and args.retry_missing):
+            state["videos"][key] = search_video(ydl, artist, title)
+            save_state(state)
+            if state["videos"][key] is None:
+                print(f"  ? No encontrado: {artist} - {title}")
+        video_id = state["videos"][key]
+        if video_id and video_id not in wanted:
+            wanted.append(video_id)
+
+    if args.quota_out:  # Sin cuota: solo se busca (gratis); YouTube se actualiza otro día
+        added = state["added"].get(name, {})
+        args.stats["pending"] += len([v for v in wanted if v not in added]) + len([v for v in added if v not in wanted])
+        return
+
+    yt_title = PLAYLIST_PREFIX + name
+    playlist_id = my_playlists.get(yt_title)
+    added = state["added"].setdefault(name, {})
+    if playlist_id:
+        state["playlists"][name] = playlist_id
+
+    if playlist_id:
+        current = get_playlist_items(youtube, playlist_id)
+    else:
+        current = {}
+        added.clear()
+
+    to_add = [v for v in wanted if v not in current]
+    to_remove = [v for v in added if v not in wanted and v in current]
+    print(f"  +{len(to_add)} -{len(to_remove)}")
+    args.stats["pending"] += len(to_add) + len(to_remove)
+    if args.dry_run or not (to_add or to_remove):
+        return
+
+    if not playlist_id:
+        resp = call(youtube.playlists().insert(part="snippet,status", body={
+            "snippet": {"title": yt_title, "description": f"Sincronizada desde {m3u_path.name}"},
+            "status": {"privacyStatus": PRIVACY},
+        }))
+        playlist_id = my_playlists[yt_title] = state["playlists"][name] = resp["id"]
+        save_state(state)
+        print(f"  Playlist creada: {yt_title}")
+
+    for video_id in to_remove:
+        try:
+            call(youtube.playlistItems().delete(id=current[video_id]))
+        except HttpError as e:
+            if e.resp.status != 404:
+                raise
+        added.pop(video_id, None)
+        save_state(state)
+        args.stats["removed"] += 1
+        args.stats["pending"] -= 1
+
+    for video_id in to_add:
+        try:
+            resp = call(youtube.playlistItems().insert(part="snippet", body={
+                "snippet": {"playlistId": playlist_id,
+                            "resourceId": {"kind": "youtube#video", "videoId": video_id}},
+            }))
+        except HttpError as e:
+            # Vídeo borrado, privado o no insertable: se olvida y se sigue
+            print(f"  ! No se pudo añadir {video_id}: {e.resp.status}")
+            args.stats["pending"] -= 1
+            continue
+        added[video_id] = resp["id"]
+        save_state(state)
+        args.stats["added"] += 1
+        args.stats["pending"] -= 1
+
+
+def md_escape(text):
+    return re.sub(r"([\\`*_\[\]<>|#])", r"\\\1", text)
+
+
+def folder_tree():
+    """{carpeta: [subcarpetas]} de Mix, igual que get_folder_tree() del mover."""
+    tree = {}
+    for item in sorted(MIX_PATH.iterdir(), key=lambda p: p.name.lower()):
+        if item.is_dir() and not item.name.startswith("."):
+            tree[item.name] = sorted((d.name for d in item.iterdir()
+                                      if d.is_dir() and not d.name.startswith(".")), key=str.lower)
+    return tree
+
+
+def build_markdown(state):
+    m3us = {p.stem.lower(): p for p in MIX_PATH.glob("*.m3u")}
+    total = found = 0
+
+    def section(level, name):
+        nonlocal total, found
+        m3u = m3us.get(name.lower())
+        tracks = read_tracks(m3u) if m3u else []
+        playlist_id = state["playlists"].get(m3u.stem if m3u else name)
+        header = f"{'#' * level} {md_escape(name)} ({len(tracks)})"
+        if playlist_id:
+            header += f" · [▶ playlist](https://www.youtube.com/playlist?list={playlist_id})"
+        lines = [header, ""]
+        for artist, title in tracks:
+            label = md_escape(f"{artist} - {title}" if artist else title)
+            video_id = state["videos"].get(f"{artist}|{title}".lower())
+            lines.append(f"- [{label}](https://www.youtube.com/watch?v={video_id})" if video_id else f"- {label}")
+            total += 1
+            found += bool(video_id)
+        return lines + [""]
+
+    body = []
+    for top, children in folder_tree().items():
+        body += section(2, top)
+        for child in children:
+            body += section(3, child)
+
+    head = ["# Mix", "",
+            f"_Actualizado: {datetime.now():%Y-%m-%d %H:%M} · {total} canciones · {found} con enlace_", "",
+            "## Índice", ""]
+    for top, children in folder_tree().items():
+        head.append(f"- {md_escape(top)}" + (f": {', '.join(md_escape(c) for c in children)}" if children else ""))
+    return "\n".join(head + [""] + body)
+
+
+def publish_gist(state, md_file):
+    gist_id = state.get("gist_id")
+    if gist_id:
+        result = subprocess.run(["gh", "gist", "edit", gist_id, "--filename", md_file.name, str(md_file)],
+                                capture_output=True, text=True)
+        if result.returncode == 0:
+            return f"https://gist.github.com/{gist_id}"
+        print(f"No se pudo editar el gist {gist_id}, se crea uno nuevo: {result.stderr.strip()}")
+    # Sin --public: gist secreto (solo accesible con el enlace, como un pastebin)
+    result = subprocess.run(["gh", "gist", "create", "--desc", "Mix: canciones por carpeta", str(md_file)],
+                            capture_output=True, text=True, check=True)
+    url = result.stdout.strip().splitlines()[-1]
+    state["gist_id"] = url.rstrip("/").rsplit("/", 1)[-1]
+    save_state(state)
+    return url
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--only", action="append", help="Sincronizar solo esta playlist (repetible)")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--retry-missing", action="store_true")
+    parser.add_argument("--notify", action="store_true", help="Avisar con notify-send")
+    parser.add_argument("--telegram", action="store_true",
+                        help="Avisar por Telegram (variables TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID)")
+    parser.add_argument("--markdown", action="store_true",
+                        help=f"Generar {MARKDOWN_FILE} con todas las canciones por carpeta")
+    parser.add_argument("--publish", action="store_true",
+                        help="Generar el markdown y publicarlo/actualizarlo en un gist secreto")
+    parser.add_argument("--no-sync", action="store_true",
+                        help="No tocar las playlists de YouTube (solo con --markdown/--publish)")
+    parser.add_argument("--no-auth", action="store_true",
+                        help="No abrir el navegador para autorizar (para llamadas en segundo plano)")
+    args = parser.parse_args()
+    global TELEGRAM
+    TELEGRAM = args.telegram
+    args.notify = args.notify or args.telegram
+    args.stats = {"added": 0, "removed": 0, "pending": 0}
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    lock = open(LOCK_FILE, "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("Ya hay una sincronización en marcha")
+        return 0
+
+    m3us = {p.stem: p for p in sorted(MIX_PATH.glob("*.m3u"))}
+    if args.only:
+        only = {o.lower() for o in args.only}  # NTFS: may/min pueden no coincidir
+        m3us = {n: p for n, p in m3us.items() if n.lower() in only}
+        if not m3us:
+            print(f"No hay .m3u para {args.only}")
+            return 1
+
+    youtube = get_youtube(interactive=not (args.no_auth or args.no_sync))
+    if youtube is None and not args.no_sync:
+        notify("YouTube", "Sin autorizar: ejecuta yt_sync_mixxx.py a mano una vez", urgent=True,
+               enabled=args.notify)
+        return 1
+
+    state = load_state()
+    ydl = yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True,
+                            "skip_download": True})
+    args.quota_out = False
+    my_playlists = {}
+    if youtube:
+        try:
+            my_playlists = get_my_playlists(youtube)
+            for title, playlist_id in my_playlists.items():
+                if title.startswith(PLAYLIST_PREFIX):
+                    state["playlists"][title[len(PLAYLIST_PREFIX):]] = playlist_id
+        except QuotaExceeded:
+            args.quota_out = True
+    if not args.no_sync:
+        for name, m3u_path in m3us.items():
+            try:
+                sync_playlist(youtube, ydl, name, m3u_path, state, my_playlists, args)
+            except QuotaExceeded:
+                args.quota_out = True
+                # Se sigue con las demás playlists solo para buscar los vídeos
+        st = args.stats
+        done = f"+{st['added']} -{st['removed']} vídeos"
+        if args.quota_out:
+            days = st["pending"] * 50 / DAILY_QUOTA
+            notify("YouTube", f"{done}. Cuota diaria agotada: quedan {st['pending']} "
+                   f"(~{max(days, 1):.0f} día{'s' if days > 1.5 else ''} de cuota); se seguirá en la próxima ejecución",
+                   enabled=args.notify)
+        elif args.notify and not args.dry_run:
+            what = ", ".join(m3us) if len(m3us) <= 5 else f"{len(m3us)} playlists"
+            notify("YouTube", f"{done}. Sincronizadas: {what}")
+    save_state(state)
+
+    if args.markdown or args.publish:
+        MARKDOWN_FILE.write_text(build_markdown(state))
+        print(f"Markdown: {MARKDOWN_FILE}")
+        if args.publish and not args.dry_run:
+            try:
+                # Por Telegram, un solo aviso al día: el de YouTube
+                notify("Gist", f"Listado actualizado: {publish_gist(state, MARKDOWN_FILE)}",
+                       enabled=args.notify and not TELEGRAM)
+            except subprocess.CalledProcessError as e:
+                notify("Gist", f"Error publicando: {e.stderr.strip()}", urgent=True, enabled=args.notify)
+                return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -63,7 +63,7 @@ def add_todos_to_task_file(todos, filename):
         todos (list): List of TODO lines
         filename (str): Source filename
     """
-    task_file_path = "/mnt/windows/FTP/Obsidian/Important/Tareas.md"
+    task_file_path = "/home/huan/notes/Important/Tareas.md"
     
     # Get current and future dates
     today = datetime.now().date()
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     # destination = input("Introduce la ruta de la carpeta destino: ")
     # exclude = input("Introduce las carpetas a excluir (separadas por comas): ").split(',')
     source = "/home/huan/gits/pollo/music-fuzzy"
-    destination = "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/snipets y scripts/music-fuzzy/scripts"
+    destination = "/home/huan/notes/Spaces/Blogs/snipets y scripts/music-fuzzy/scripts"
     exclude = [
         "/home/huan/gits/pollo/music-fuzzy/.git",
         "/home/huan/gits/pollo/music-fuzzy/.content",
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     sync_files(source, destination, exclude, exclude_extensions)
 
     config_example = Path("/home/huan/gits/pollo/music-fuzzy/config/config_database_creator_example.json")
-    config_dest_md = Path("/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs/snipets y scripts/music-fuzzy/scripts/config/config_database_creator_example.json.md")
+    config_dest_md = Path("/home/huan/notes/Spaces/Blogs/snipets y scripts/music-fuzzy/scripts/config/config_database_creator_example.json.md")
 
     # Copiar archivo
     shutil.copy(config_example, config_dest_md)

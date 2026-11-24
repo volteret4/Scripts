@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Define el directorio donde están tus archivos Markdown
-SEARCH_DIR="/mnt/windows/FTP/wiki/Obsidian/"
+SEARCH_DIR="/home/huan/notes/"
 
 busq="$1"
 if [[ -z $busq ]]; then busq=".+"; fi

@@ -4,6 +4,16 @@ import os
 from dotenv import load_dotenv
 import urllib.parse
 import json
+import sys
+
+# same_artist y same_title están junto a main.py
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from online_info import same_artist, same_title
+
+HEADERS = {'User-Agent': 'vvmm-post-creator/1.0'}
+
+# Imagen que Last.fm devuelve cuando no tiene portada
+LASTFM_PLACEHOLDER = '2a96cbd8b46e442fc41c2b86b821562f'
 
 # Cargar variables de entorno
 load_dotenv()
@@ -25,13 +35,13 @@ def validar_url_imagen(url, fuente=""):
                 return content_type.startswith('image/') or len(content) > 500  # Si tiene contenido, probablemente es imagen
         else:
             # Para otras fuentes, usar HEAD
-            response = requests.head(url, timeout=10)
+            response = requests.head(url, timeout=10, headers=HEADERS)
             if response.status_code == 200:
                 content_type = response.headers.get('content-type', '')
                 return content_type.startswith('image/')
             # Si HEAD falla, intentar GET
-            elif response.status_code in [405, 404]:
-                response = requests.get(url, timeout=10, stream=True)
+            elif response.status_code in [403, 405, 404]:
+                response = requests.get(url, timeout=10, stream=True, headers=HEADERS)
                 if response.status_code == 200:
                     content_type = response.headers.get('content-type', '')
                     return content_type.startswith('image/')
@@ -54,7 +64,7 @@ def buscar_portada_musicbrainz(artista, album):
             'limit': 10
         }
         
-        headers = {'User-Agent': 'PortadaDownloader/1.0 (tu-email@ejemplo.com)'}
+        headers = {'User-Agent': 'vvmm-post-creator/1.0'}
         response = requests.get(url, params=params, headers=headers, timeout=15)
         
         if response.status_code == 200:
@@ -62,7 +72,12 @@ def buscar_portada_musicbrainz(artista, album):
             if 'releases' in data and data['releases']:
                 print(f"  → Encontrados {len(data['releases'])} releases")
                 
-                for i, release in enumerate(data['releases'][:5]):  # Solo los primeros 5
+                # La búsqueda también devuelve títulos parecidos: solo vale el mismo disco
+                coinciden = [r for r in data['releases']
+                             if same_title(r.get('title', ''), album)
+                             and any(same_artist(c.get('name', ''), artista) for c in r.get('artist-credit', []))]
+
+                for i, release in enumerate(coinciden[:5]):  # Solo los primeros 5
                     release_id = release['id']
                     cover_url = f"https://coverartarchive.org/release/{release_id}/front"
                     
@@ -110,13 +125,12 @@ def buscar_portada_discogs(artista, album):
             'User-Agent': 'PortadaDownloader/1.0'
         }
         
-        queries = [f"{artista} {album}", album]
-        
-        for query in queries:
+        for tipo in ('master', 'release'):
             params = {
-                'q': query,
-                'type': 'release',
-                'per_page': 5
+                'artist': artista,
+                'release_title': album,
+                'type': tipo,
+                'per_page': 10
             }
             
             response = requests.get(url, params=params, headers=headers, timeout=10)
@@ -124,8 +138,15 @@ def buscar_portada_discogs(artista, album):
             if response.status_code == 200:
                 data = response.json()
                 if 'results' in data:
-                    for result in data['results']:
-                        if 'cover_image' in result and result['cover_image']:
+                    # Un título puede coincidir con un promo o un single: primero el más extendido
+                    resultados = sorted(data['results'], reverse=True,
+                                        key=lambda r: (r.get('community') or {}).get('have', 0))
+                    for result in resultados:
+                        # El título viene como 'Artista - Disco'
+                        r_artista, _, r_album = result.get('title', '').partition(' - ')
+                        if not (same_artist(r_artista, artista) and same_title(r_album, album)):
+                            continue
+                        if 'cover_image' in result and result['cover_image'] and 'spacer.gif' not in result['cover_image']:
                             image_url = result['cover_image']
                             print(f"  → Verificando: {image_url}")
                             if validar_url_imagen(image_url, "discogs"):
@@ -161,11 +182,13 @@ def buscar_portada_lastfm(artista, album):
         if response.status_code == 200:
             data = response.json()
             
-            if 'album' in data and 'image' in data['album']:
+            if ('album' in data and 'image' in data['album']
+                    and same_artist(data['album'].get('artist', ''), artista)
+                    and same_title(data['album'].get('name', ''), album)):
                 images = data['album']['image']
                 # Buscar la imagen de mayor resolución (última en la lista)
                 for img in reversed(images):
-                    if img.get('#text') and img['#text'].strip():
+                    if img.get('#text') and img['#text'].strip() and LASTFM_PLACEHOLDER not in img['#text']:
                         image_url = img['#text']
                         print(f"  → Verificando: {image_url}")
                         if validar_url_imagen(image_url, "lastfm"):
@@ -191,7 +214,7 @@ def buscar_portada_itunes(artista, album):
             'term': f"{artista} {album}",
             'media': 'music',
             'entity': 'album',
-            'limit': 5
+            'limit': 25
         }
         
         response = requests.get(url, params=params, timeout=10)
@@ -200,6 +223,10 @@ def buscar_portada_itunes(artista, album):
             data = response.json()
             if 'results' in data and data['results']:
                 for result in data['results']:
+                    # iTunes devuelve lo más popular aunque no se parezca a lo buscado
+                    if not (same_artist(result.get('artistName', ''), artista)
+                            and same_title(result.get('collectionName', ''), album)):
+                        continue
                     if 'artworkUrl100' in result:
                         # Obtener la imagen en alta resolución
                         image_url = result['artworkUrl100'].replace('100x100', '600x600')
@@ -219,11 +246,7 @@ def descargar_portada(artista, album, url, ruta_salida):
     try:
         print(f"Descargando desde: {url}")
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(url, stream=True, headers=headers, timeout=30)
+        response = requests.get(url, stream=True, headers=HEADERS, timeout=30)
         if response.status_code == 200:
             # Limpiar nombre de archivo
             nombre_archivo = f"{artista} - {album}".replace(' ', '_')
@@ -272,9 +295,9 @@ def main():
     # Fuentes ordenadas por probabilidad de éxito
     fuentes = [
         ('iTunes', buscar_portada_itunes),           # No requiere token
-        ('Last.fm', buscar_portada_lastfm),          # Solo API key
-        ('MusicBrainz', buscar_portada_musicbrainz), # No requiere token
-        ('Discogs', buscar_portada_discogs)          # Solo token personal
+        ('Discogs', buscar_portada_discogs),         # Solo token personal (600 px)
+        ('Last.fm', buscar_portada_lastfm),          # Solo API key (300 px)
+        ('MusicBrainz', buscar_portada_musicbrainz)  # No requiere token
     ]
 
     for nombre_fuente, buscar_funcion in fuentes:

@@ -1,0 +1,1 @@
+/home/huan/gits/pollo/second_brain/scripts/hotkeys/sb_search_notes.sh

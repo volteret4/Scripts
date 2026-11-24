@@ -34,7 +34,7 @@ class DatabaseSearchThread(QThread):
 
     def run(self):
         try:
-            conn = sqlite3.connect(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path), timeout=30)
             conn.row_factory = sqlite3.Row
 
             # Construir query SQL con filtros
@@ -149,12 +149,12 @@ class DotfilesEditor(QMainWindow):
 
     def setup_database(self):
         """Configura la conexión a la base de datos"""
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), timeout=30)
         self.conn.row_factory = sqlite3.Row
 
-        # Optimizaciones para lectura
-        self.conn.execute('PRAGMA synchronous = OFF')
-        self.conn.execute('PRAGMA journal_mode = MEMORY')
+        # Optimizaciones para lectura — mantener WAL para compatibilidad con el indexer
+        self.conn.execute('PRAGMA synchronous = NORMAL')
+        self.conn.execute('PRAGMA journal_mode = WAL')
         self.conn.execute('PRAGMA temp_store = MEMORY')
         self.conn.execute('PRAGMA cache_size = 10000')
 

@@ -1,0 +1,128 @@
+import os
+import requests
+from mutagen import File
+from mutagen.id3 import ID3, APIC, error
+from mutagen.flac import FLAC, Picture
+
+CACHE = {}
+
+def has_cover_mp3(path):
+    try:
+        audio = ID3(path)
+        return any(tag.startswith("APIC") for tag in audio.keys())
+    except error:
+        return False
+
+
+def has_cover_flac(path):
+    try:
+        audio = FLAC(path)
+        return len(audio.pictures) > 0
+    except:
+        return False
+
+def get_cover(artist, album):
+    key = f"{artist}-{album}"
+    if key in CACHE:
+        return CACHE[key]
+
+    query = f"https://musicbrainz.org/ws/2/release/?query=artist:{artist} AND release:{album}&fmt=json"
+    r = requests.get(query, headers={"User-Agent": "cover-fetcher/1.0"})
+    data = r.json()
+
+    if not data.get("releases"):
+        return None
+
+    mbid = data["releases"][0]["id"]
+    cover_url = f"https://coverartarchive.org/release/{mbid}/front"
+
+    img = requests.get(cover_url)
+    if img.status_code == 200:
+        CACHE[key] = img.content
+        return img.content
+
+    return None
+
+
+def embed_mp3(path, image_data):
+    audio = ID3(path)
+    audio.delall("APIC")
+    audio.add(
+        APIC(
+            encoding=3,
+            mime="image/jpeg",
+            type=3,
+            desc="Cover",
+            data=image_data
+        )
+    )
+    audio.save()
+
+
+def embed_flac(path, image_data):
+    audio = FLAC(path)
+    pic = Picture()
+    pic.data = image_data
+    pic.type = 3
+    pic.mime = "image/jpeg"
+    audio.clear_pictures()
+    audio.add_picture(pic)
+    audio.save()
+
+
+def process_file(path):
+    try:
+        audio = File(path, easy=True)
+        if not audio:
+            return
+
+        artist = audio.get("artist", [None])[0]
+        album = audio.get("album", [None])[0]
+
+        if not artist or not album:
+            print(f"⏭️  Sin tags: {path}")
+            return
+
+        # 👇 NUEVO: comprobar si ya tiene carátula
+        if path.lower().endswith(".mp3") and has_cover_mp3(path):
+            print(f"🖼️ Ya tiene carátula: {path}")
+            return
+
+        if path.lower().endswith(".flac") and has_cover_flac(path):
+            print(f"🖼️ Ya tiene carátula: {path}")
+            return
+
+        print(f"🔎 {artist} - {album}")
+
+        cover = get_cover(artist, album)
+        if not cover:
+            print("❌ No encontrada")
+            return
+
+        if path.lower().endswith(".mp3"):
+            embed_mp3(path, cover)
+        elif path.lower().endswith(".flac"):
+            embed_flac(path, cover)
+
+        print("✅ OK")
+
+    except Exception as e:
+        print(f"⚠️ Error en {path}: {e}")
+
+
+def walk(folder):
+    for root, _, files in os.walk(folder):
+        for f in files:
+            if f.lower().endswith((".mp3", ".flac")):
+                process_file(os.path.join(root, f))
+
+
+if __name__ == "__main__":
+    import sys
+    # Con argumentos: solo esos archivos/carpetas; sin ellos, todo Mix
+    targets = sys.argv[1:] or ["/mnt/windows/Mix/"]
+    for target in targets:
+        if os.path.isdir(target):
+            walk(target)
+        else:
+            process_file(target)

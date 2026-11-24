@@ -36,27 +36,46 @@ if echo "$notifications" | grep -q '"unread":true'; then
     fi
     message="$message\n\n💡 Tipo: $type | Razón: $reason"
 
-    # Enviar la notificación usando dunstify con acción
+    # Enviar la notificación (no bloqueante) y quedarnos con su ID
     if [ -n "$DISPLAY" ]; then
-        # Capturar la respuesta de la acción
-        action=$(dunstify -u normal -t 15000 \
+        notif_id=$(dunstify -p -u normal -t 15000 \
             "🐙 GitHub: $repository" \
             "$message" \
             -A "open,Abrir Notificaciones" \
-            -A "repo,Ver Repositorio" \
+            -A "default,Ver Repositorio" \
             -h string:category:github 2>/dev/null)
 
-        # Manejar la acción seleccionada
-        case "$action" in
-            "open")
-                # Abrir página de notificaciones de GitHub
-                xdg-open "https://github.com/notifications" &
-                ;;
-            "repo")
-                # Abrir el repositorio
-                xdg-open "$repo_url" &
-                ;;
-        esac
+        # dunstify NUNCA informa qué acción se invocó (solo el motivo de
+        # cierre con -w: expirada/descartada/cerrada), así que escuchamos
+        # la señal real de D-Bus en segundo plano para saber en qué botón
+        # se hizo click y actuar en consecuencia.
+        (
+            timeout 16 dbus-monitor --session \
+                "type='signal',interface='org.freedesktop.Notifications',member='ActionInvoked'" 2>/dev/null \
+            | gawk -v target="$notif_id" '
+                /member=ActionInvoked/ { state = 1; next }
+                state == 1 && /uint32/ {
+                    gsub(/[^0-9]/, "", $0)
+                    id = $0
+                    state = 2
+                    next
+                }
+                state == 2 && /string/ {
+                    if (match($0, /"([^"]*)"/, arr) && id == target) {
+                        print arr[1]
+                        fflush()
+                        exit
+                    }
+                    state = 0
+                }
+            ' \
+            | { read -r action
+                case "$action" in
+                    open) xdg-open "https://github.com/notifications" ;;
+                    default) xdg-open "$repo_url" ;;
+                esac
+              }
+        ) &
     fi
 
     # Mostrar detalles en la terminal/log

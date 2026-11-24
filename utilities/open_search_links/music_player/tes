@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+import hashlib
+import secrets
+import requests
+import sys
+
+# Configuración
+url = "http://192.168.1.133:4040"
+username = input("Usuario: ")
+password = input("Contraseña: ")
+
+print("\nProbando diferentes versiones de API...\n")
+
+versions = ['1.15.0', '1.16.0', '1.16.1']
+
+for version in versions:
+    salt = secrets.token_hex(8)
+    token = hashlib.md5((password + salt).encode()).hexdigest()
+
+    params = {
+        'u': username,
+        't': token,
+        's': salt,
+        'v': version,
+        'c': 'test',
+        'f': 'json'
+    }
+
+    try:
+        response = requests.get(f"{url}/rest/getNowPlaying.view", params=params, timeout=5)
+        data = response.json()
+
+        subsonic_response = data.get('subsonic-response', {})
+        status = subsonic_response.get('status')
+
+        if status == 'ok':
+            print(f"✅ Versión {version}: FUNCIONA")
+            server_version = subsonic_response.get('version', 'unknown')
+            print(f"   Versión del servidor: {server_version}")
+        else:
+            error = subsonic_response.get('error', {})
+            code = error.get('code', 'unknown')
+            msg = error.get('message', 'Unknown')
+            print(f"❌ Versión {version}: ERROR [{code}] {msg}")
+    except Exception as e:
+        print(f"❌ Versión {version}: ERROR - {e}")
+
+print("\nProbando con ping.view para ver qué reporta el servidor...")
+salt = secrets.token_hex(8)
+token = hashlib.md5((password + salt).encode()).hexdigest()
+
+params = {
+    'u': username,
+    't': token,
+    's': salt,
+    'v': '1.13.0',  # Versión muy compatible
+    'c': 'test',
+    'f': 'json'
+}
+
+try:
+    response = requests.get(f"{url}/rest/ping.view", params=params, timeout=5)
+    data = response.json()
+    subsonic_response = data.get('subsonic-response', {})
+
+    if subsonic_response.get('status') == 'ok':
+        server_version = subsonic_response.get('version', 'unknown')
+        server_type = subsonic_response.get('type', 'unknown')
+        print(f"\nServidor:")
+        print(f"  Versión: {server_version}")
+        print(f"  Tipo: {server_type}")
+except Exception as e:
+    print(f"Error: {e}")

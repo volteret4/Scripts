@@ -947,14 +947,21 @@ class SpotifyService:
             return artist_data['external_urls'].get('spotify', '')
         return ''
 
-    def search_artist_and_concerts(self, artist_name):
+    def search_artist_and_concerts(self, artist_name, country_code=None):
         """
         Busca un artista en Spotify y sus conciertos con detección de país mejorada
+
+        Args:
+            artist_name (str): Nombre del artista
+            country_code (str, optional): Código de país para filtrar conciertos (ej: 'ES', 'US')
         """
         print(f"🎵 Buscando conciertos de {artist_name} en Spotify...")
+        if country_code:
+            print(f"🌍 Filtrando por país: {country_code}")
 
         # Verificar caché primero
-        cache_file = self._get_cache_file_path(f"spotify_concerts_{artist_name}")
+        cache_key = f"spotify_concerts_{artist_name}" + (f"_{country_code}" if country_code else "")
+        cache_file = self._get_cache_file_path(cache_key)
         cached_data = self._load_from_cache(cache_file)
 
         if cached_data:
@@ -970,7 +977,20 @@ class SpotifyService:
 
         # Scrapear conciertos
         try:
-            return self.scrape_artist_concerts(artist_url, artist_name)
+            concerts, message = self.scrape_artist_concerts(artist_url, artist_name)
+
+            # Filtrar por país si se especificó
+            if country_code and concerts:
+                original_count = len(concerts)
+                concerts = [c for c in concerts if c.get('country', '').upper() == country_code.upper()]
+                print(f"🌍 Filtrados {original_count - len(concerts)} conciertos que no están en {country_code}")
+                message = f"Se encontraron {len(concerts)} conciertos en {country_code} para {artist_name}"
+
+            # Guardar en caché solo si hay resultados
+            if concerts:
+                self._save_to_cache(cache_file, concerts)
+
+            return concerts, message
         except Exception as e:
             print(f"❌ Error en scraping de Spotify para {artist_name}: {e}")
             return [], f"Error scrapeando Spotify: {str(e)}"

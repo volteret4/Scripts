@@ -12,12 +12,15 @@ import os
 import sys
 import subprocess
 import argparse
+import re
 import logging
 import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+import hashlib
 import json
+import secrets
 import shutil
 import signal
 import tempfile
@@ -39,6 +42,10 @@ try:
     SPOTIFY_AVAILABLE = True
 except ImportError:
     SPOTIFY_AVAILABLE = False
+
+from PIL import Image
+
+import online_info
 
 
 class VVMMPostCreator:
@@ -88,9 +95,14 @@ class VVMMPostCreator:
         # Variables de estado
         self.current_metadata = {}
         self.database_data = {}
+        self.online_info = {}
         self.post_file = None
         self.links = {}
         self.success = True
+        # Datos dados por argumentos (--artist/--album/--title/--tags): sin playerctl ni yad,
+        # para lanzarlo sin pantalla (servicio mover_mix de pepecono, desde DSub)
+        self.forced_song: Optional[Tuple[str, str, str]] = None
+        self.forced_tags: Optional[List[str]] = None
 
     def _setup_logging(self):
         """Configurar sistema de logging"""
@@ -155,56 +167,14 @@ class VVMMPostCreator:
         self.logger.info("Obteniendo metadata de la canción en reproducción...")
 
         try:
-            # Obtener reproductores disponibles
-            result = subprocess.run(['playerctl', '-l'],
-                                  capture_output=True, text=True, check=True)
-            players = result.stdout.strip().split('\n')
-
-            if not players or players == ['']:
-                self.logger.error("No hay reproductores disponibles")
-                self._notify("Error", "No hay reproductores de música activos")
-                return False
-
-        except subprocess.CalledProcessError:
-            self.logger.error("playerctl no está disponible")
-            self._notify("Error", "playerctl no está instalado")
-            return False
-
-        # Buscar reproductor activo
-        active_player = None
-        for player in players:
-            try:
-                status = subprocess.run(['playerctl', '-p', player, 'status'],
-                                      capture_output=True, text=True, check=True)
-                if status.stdout.strip() == 'Playing':
-                    active_player = player
-                    break
-            except subprocess.CalledProcessError:
-                continue
-
-        if not active_player:
-            active_player = players[0]  # Usar el primero disponible
-
-        self.logger.info(f"Reproductor detectado: {active_player}")
-
-        # Obtener metadata
-        try:
-            def get_metadata(field):
-                try:
-                    result = subprocess.run(['playerctl', '-p', active_player, 'metadata', field],
-                                          capture_output=True, text=True, check=True)
-                    return result.stdout.strip().replace('"', '').replace(':', '')
-                except subprocess.CalledProcessError:
-                    return ""
-
-            artist_raw = get_metadata('artist')
-            album_raw = get_metadata('album')
-            title_raw = get_metadata('title')
+            source, artist_raw, album_raw, title_raw = self._detect_now_playing()
 
             if not artist_raw or not title_raw:
                 self.logger.error("No se pudo obtener metadata suficiente")
-                self._notify("Error", "No se pudo obtener información de la canción")
+                self._notify("Error", "No se detecta ninguna canción sonando")
                 return False
+
+            self.logger.info(f"Reproductor detectado: {source}")
 
             # Si no hay álbum, usar título
             if not album_raw:
@@ -218,10 +188,10 @@ class VVMMPostCreator:
                 'title_raw': title_raw,
                 # Para BD: usar datos casi sin procesar (solo reemplazar & por and)
                 'artist': artist_raw.replace('&', 'and').strip(),
-                'album': album_raw.replace('&', 'and').strip(),
+                'album': online_info.strip_disc_marker(album_raw.replace('&', 'and').strip()),
                 # Para URLs: procesamiento más agresivo
                 'artist_processed': self._process_for_url(artist_raw),
-                'album_processed': self._process_for_url(album_raw)
+                'album_processed': self._process_for_url(online_info.strip_disc_marker(album_raw))
             }
 
             self.logger.info(f"Metadata obtenida: '{self.current_metadata['artist']}' - '{self.current_metadata['album']}'")
@@ -232,6 +202,80 @@ class VVMMPostCreator:
         except Exception as e:
             self.logger.error(f"Error obteniendo metadata: {e}")
             return False
+
+    def _detect_now_playing(self) -> Tuple[str, str, str, str]:
+        """Devuelve (fuente, artista, álbum, título) de lo que suena.
+
+        Orden: reproductor local sonando, Navidrome, navegador sonando, reproductor
+        local en pausa. Un navegador parado no cuenta: no es música que se esté oyendo.
+        """
+        if self.forced_song:
+            return ('argumentos', *[self._strip_metadata(f) for f in self.forced_song])
+        local_playing, browser_playing, local_paused = [], [], []
+        for player in self._playerctl(['-l']).splitlines():
+            status = self._playerctl(['-p', player, 'status'])
+            is_browser = player.lower().startswith(('firefox', 'chromium', 'chrome', 'brave', 'vivaldi', 'kdeconnect'))
+            if status == 'Playing':
+                (browser_playing if is_browser else local_playing).append(player)
+            elif status == 'Paused' and not is_browser:
+                local_paused.append(player)
+
+        def first_with_metadata(players):
+            for player in players:
+                fields = [self._playerctl(['-p', player, 'metadata', f]) for f in ('artist', 'album', 'title')]
+                if fields[0] and fields[2]:
+                    return (player, *[self._strip_metadata(f) for f in fields])
+            return None
+
+        return (first_with_metadata(local_playing)
+                or self._navidrome_now_playing()
+                or first_with_metadata(browser_playing)
+                or first_with_metadata(local_paused)
+                or ('', '', '', ''))
+
+    def _playerctl(self, args: List[str]) -> str:
+        try:
+            return subprocess.run(['playerctl', *args], capture_output=True, text=True,
+                                  timeout=5).stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            return ''
+
+    @staticmethod
+    def _strip_metadata(text: str) -> str:
+        return (text or '').replace('"', '').replace(':', '').strip()
+
+    def _navidrome_now_playing(self) -> Optional[Tuple[str, str, str, str]]:
+        """Lo que Navidrome cree que está sonando para este usuario, lo más reciente primero"""
+        url = os.getenv('NAVIDROME_URL', '').rstrip('/')
+        user, password = os.getenv('NAVIDROME_USERNAME', ''), os.getenv('NAVIDROME_PASSWORD', '')
+        if not (url and user and password):
+            self.logger.debug("Navidrome sin configurar en .env")
+            return None
+
+        salt = secrets.token_hex(8)
+        try:
+            response = requests.get(f"{url}/rest/getNowPlaying.view", timeout=5, params={
+                'u': user, 's': salt, 't': hashlib.md5((password + salt).encode()).hexdigest(),
+                'v': '1.16.1', 'c': 'vvmm-post-creator', 'f': 'json'})
+            data = response.json().get('subsonic-response', {})
+        except (requests.RequestException, ValueError) as e:
+            # No se registra el mensaje de la excepción: incluye la URL con el token
+            self.logger.warning(f"Navidrome no responde ({type(e).__name__})")
+            return None
+
+        if data.get('status') != 'ok':
+            self.logger.warning(f"Navidrome: {data.get('error', {}).get('message', 'error desconocido')}")
+            return None
+
+        entries = (data.get('nowPlaying') or {}).get('entry') or []
+        entries = [e for e in entries if e.get('username') == user and e.get('artist') and e.get('title')]
+        if not entries:
+            self.logger.info("Navidrome: no hay nada sonando")
+            return None
+
+        song = min(entries, key=lambda e: e.get('minutesAgo', 0))
+        return (f"Navidrome ({song.get('playerName') or 'sin nombre'})",
+                *[self._strip_metadata(song.get(f, '')) for f in ('artist', 'album', 'title')])
 
     def _clean_variable(self, text: str) -> str:
         """Limpiar variables de texto (versión menos agresiva)"""
@@ -448,24 +492,7 @@ class VVMMPostCreator:
                               LIKE LOWER(?)
                         AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(al.name, '.', ''), '!', ''), '?', ''), '(', ''), ')', ''), '-', ' '), '…', ''), '...', ''), '"', ''))
                             LIKE LOWER(?)
-                        LIMIT 1;
-                    """
-                },
-
-                # 6. NUEVA: Búsqueda solo por artista (si el álbum es muy problemático)
-                {
-                    'name': 'solo artista',
-                    'artist_search': self._normalize_for_db_search(artist),
-                    'album_search': '',
-                    'query': """
-                        SELECT a.name, al.name FROM albums al
-                        JOIN artists a ON al.artist_id = a.id
-                        WHERE LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(a.name, '.', ''), '!', ''), '?', ''), '(', ''), ')', ''), '-', ' '), '…', ''), '...', ''), '"', ''))
-                              LIKE LOWER(?)
-                        ORDER BY
-                            CASE WHEN LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(al.name, '.', ''), '!', ''), '?', ''), '(', ''), ')', ''), '-', ' '), '…', ''), '...', ''), '"', ''))
-                                      LIKE LOWER(?) THEN 1 ELSE 2 END
-                        LIMIT 1;
+                        LIMIT 20;
                     """
                 }
             ]
@@ -484,14 +511,13 @@ class VVMMPostCreator:
                 self.logger.debug(f"  Álbum: '{album_search}'")
 
                 try:
-                    if strategy_name == 'solo artista':
-                        # Para búsqueda solo por artista, usar el álbum normalizado también
-                        album_search_normalized = self._normalize_for_db_search(album)
-                        cursor.execute(query, (f"%{artist_search}%", f"%{album_search_normalized}%"))
-                    else:
-                        cursor.execute(query, (artist_search, album_search))
+                    cursor.execute(query, (artist_search, album_search))
 
-                    test_result = cursor.fetchone()
+                    # LIKE también encuentra otros discos ('Blue' en 'Blue Monday'): hay que confirmarlo
+                    test_result = next((row for row in cursor.fetchall()
+                                        if strategy_name != 'fuzzy'
+                                        or (online_info.same_artist(row[0], artist)
+                                            and online_info.same_title(row[1], album))), None)
 
                     if test_result:
                         successful_strategy = strategy_name
@@ -523,6 +549,15 @@ class VVMMPostCreator:
                     similar_artists = cursor.fetchall()
                     for (db_artist,) in similar_artists:
                         self.logger.debug(f"  Similar: '{db_artist}'")
+
+                # El disco no está, pero los datos del artista (menciones, equipo) sí pueden estarlo
+                cursor.execute("SELECT id, name FROM artists WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1",
+                               (artist,))
+                artist_row = cursor.fetchone()
+                if artist_row:
+                    self.logger.info(f"Artista en BD sin este álbum: '{artist_row[1]}'")
+                    self.database_data = {'artist_id': artist_row[0], 'db_artist': artist_row[1],
+                                          'album_id': None, 'db_album': album}
 
                 conn.close()
                 return False
@@ -612,6 +647,13 @@ class VVMMPostCreator:
 
     def get_user_tags(self) -> bool:
         """Solicitar tags al usuario usando yad"""
+        if self.forced_tags is not None:
+            if not self.forced_tags:
+                self.logger.warning("Post cancelado: Sin tags proporcionados")
+                return False
+            self.current_metadata['tags'] = self.forced_tags
+            self.logger.info(f"Tags (argumentos): {self.forced_tags}")
+            return True
         self.logger.info("Solicitando tags al usuario...")
 
         try:
@@ -673,6 +715,8 @@ class VVMMPostCreator:
             self.current_metadata.update({
                 'artist': new_artist,
                 'album': new_album,
+                'artist_raw': new_artist,
+                'album_raw': new_album,
                 'artist_processed': self._process_for_url(new_artist),
                 'album_processed': self._process_for_url(new_album)
             })
@@ -862,14 +906,40 @@ class VVMMPostCreator:
                     self.links[f'link_{service}'] = service_link
 
         # Spotify - usar búsqueda directa con spotipy
-        if 'link_spotify' not in self.links or '<!--' in self.links.get('link_spotify', ''):
+        if self.config['enable_spotify'] and ('link_spotify' not in self.links or '<!--' in self.links.get('link_spotify', '')):
             spotify_url = self._search_spotify_album(artist, album)
             if spotify_url:
                 self.links['url_spotify'] = spotify_url
                 self.links['link_spotify'] = f'[![spotify](../links/svg/spotify.png (spotify))]({spotify_url})'
 
         # Discogs requiere procesamiento especial
-        self._search_discogs(artist, album)
+        if '(not_in_db)' in self.links.get('link_discogs', '(not_in_db)'):
+            self._search_discogs(artist, album)
+
+    def fetch_online_info(self):
+        """Buscar en línea la información del disco que puede no estar en la base de datos"""
+        self.logger.info("Buscando información del álbum en línea...")
+
+        known_url = re.search(r'\]\((https?://[^)]+)\)', self.links.get('link_discogs', ''))
+        try:
+            self.online_info = online_info.fetch_album_info(
+                self.current_metadata['artist'], self.current_metadata['album'],
+                os.getenv('DISCOGS_TOKEN', ''), os.getenv('LASTFM_API_KEY', ''),
+                known_url.group(1) if known_url else ''
+            )
+        except Exception as e:
+            self.logger.warning(f"Error buscando información en línea: {type(e).__name__}")
+            self.online_info = {}
+            return
+
+        # El enlace verificado sustituye al de artista o al de una búsqueda que no coincidía
+        discogs_url = self.online_info.get('discogs_url')
+        if discogs_url:
+            self.links['url_discogs'] = discogs_url
+            self.links['link_discogs'] = f'[![discogs](../links/svg/discogs.png (discogs))]({discogs_url})'
+
+        self.logger.info(f"Información en línea: {len(self.online_info.get('tracks', []))} pistas, "
+                         f"{len(self.online_info.get('credits', {}))} créditos")
 
     def _search_spotify_album(self, artist: str, album: str) -> str:
         """Buscar álbum en Spotify usando API directa"""
@@ -1020,24 +1090,13 @@ class VVMMPostCreator:
 
             content.append("")
 
-            # Añadir información de la base de datos si existe
-            if self.database_data:
-                self._add_database_info_to_content(content)
-
-                # NUEVA FUNCIONALIDAD: Añadir tabla de información de producción
-                self._add_production_table_to_content(content)
-
-                # NUEVA FUNCIONALIDAD: Añadir tracklist con enlaces
-                self._add_tracklist_with_links_to_content(content)
-
-                # NUEVA FUNCIONALIDAD: Añadir tabla de instrumentos/equipboard
-                self._add_equipment_table_to_content(content)
-
-                # NUEVA FUNCIONALIDAD: Añadir información adicional (estudios, equipo, etc.)
-                self._add_extended_info_to_content(content)
-
-                # NUEVA FUNCIONALIDAD: Añadir tablas de reviews, menciones y puntuaciones
-                self._add_reviews_and_mentions_tables(content)
+            # Cada sección combina la base de datos con lo encontrado en línea
+            self._add_database_info_to_content(content)
+            self._add_production_table_to_content(content)
+            self._add_tracklist_with_links_to_content(content)
+            self._add_equipment_table_to_content(content)
+            self._add_extended_info_to_content(content)
+            self._add_reviews_and_mentions_tables(content)
 
             # Escribir contenido al archivo
             with open(self.post_file, 'a', encoding='utf-8') as f:
@@ -1052,84 +1111,81 @@ class VVMMPostCreator:
 
     def _add_production_table_to_content(self, content: List[str]):
         """Añadir tabla de información de producción al contenido"""
-        self.logger.info("Obteniendo información de producción desde base de datos...")
+        self.logger.info("Obteniendo información de producción...")
 
         try:
-            conn = sqlite3.connect(self.config['database_path'])
-            cursor = conn.cursor()
+            album_id = self.database_data.get('album_id')
+            artist_id = self.database_data.get('artist_id')
+            production_result = discogs_result = mb_result = None
 
-            # Obtener información de producción desde albums y discogs_discography
-            production_query = """
-            SELECT
-                COALESCE(al.producers, '') as producers,
-                COALESCE(al.engineers, '') as engineers,
-                COALESCE(al.mastering_engineers, '') as mastering,
-                COALESCE(al.label, '') as label,
-                COALESCE(al.year, '') as year,
-                COALESCE(al.genre, '') as genre,
-                COALESCE(al.credits, '') as credits,
-                al.total_tracks
-            FROM albums al
-            WHERE al.id = ?
-            """
+            if artist_id:
+                conn = sqlite3.connect(self.config['database_path'])
+                cursor = conn.cursor()
 
-            cursor.execute(production_query, (self.database_data['album_id'],))
-            production_result = cursor.fetchone()
+                if album_id:
+                    cursor.execute("""
+                    SELECT
+                        COALESCE(al.producers, '') as producers,
+                        COALESCE(al.engineers, '') as engineers,
+                        COALESCE(al.mastering_engineers, '') as mastering,
+                        COALESCE(al.label, '') as label,
+                        COALESCE(al.year, '') as year,
+                        COALESCE(al.genre, '') as genre,
+                        COALESCE(al.credits, '') as credits,
+                        al.total_tracks
+                    FROM albums al
+                    WHERE al.id = ?
+                    """, (album_id,))
+                    production_result = cursor.fetchone()
 
-            # Obtener información adicional de discogs_discography si existe
-            discogs_extra_query = """
-            SELECT
-                COALESCE(dd.extraartists, '') as extraartists,
-                COALESCE(dd.format, '') as format,
-                COALESCE(dd.status, '') as status,
-                COALESCE(dd.notes, '') as dd_notes
-            FROM discogs_discography dd
-            WHERE dd.artist_id = ? AND dd.album_name LIKE ?
-            LIMIT 1
-            """
+                # Información adicional de discogs_discography, si existe
+                cursor.execute("""
+                SELECT
+                    COALESCE(dd.extraartists, '') as extraartists,
+                    COALESCE(dd.format, '') as format,
+                    COALESCE(dd.status, '') as status
+                FROM discogs_discography dd
+                WHERE dd.artist_id = ? AND LOWER(dd.album_name) = LOWER(?)
+                ORDER BY dd.extraartists IS NULL
+                LIMIT 1
+                """, (artist_id, self.database_data['db_album']))
+                discogs_result = cursor.fetchone()
 
-            cursor.execute(discogs_extra_query, (
-                self.database_data['artist_id'],
-                f"%{self.database_data['db_album']}%"
-            ))
-            discogs_result = cursor.fetchone()
+                # Información adicional de mb_release_group, si existe
+                cursor.execute("""
+                SELECT
+                    COALESCE(producer, '') as mb_producer,
+                    COALESCE(productor, '') as mb_productor,
+                    COALESCE(colaborador, '') as mb_colaborador
+                FROM mb_release_group
+                WHERE artist_id = ? AND LOWER(title) = LOWER(?)
+                LIMIT 1
+                """, (artist_id, self.database_data['db_album']))
+                mb_result = cursor.fetchone()
 
-            # Obtener información adicional de mb_release_group si existe
-            mb_extra_query = """
-            SELECT
-                COALESCE(producer, '') as mb_producer,
-                COALESCE(productor, '') as mb_productor,
-                COALESCE(colaborador, '') as mb_colaborador
-            FROM mb_release_group
-            WHERE artist_id = ? AND title LIKE ?
-            LIMIT 1
-            """
+                conn.close()
 
-            cursor.execute(mb_extra_query, (
-                self.database_data['artist_id'],
-                f"%{self.database_data['db_album']}%"
-            ))
-            mb_result = cursor.fetchone()
-
-            conn.close()
-
-            if not production_result:
+            online = self.online_info
+            if not production_result and not online:
                 return
-
-            # Crear tabla de información
-            content.extend(["", "## Información de Producción", ""])
 
             # Tabla principal con información básica
             table_rows = []
 
-            producers, engineers, mastering, label, year, genre, credits, total_tracks = production_result
+            producers, engineers, mastering, label, year, genre, credits, total_tracks = (
+                production_result or ('', '', '', '', '', '', '', 0))
+
+            label = label or self._online_label()
+            year = year or online.get('released') or online.get('year')
+            genre = self._known_genre(genre) or self._online_genre()
+            total_tracks = len(self._db_tracks()) or total_tracks or len(online.get('tracks', []))
 
             if label:
-                table_rows.append(f"| **Sello** | {label} |")
+                table_rows.append(f"| **Sello** | {online_info.cell(label)} |")
             if year:
                 table_rows.append(f"| **Año** | {year} |")
             if genre:
-                table_rows.append(f"| **Género** | {genre} |")
+                table_rows.append(f"| **Género** | {online_info.cell(genre)} |")
             if total_tracks and total_tracks > 0:
                 table_rows.append(f"| **Total de pistas** | {total_tracks} |")
 
@@ -1156,19 +1212,21 @@ class VVMMPostCreator:
                 table_rows.append(f"| **Masterización** | {mastering} |")
 
             # Añadir información de Discogs si existe
+            credit_rows = []
+            format_info = ''
             if discogs_result:
-                extraartists, format_info, status, dd_notes = discogs_result
+                extraartists, format_info, status = discogs_result
 
-                if format_info:
-                    table_rows.append(f"| **Formato** | {format_info} |")
                 if status:
-                    table_rows.append(f"| **Estado** | {status} |")
+                    table_rows.append(f"| **Estado** | {online_info.cell(status)} |")
                 if extraartists:
-                    # Procesar JSON de extraartists si es necesario
-                    extraartists_rows = self._process_credits_json_to_rows(extraartists)
-                    table_rows.extend(extraartists_rows)
-                if dd_notes:
-                    table_rows.append(f"| **Notas (Discogs)** | {dd_notes} |")
+                    credit_rows.extend(self._process_credits_json_to_rows(extraartists))
+
+            format_info = format_info or online.get('format')
+            if format_info:
+                table_rows.append(f"| **Formato** | {online_info.cell(format_info)} |")
+            if online.get('country'):
+                table_rows.append(f"| **País** | {online_info.cell(online['country'])} |")
 
             # Añadir colaboradores de MusicBrainz
             if mb_result and mb_colaborador:
@@ -1176,11 +1234,19 @@ class VVMMPostCreator:
 
             # Procesar créditos adicionales (JSON) - CADA ROL EN UNA FILA SEPARADA
             if credits:
-                credits_rows = self._process_credits_json_to_rows(credits)
-                table_rows.extend(credits_rows)
+                credit_rows.extend(self._process_credits_json_to_rows(credits))
+
+            # Sin créditos en la base de datos, los de Discogs en línea
+            if not credit_rows:
+                credit_rows = [f"| **{online_info.cell(role)}** | {online_info.cell(', '.join(names))} |"
+                               for role, names in online.get('credits', {}).items()]
+            table_rows.extend(dict.fromkeys(credit_rows))
 
             if table_rows:
                 content.extend([
+                    "",
+                    "## Información de Producción",
+                    "",
                     "| Campo | Información |",
                     "|-------|-------------|"
                 ])
@@ -1217,10 +1283,16 @@ class VVMMPostCreator:
                     # Crear fila de tabla
                     rows.append(f"| **{clean_role}** | {people_str} |")
 
+            elif isinstance(data, list) and data and all(isinstance(item, dict) for item in data):
+                # Formato de Discogs: una fila por rol
+                for role, people in online_info._group_credits(data).items():
+                    rows.append(f"| **{online_info.cell(role)}** | {online_info.cell(', '.join(people))} |")
+
             elif isinstance(data, list):
                 # Es una lista - crear una sola fila
-                people_str = ", ".join(str(item) for item in data)
-                rows.append(f"| **Artistas Adicionales** | {people_str} |")
+                if data:
+                    people_str = ", ".join(str(item) for item in data)
+                    rows.append(f"| **Artistas Adicionales** | {people_str} |")
 
             else:
                 # Es otro tipo de dato JSON
@@ -1272,9 +1344,13 @@ class VVMMPostCreator:
 
     def _add_reviews_and_mentions_tables(self, content: List[str]):
         """Añadir tablas de reviews, menciones y puntuaciones"""
-        self.logger.info("Obteniendo reviews, menciones y puntuaciones desde base de datos...")
+        self.logger.info("Obteniendo reviews, menciones y puntuaciones...")
 
         try:
+            if not self.database_data:
+                self._add_discogs_rating_table(content)
+                return
+
             conn = sqlite3.connect(self.config['database_path'])
             cursor = conn.cursor()
 
@@ -1382,6 +1458,7 @@ class VVMMPostCreator:
                     formatted_date = self._format_date(post_date)
 
                     # Crear enlace si hay URL
+                    post_title = online_info.cell(post_title)
                     if post_url:
                         title_link = f"[{post_title}]({post_url})"
                     else:
@@ -1409,6 +1486,7 @@ class VVMMPostCreator:
                     formatted_date = self._format_date(post_date)
 
                     # Crear enlace si hay URL
+                    post_title = online_info.cell(post_title)
                     if post_url:
                         title_link = f"[{post_title}]({post_url})"
                     else:
@@ -1422,7 +1500,7 @@ class VVMMPostCreator:
                 self.logger.info(f"Tabla de feeds añadida: {len(feeds_result)} artículos")
 
             # Tabla de Puntuaciones
-            if aoty_result or metacritic_result:
+            if aoty_result or metacritic_result or self.online_info.get('rating_count'):
                 if not tables_added:
                     content.extend(["", "## Reviews y Menciones", ""])
                     tables_added = True
@@ -1432,6 +1510,10 @@ class VVMMPostCreator:
                     "| Plataforma | Puntuación Críticos | Puntuación Usuarios | Enlaces |",
                     "|------------|-------------------|-------------------|---------|"
                 ])
+
+                discogs_row = self._discogs_rating_row()
+                if discogs_row:
+                    content.append(discogs_row)
 
                 # Album of the Year
                 if aoty_result:
@@ -1480,6 +1562,34 @@ class VVMMPostCreator:
 
 
 
+    def _discogs_rating_row(self) -> str:
+        """Fila de puntuaciones con la valoración de Discogs, si tiene votos"""
+        online = self.online_info
+        if not online.get('rating_count'):
+            return ""
+        return (f"| **Discogs** | - | {online['rating_average']:.2f}/5 ({online['rating_count']} votos) "
+                f"| [🔗 Discogs]({online['discogs_url']}) |")
+
+    def _add_discogs_rating_table(self, content: List[str]):
+        """Puntuaciones cuando ni el artista ni el disco están en la base de datos"""
+        row = self._discogs_rating_row()
+        if row:
+            content.extend(["", "## Reviews y Menciones", "", "", "### ⭐ Puntuaciones y Críticas", "",
+                            "| Plataforma | Puntuación Críticos | Puntuación Usuarios | Enlaces |",
+                            "|------------|-------------------|-------------------|---------|",
+                            row, ""])
+
+    def _online_label(self) -> str:
+        label, catno = self.online_info.get('label', ''), self.online_info.get('catno', '')
+        return f"{label} ({catno})" if label and catno else label
+
+    @staticmethod
+    def _known_genre(genre) -> str:
+        return '' if (genre or '').strip().lower() in ('', 'unknown') else genre
+
+    def _online_genre(self) -> str:
+        return ", ".join(self.online_info.get('genres', []) + self.online_info.get('styles', []))
+
     def _format_date(self, date_value) -> str:
         """Formatear fecha para mostrar en tablas"""
         if not date_value:
@@ -1511,42 +1621,31 @@ class VVMMPostCreator:
 
     def _add_tracklist_with_links_to_content(self, content: List[str]):
         """Añadir tracklist con enlaces al contenido"""
-        self.logger.info("Obteniendo tracklist con enlaces desde base de datos...")
+        self.logger.info("Obteniendo tracklist con enlaces...")
 
         try:
-            conn = sqlite3.connect(self.config['database_path'])
-            cursor = conn.cursor()
-
-            # Obtener tracklist con enlaces (usando las columnas reales)
-            tracklist_query = """
-            SELECT
-                s.track_number,
-                s.title,
-                s.duration,
-                COALESCE(sl.spotify_url, '') as spotify_url,
-                COALESCE(sl.youtube_url, '') as youtube_url,
-                COALESCE(sl.bandcamp_url, '') as bandcamp_url,
-                s.has_lyrics,
-                COALESCE(l.lyrics, '') as lyrics_text
-            FROM songs s
-            LEFT JOIN song_links sl ON s.id = sl.song_id
-            LEFT JOIN lyrics l ON s.id = l.track_id
-            WHERE s.artist = ? AND s.album = ?
-            ORDER BY s.track_number
-            """
-
-            cursor.execute(tracklist_query, (self.database_data['db_artist'], self.database_data['db_album']))
-            tracks_result = cursor.fetchall()
-
-            conn.close()
+            tracks_result = self._db_tracks()
 
             if not tracks_result:
-                self.logger.debug("No se encontró tracklist en la base de datos")
+                # Sin pistas en la base de datos, las encontradas en línea (mismo formato de fila)
+                tracks_result = [
+                    (number, online_info.cell(self._track_title(track)), track['duration'],
+                     '', track['youtube_url'], '', 0, '')
+                    for number, track in enumerate(self.online_info.get('tracks', []), 1)
+                ]
+
+            if not tracks_result:
+                self.logger.debug("No se encontró tracklist")
                 return
 
             content.extend(["", "## Tracklist", ""])
 
             for track_num, title, duration, spotify_url, youtube_url, bandcamp_url, has_lyrics, lyrics_text in tracks_result:
+                # Completar con lo encontrado en línea lo que falte en la base de datos
+                online_track = online_info.track_for(self.online_info, title)
+                duration = duration or online_track.get('duration', '')
+                youtube_url = youtube_url or online_track.get('youtube_url', '')
+
                 # Formatear línea principal de la canción
                 track_line = f"**{track_num}.** {title}"
 
@@ -1584,9 +1683,50 @@ class VVMMPostCreator:
         except Exception as e:
             self.logger.warning(f"Error creando tracklist: {e}")
 
+    def _db_tracks(self) -> List[tuple]:
+        """Pistas del disco en la base de datos, sin repetir las de copias en varias carpetas"""
+        if not self.database_data:
+            return []
+
+        conn = sqlite3.connect(self.config['database_path'])
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT
+            s.track_number,
+            s.title,
+            s.duration,
+            COALESCE(sl.spotify_url, '') as spotify_url,
+            COALESCE(sl.youtube_url, '') as youtube_url,
+            COALESCE(sl.bandcamp_url, '') as bandcamp_url,
+            s.has_lyrics,
+            COALESCE(l.lyrics, '') as lyrics_text
+        FROM songs s
+        LEFT JOIN song_links sl ON s.id = sl.song_id
+        LEFT JOIN lyrics l ON s.id = l.track_id
+        WHERE s.artist = ? AND s.album = ?
+        ORDER BY s.track_number
+        """, (self.database_data['db_artist'], self.database_data['db_album']))
+        rows = cursor.fetchall()
+        conn.close()
+
+        unique = {}
+        for row in rows:
+            # 'Tema' y 'Tema (feat. X)' son la misma pista: se conserva el título más completo
+            key = (row[0], online_info.normalize(re.sub(r'[(\[].*?[)\]]', ' ', row[1] or '')))
+            if key not in unique or len(row[1] or '') > len(unique[key][1] or ''):
+                unique[key] = row
+        return list(unique.values())
+
+    def _track_title(self, track: dict) -> str:
+        featuring = ", ".join(track.get('featuring', []))
+        return f"{track['title']} (feat. {featuring})" if featuring else track['title']
+
     def _add_equipment_table_to_content(self, content: List[str]):
         """Añadir tabla de instrumentos y equipos utilizados"""
         self.logger.info("Obteniendo información de equipos desde base de datos...")
+
+        if not self.database_data:
+            return
 
         try:
             conn = sqlite3.connect(self.config['database_path'])
@@ -1700,96 +1840,62 @@ class VVMMPostCreator:
 
     def _add_extended_info_to_content(self, content: List[str]):
         """Añadir información extendida como estudios de grabación, equipos, etc."""
-        self.logger.info("Obteniendo información extendida desde base de datos...")
+        self.logger.info("Obteniendo información extendida...")
+
+        info_table = []
+        notes = ''
 
         try:
-            conn = sqlite3.connect(self.config['database_path'])
-            cursor = conn.cursor()
+            artist_id = self.database_data.get('artist_id')
+            if artist_id:
+                conn = sqlite3.connect(self.config['database_path'])
+                cursor = conn.cursor()
+                db_album = self.database_data['db_album']
 
-            # Obtener información de Discogs adicional si existe
-            discogs_query = """
-            SELECT DISTINCT
-                COALESCE(grabado_en, '') as recorded_at,
-                COALESCE(fecha_de_grabación, '') as recording_date,
-                COALESCE(caracterizado_por, '') as characterized_by,
-                COALESCE(notes, '') as notes,
-                COALESCE(extraartists, '') as extraartists
-            FROM discogs_discography
-            WHERE artist_id = ? AND album_name LIKE ?
-            LIMIT 1
-            """
+                cursor.execute("""
+                SELECT COALESCE(notes, '')
+                FROM discogs_discography
+                WHERE artist_id = ? AND LOWER(album_name) = LOWER(?)
+                ORDER BY notes IS NULL
+                LIMIT 1
+                """, (artist_id, db_album))
+                notes_row = cursor.fetchone()
+                notes = notes_row[0] if notes_row else ''
 
-            cursor.execute(discogs_query, (
-                self.database_data['artist_id'],
-                f"%{self.database_data['db_album']}%"
-            ))
-            discogs_info = cursor.fetchone()
-
-            # Obtener información de MusicBrainz si existe
-            mb_query = """
-            SELECT DISTINCT
-                COALESCE(caracterizado_por, '') as characterized_by,
-                COALESCE(grabado_en, '') as recorded_at,
-                COALESCE(fecha_de_grabación, '') as recording_date,
-                COALESCE(producer, '') as producer,
-                COALESCE(productor, '') as productor,
-                COALESCE(colaborador, '') as colaborador
-            FROM mb_release_group
-            WHERE artist_id = ? AND title LIKE ?
-            LIMIT 1
-            """
-
-            cursor.execute(mb_query, (
-                self.database_data['artist_id'],
-                f"%{self.database_data['db_album']}%"
-            ))
-            mb_info = cursor.fetchone()
-
-            conn.close()
-
-            # Procesar información extendida
-            if discogs_info or mb_info:
-                content.extend(["", "## Información Adicional", ""])
-
-                # Combinar información de Discogs y MusicBrainz
-                info_table = []
-
-                if discogs_info:
-                    recorded_at, recording_date, characterized_by, notes, extraartists = discogs_info
-
-                    if recorded_at:
-                        info_table.append(f"| **Grabado en** | {recorded_at} |")
-                    if recording_date:
-                        info_table.append(f"| **Fecha de grabación** | {recording_date} |")
-                    if characterized_by:
-                        info_table.append(f"| **Caracterizado por** | {characterized_by} |")
-                    if extraartists:
-                        info_table.append(f"| **Artistas adicionales** | {extraartists} |")
-                    if notes:
-                        info_table.append(f"| **Notas** | {notes} |")
+                cursor.execute("""
+                SELECT
+                    COALESCE(grabado_en, ''),
+                    COALESCE(fecha_de_grabación, ''),
+                    COALESCE(caracterizado_por, '')
+                FROM mb_release_group
+                WHERE artist_id = ? AND LOWER(title) = LOWER(?)
+                LIMIT 1
+                """, (artist_id, db_album))
+                mb_info = cursor.fetchone()
+                conn.close()
 
                 if mb_info:
-                    (mb_characterized_by, mb_recorded_at, mb_recording_date,
-                     mb_producer, mb_productor, mb_colaborador) = mb_info
-
-                    # Solo añadir si no está ya desde Discogs
-                    if mb_producer and not any('Productor' in row for row in info_table):
-                        info_table.append(f"| **Productor (MB)** | {mb_producer} |")
-                    if mb_colaborador and not any('Colaborador' in row for row in info_table):
-                        info_table.append(f"| **Colaborador (MB)** | {mb_colaborador} |")
-
-                if info_table:
-                    content.extend([
-                        "| Campo | Información |",
-                        "|-------|-------------|"
-                    ])
-                    content.extend(info_table)
-                    content.append("")
+                    for label, value in zip(('Grabado en', 'Fecha de grabación', 'Caracterizado por'), mb_info):
+                        if value:
+                            info_table.append(f"| **{label}** | {online_info.cell(value)} |")
 
         except sqlite3.Error as e:
-            self.logger.debug(f"Error obteniendo información extendida: {e}")
-        except Exception as e:
-            self.logger.debug(f"Error procesando información extendida: {e}")
+            self.logger.warning(f"Error obteniendo información extendida: {e}")
+
+        # Estudios, fábricas, editoras... según Discogs
+        for role, names in self.online_info.get('companies', {}).items():
+            info_table.append(f"| **{online_info.cell(role)}** | {online_info.cell(', '.join(names))} |")
+
+        notes = notes or self.online_info.get('notes', '')
+        if notes:
+            info_table.append(f"| **Notas** | {online_info.cell(online_info.clean_markup(notes))} |")
+
+        if info_table:
+            content.extend(["", "## Información Adicional", "",
+                            "| Campo | Información |",
+                            "|-------|-------------|"])
+            content.extend(info_table)
+            content.append("")
 
     def show_content_summary(self):
         """Mostrar resumen del contenido añadido"""
@@ -1820,9 +1926,9 @@ class VVMMPostCreator:
             # Contar colaboradores desde discogs_discography
             cursor.execute("""
                 SELECT COUNT(*) FROM discogs_discography dd
-                WHERE dd.artist_id = ? AND dd.album_name LIKE ?
-                AND (dd.extraartists IS NOT NULL OR dd.colaborador IS NOT NULL)
-            """, (self.database_data['artist_id'], f"%{self.database_data['db_album']}%"))
+                WHERE dd.artist_id = ? AND LOWER(dd.album_name) = LOWER(?)
+                AND dd.extraartists IS NOT NULL
+            """, (self.database_data['artist_id'], self.database_data['db_album']))
             collab_count = cursor.fetchone()[0]
 
             if collab_count > 0:
@@ -1865,17 +1971,24 @@ class VVMMPostCreator:
         """Añadir información de la base de datos al contenido"""
 
         # Información básica
-        if self.database_data.get('genre'):
-            content.extend(["", f"**Género:** {self.database_data['genre']}", ""])
+        online = self.online_info
+        genre = self._known_genre(self.database_data.get('genre')) or self._online_genre()
+        label = self.database_data.get('record_label') or self._online_label()
+        year = self.database_data.get('release_year') or online.get('released') or online.get('year')
+        total_tracks = (len(self._db_tracks()) or self.database_data.get('total_tracks')
+                        or len(online.get('tracks', [])))
 
-        if self.database_data.get('record_label'):
-            content.extend([f"**Sello:** {self.database_data['record_label']}", ""])
+        if genre:
+            content.extend(["", f"**Género:** {genre}", ""])
 
-        if self.database_data.get('release_year'):
-            content.extend([f"**Año:** {self.database_data['release_year']}", ""])
+        if label:
+            content.extend([f"**Sello:** {label}", ""])
 
-        if self.database_data.get('total_tracks'):
-            content.extend([f"**Total de pistas:** {self.database_data['total_tracks']}", ""])
+        if year:
+            content.extend([f"**Año:** {year}", ""])
+
+        if total_tracks:
+            content.extend([f"**Total de pistas:** {total_tracks}", ""])
 
     def download_cover_art(self) -> bool:
         """Descargar carátula del álbum"""
@@ -1888,41 +2001,40 @@ class VVMMPostCreator:
             # Si hay carátula en BD, usarla
             if self.database_data.get('cover_path'):
                 cover_path = Path(self.database_data['cover_path'])
-                if cover_path.exists():
-                    shutil.copy2(cover_path, post_folder / 'image.jpeg')
+                # La BD puede tener la carátula de otro disco con el mismo título
+                if not online_info.cover_matches_artist(str(cover_path), self.current_metadata['artist']):
+                    self.logger.warning(f"Carátula de BD descartada, no es de {self.current_metadata['artist']}: {cover_path}")
+                elif not self._valid_image(cover_path):
+                    # Una carátula vacía o rota hace fallar a hugo y bloquea todos los posts
+                    self.logger.warning(f"Carátula de BD vacía o ilegible, se descarta: {cover_path}")
+                elif cover_path.exists():
+                    self._save_cover_as_jpeg(cover_path, post_folder / 'image.jpeg', keep_source=True)
                     self.logger.info(f"Carátula copiada desde BD: {cover_path}")
                     return True
 
             # Activar entorno Python
             self._activate_python_env()
 
-            # Intentar Spotify primero
-            result = subprocess.run([
-                'python3', str(self.modules_dir / 'caratula-spotify.py'),
-                self.current_metadata['artist'], self.current_metadata['album']
-            ], capture_output=True, text=True, timeout=60)
-
-            if 'Error' in result.stdout:
-                self.logger.warning("Error con Spotify, intentando fuente alternativa...")
-                # Usar script alternativo
+            # En una carpeta aparte: image.jpeg ya existe, es la foto genérica de la plantilla del post
+            with tempfile.TemporaryDirectory() as download_dir:
+                # iTunes, Discogs, Last.fm y MusicBrainz, por este orden
                 subprocess.run([
                     'python3', str(self.modules_dir / 'caratula-alternativa.py'),
                     self.current_metadata['artist'], self.current_metadata['album'],
-                    str(post_folder)
-                ], timeout=60)
-            else:
-                # Copiar desde resultado de Spotify
-                spotify_cover = result.stdout.strip()
-                if spotify_cover and Path(spotify_cover).exists():
-                    shutil.copy2(spotify_cover, post_folder / 'image.jpeg')
+                    download_dir
+                ], timeout=120, capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
-            # Verificar que se descargó
-            if (post_folder / 'image.jpeg').exists():
-                self.logger.info("Carátula descargada exitosamente")
-                return True
-            else:
-                self.logger.warning("No se pudo descargar la carátula")
-                return False
+                # Este script nombra el archivo según artista y álbum; el post espera image.jpeg
+                downloaded = next(Path(download_dir).iterdir(), None)
+                if downloaded and self._valid_image(downloaded):
+                    self._save_cover_as_jpeg(downloaded, post_folder / 'image.jpeg')
+                    self.logger.info("Carátula descargada exitosamente")
+                    return True
+
+            self.logger.warning("No se encontró una carátula que coincida con el disco")
+            self._notify("Sin carátula", f"{self.current_metadata['artist']} - {self.current_metadata['album']}: "
+                                         "el post lleva la imagen genérica")
+            return False
 
         except subprocess.TimeoutExpired:
             self.logger.warning("Timeout descargando carátula")
@@ -1930,6 +2042,28 @@ class VVMMPostCreator:
         except Exception as e:
             self.logger.error(f"Error descargando carátula: {e}")
             return False
+
+    @staticmethod
+    def _valid_image(path: Path) -> bool:
+        """True si el archivo existe, no está vacío y PIL lo reconoce como imagen"""
+        try:
+            if not path.is_file() or path.stat().st_size == 0:
+                return False
+            with Image.open(path) as image:
+                image.verify()
+            return True
+        except Exception:
+            return False
+
+    def _save_cover_as_jpeg(self, source: Path, target: Path, keep_source: bool = False):
+        """El blog espera un JPEG en image.jpeg; algunas fuentes dan PNG o WebP"""
+        with Image.open(source) as image:
+            is_jpeg = image.format == 'JPEG'
+        if is_jpeg:
+            (shutil.copy2 if keep_source else shutil.move)(str(source), target)
+            return
+        with Image.open(source) as image:
+            image.convert('RGB').save(target, 'JPEG', quality=92)
 
     def add_tags_to_post(self) -> bool:
         """Añadir tags al post"""
@@ -1971,6 +2105,15 @@ class VVMMPostCreator:
             # Cambiar draft a false
             content = content.replace('draft: true', 'draft: false')
 
+            # Título limpio y artista/álbum explícitos (la plantilla del blog los usa)
+            artist = self.current_metadata['artist']
+            album = self.current_metadata['album']
+            content = re.sub(r'^title: .*$', lambda _: f'title: {json.dumps(f"{artist} - {album}", ensure_ascii=False)}',
+                             content, count=1, flags=re.M)
+            if '\nartist:' not in content:
+                content = content.replace('\ndraft: false', f'\nartist: {json.dumps(artist, ensure_ascii=False)}'
+                                          f'\nalbum: {json.dumps(album, ensure_ascii=False)}\ndraft: false', 1)
+
             with open(self.post_file, 'w', encoding='utf-8') as f:
                 f.write(content)
 
@@ -1979,6 +2122,32 @@ class VVMMPostCreator:
         except Exception as e:
             self.logger.error(f"Error formateando contenido: {e}")
             return False
+
+    def update_blog_data(self) -> bool:
+        """Enlaces a Encarta/Grapa y reproductor (Bandcamp o YouTube) del post nuevo"""
+        self.logger.info("Actualizando enlaces y reproductor...")
+        blog = self.config['blog_dir']
+        steps = [
+            ['scripts/enlaces.py', '.'],
+            ['scripts/bandcamp_buscar.py', '.'],
+            ['scripts/bandcamp_ids.py', '.'],
+            ['scripts/bandcamp_verificar.py', '.'],
+            ['scripts/reproductor.py', '.'],
+        ]
+        ok = True
+        for script, *args in steps:
+            if not (blog / script).exists():
+                continue
+            try:
+                r = subprocess.run(['python3', '-I', script, *args], cwd=blog, capture_output=True, text=True, timeout=600)
+                self.logger.info(f"{script}: {(r.stdout.strip().splitlines() or [''])[-1]}")
+                if r.returncode:
+                    ok = False
+                    self.logger.warning(f"{script} falló: {r.stderr.strip()[-300:]}")
+            except subprocess.TimeoutExpired:
+                ok = False
+                self.logger.warning(f"{script}: tiempo agotado")
+        return ok
 
     def build_and_publish(self) -> bool:
         """Construir y publicar sitio"""
@@ -2611,6 +2780,13 @@ class VVMMPostCreator:
                 self.logger.error("Error fatal: No se pudo obtener metadata")
                 return 1
 
+            # En el PC: el post se crea y publica en pepecono (servicio mover_mix), el mismo
+            # camino que usa DSub en el móvil. Aquí solo se detecta qué suena y se piden los tags.
+            if os.getenv('VVMM_REMOTO_URL'):
+                if not self.get_user_tags():
+                    return 1
+                return self.run_remote()
+
             # 2. Verificar base de datos primero
             use_database = self.check_database_first()
 
@@ -2618,8 +2794,11 @@ class VVMMPostCreator:
                 self.logger.info("✅ Usando información de base de datos")
                 self.generate_links_from_database()
             else:
-                self.logger.info("ℹ️ Usando flujo tradicional con búsquedas")
-                self.search_missing_services()
+                self.logger.info("ℹ️ Álbum no encontrado en base de datos: se busca en línea")
+
+            # Lo que no esté en la base de datos se busca
+            self.search_missing_services()
+            self.fetch_online_info()
 
             # 3. Solicitar tags al usuario
             if not self.get_user_tags():
@@ -2664,6 +2843,10 @@ class VVMMPostCreator:
                 self.logger.warning("Error en preview del sitio")
                 self.success = False
 
+            # 10.5 Enlaces a Encarta/Grapa y reproductor (no crítico)
+            if not self.update_blog_data():
+                self.logger.warning("No se pudieron actualizar enlaces/reproductor, continuando...")
+
             # 11. Construir y publicar
             if not self.build_and_publish():
                 self.logger.error("Error en construcción/publicación")
@@ -2682,6 +2865,39 @@ class VVMMPostCreator:
             return 1
         finally:
             self.cleanup()
+
+    def run_remote(self) -> int:
+        """Pide el post a pepecono (POST /api/vvmm) y espera a que termine."""
+        import time
+        url = os.getenv('VVMM_REMOTO_URL', '').rstrip('/')
+        headers = {'X-Token': os.getenv('VVMM_REMOTO_TOKEN', '')}
+        m = self.current_metadata
+        payload = {'artist': m['artist_raw'], 'album': m['album_raw'], 'title': m['title_raw'],
+                   'tags': ' '.join(m.get('tags', []))}
+        label = f"{m['artist_raw']} - {m['album_raw']}"
+        try:
+            r = requests.post(f"{url}/api/vvmm", json=payload, headers=headers, timeout=30)
+            r.raise_for_status()
+            job = r.json()['job']
+            self.logger.info(f"Post enviado a pepecono: {label}")
+            self._notify("VVMM (pepecono)", f"Creando post\n🎵 {label}")
+            st = {}
+            for _ in range(400):  # hasta ~20 min, como el servidor
+                time.sleep(3)
+                st = requests.get(f"{url}/api/jobs/{job}", headers=headers, timeout=30).json()
+                if st.get('state') in ('done', 'error'):
+                    break
+            for line in st.get('log', []):
+                self.logger.info(f"[pepecono] {line}")
+            if st.get('state') == 'done':
+                self._notify("🎉 VVMM (pepecono)", "\n".join(st.get('messages', [])) or f"Post creado\n🎵 {label}")
+                return 0
+            self._notify("⚠️ VVMM (pepecono)", st.get('error') or "No terminó a tiempo")
+            return 1
+        except Exception as e:
+            self.logger.error(f"pepecono: {e}")
+            self._notify("⚠️ VVMM (pepecono)", f"Error: {e}")
+            return 1
 
     def _show_final_summary(self):
         """Mostrar resumen final"""
@@ -2744,6 +2960,10 @@ Ejemplos:
                        help='Solo validar entorno y salir')
     parser.add_argument('--project-root', type=str,
                        help='Ruta del directorio raíz del proyecto')
+    parser.add_argument('--artist', help='Artista (con --album y --title: no mira qué suena)')
+    parser.add_argument('--album', help='Álbum')
+    parser.add_argument('--title', help='Canción')
+    parser.add_argument('--tags', help='Tags separados por espacios (sin preguntar con yad)')
 
     args = parser.parse_args()
 
@@ -2760,6 +2980,10 @@ Ejemplos:
     try:
         # Crear instancia del creador de posts
         creator = VVMMPostCreator(args.project_root)
+        if args.artist and args.title:
+            creator.forced_song = (args.artist, args.album or '', args.title)
+        if args.tags is not None:
+            creator.forced_tags = args.tags.split()
 
         # Solo validar si se solicita
         if args.validate_only:

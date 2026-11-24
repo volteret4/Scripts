@@ -1,6 +1,5 @@
 #!/bin/bash
 
-API_KEY="***ELIMINADO***"
 FOLDER_ID="johxm-xegyy"
 HOST="http://127.0.0.1:8384"
 

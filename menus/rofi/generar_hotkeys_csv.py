@@ -1,0 +1,1 @@
+/home/huan/gits/pollo/hotkeyz/scripts/generar_hotkeys_csv.py

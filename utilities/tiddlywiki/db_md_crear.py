@@ -20,10 +20,10 @@ from pathlib import Path
 DEFAULT_CONFIG = {
     'db_path': 'wiki_obsidian.db',
     'root_dirs': [
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Wiki",
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Blogs", 
-        "/mnt/windows/FTP/wiki/Obsidian/Spaces/Proyectos Interesantes",
-        "/mnt/windows/FTP/wiki/Obsidian/Recortes"
+        "/home/huan/notes/Spaces/Wiki",
+        "/home/huan/notes/Spaces/Blogs", 
+        "/home/huan/notes/Spaces/Proyectos Interesantes",
+        "/home/huan/notes/Recortes"
     ],
     'excluded_paths': ['.git', '.gitignore', '.stfolder', '.obsidian'],
     'log_file': 'wiki_sync.log',
