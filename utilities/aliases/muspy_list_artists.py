@@ -4,13 +4,15 @@ Exporta los artistas seguidos en muspy.com a un archivo artists.txt
 Uso: python muspy_export.py
 """
 
+import os
 import requests
 import sys
 
 # ── Configuración ──────────────────────────────────────────────
 MUSPY_USER_ID = "rvy1q943dvxvelrwvmmnxzk6ownko6"   # Tu user ID o nombre de usuario de muspy
 MUSPY_EMAIL   = "frodobolson@disroot.org" # Email de tu cuenta
-MUSPY_PASS    = "***ELIMINADO***"  # Contraseña
+_ENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")  # ignorado por git
+MUSPY_PASS    = os.environ.get("MUSPY_PASS") or next((l.split("=", 1)[1].strip() for l in open(_ENV) if l.startswith("MUSPY_PASS=")), "")
 OUTPUT_FILE   = "/home/huan/Scripts/.content/muspy_artists.txt"
 # ───────────────────────────────────────────────────────────────
 

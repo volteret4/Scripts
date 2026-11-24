@@ -79,3 +79,6 @@ menus/vm/*.xml
 
 *.ics
 menus/dotfiles/dotfiles.db*
+
+.env_lastfm
+.cache*
