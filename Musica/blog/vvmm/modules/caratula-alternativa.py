@@ -296,9 +296,12 @@ def main():
     fuentes = [
         ('iTunes', buscar_portada_itunes),           # No requiere token
         ('Discogs', buscar_portada_discogs),         # Solo token personal (600 px)
-        ('Last.fm', buscar_portada_lastfm),          # Solo API key (300 px)
         ('MusicBrainz', buscar_portada_musicbrainz)  # No requiere token
     ]
+
+    # API de pago: la última, y solo si hay clave (300 px)
+    if LASTFM_API_KEY:
+        fuentes.append(('Last.fm', buscar_portada_lastfm))
 
     for nombre_fuente, buscar_funcion in fuentes:
         print(f"\n🔍 Buscando en {nombre_fuente}...")

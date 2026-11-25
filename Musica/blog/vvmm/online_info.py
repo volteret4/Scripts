@@ -3,7 +3,8 @@
 Información de un álbum desde fuentes en línea, para lo que no esté en la base de datos.
 
 Discogs aporta sello, créditos, estudios, notas, valoración, tracklist y vídeos.
-Last.fm aporta las duraciones que Discogs no tenga, y el tracklist si Discogs no conoce el disco.
+MusicBrainz aporta las duraciones que Discogs no tenga, el tracklist si Discogs no conoce el disco
+y el enlace a ListenBrainz. Last.fm solo se consulta si hay LASTFM_API_KEY (API de pago) y aún falta algo.
 
 Un resultado solo se acepta si artista y título coinciden: es preferible dejar una sección
 vacía a publicar los datos de otro disco.
@@ -19,6 +20,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 
 DISCOGS_API = 'https://api.discogs.com'
+MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2'
 LASTFM_API = 'https://ws.audioscrobbler.com/2.0/'
 USER_AGENT = 'vvmm-post-creator/1.0'
 TIMEOUT = 20
@@ -270,6 +272,62 @@ def _parse_discogs(kind: str, data: dict, token: str) -> dict:
     }
 
 
+def _musicbrainz_get(path: str, **params) -> Optional[dict]:
+    for attempt in range(3):
+        try:
+            response = requests.get(MUSICBRAINZ_API + path, timeout=TIMEOUT, headers={'User-Agent': USER_AGENT},
+                                    params={**params, 'fmt': 'json'})
+            if response.status_code == 503:  # saturado o más de una petición por segundo
+                time.sleep(2 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            return response.json()
+        except (requests.RequestException, ValueError) as e:
+            logger.warning(f'MusicBrainz {path}: {e}')
+            return None
+        finally:
+            time.sleep(1)
+    logger.warning(f'MusicBrainz {path}: no disponible')
+    return None
+
+
+def _find_musicbrainz(artist: str, album: str) -> Optional[dict]:
+    """Edición de MusicBrainz que coincide con el disco; mejor si es oficial."""
+    def phrase(text):
+        return re.sub(r'["\\]', ' ', text)
+
+    found = _musicbrainz_get('/release', limit=25,
+                             query=f'artist:"{phrase(artist)}" AND release:"{phrase(album)}"') or {}
+    releases = [r for r in found.get('releases', [])
+                if same_title(r.get('title', ''), album)
+                and (any(same_artist(c.get('name', ''), artist) for c in r.get('artist-credit', []))
+                     or same_artist(''.join(c.get('name', '') + c.get('joinphrase', '')
+                                            for c in r.get('artist-credit', [])), artist))]
+    official = [r for r in releases if r.get('status') == 'Official']
+    return next(iter(official or releases), None)
+
+
+def _musicbrainz_tracks(release_id: str) -> List[dict]:
+    data = _musicbrainz_get(f'/release/{release_id}', inc='recordings') or {}
+    return [{'title': t.get('title', ''), 'duration': duration_text((t.get('length') or 0) / 1000)}
+            for medium in data.get('media', []) for t in medium.get('tracks', []) if t.get('title')]
+
+
+def _fill_tracks(info: dict, found: List[dict]) -> None:
+    """Completa las duraciones que falten, o el tracklist entero si no hay."""
+    if not info.get('tracks'):
+        info['tracks'] = [{'position': '', 'featuring': [], 'youtube_url': '', **t} for t in found]
+        return
+    by_title = {normalize(t['title']): t['duration'] for t in found}
+    for track in info['tracks']:
+        track['duration'] = track['duration'] or by_title.get(normalize(track['title']), '')
+
+
+def _lacks_tracks(info: dict) -> bool:
+    tracks = info.get('tracks', [])
+    return not tracks or not all(t['duration'] for t in tracks)
+
+
 def _lastfm_tracks(artist: str, album: str, api_key: str) -> List[dict]:
     if not api_key:
         return []
@@ -304,15 +362,17 @@ def fetch_album_info(artist: str, album: str, discogs_token: str = '', lastfm_ke
     else:
         logger.info(f'Discogs no tiene {artist} - {album}')
 
-    tracks = info.get('tracks', [])
-    if not tracks or not all(t['duration'] for t in tracks):
-        lastfm = _lastfm_tracks(artist, album, lastfm_key)
-        if not tracks:
-            info['tracks'] = [{'position': '', 'featuring': [], 'youtube_url': '', **t} for t in lastfm]
-        else:
-            by_title = {normalize(t['title']): t['duration'] for t in lastfm}
-            for track in tracks:
-                track['duration'] = track['duration'] or by_title.get(normalize(track['title']), '')
+    release = _find_musicbrainz(artist, album)
+    if release:
+        group = (release.get('release-group') or {}).get('id')
+        if group:
+            info['listenbrainz_url'] = f'https://listenbrainz.org/album/{group}/'
+        if _lacks_tracks(info):
+            _fill_tracks(info, _musicbrainz_tracks(release['id']))
+    else:
+        logger.info(f'MusicBrainz no tiene {artist} - {album}')
+    if lastfm_key and _lacks_tracks(info):
+        _fill_tracks(info, _lastfm_tracks(artist, album, lastfm_key))
 
     return info if any(info.values()) else {}
 

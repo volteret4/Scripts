@@ -2755,7 +2755,7 @@ class CommentDialog(QDialog):
         self.comment_edit.setFocus()
         layout.addWidget(self.comment_edit)
 
-        self.obsession_check = QCheckBox("Marcar como obsesión en Last.fm")
+        self.obsession_check = QCheckBox("Marcar como obsesión (fijar en ListenBrainz)")
         self.obsession_check.setStyleSheet("color: #c0caf5; font-size: 13px; background-color: transparent;")
         layout.addWidget(self.obsession_check)
 
@@ -3234,8 +3234,9 @@ def main():
         msgs = st.get('messages', [])
         rel = msgs[-1] if msgs and msgs[-1].lower().endswith(MusicMover.AUDIO_EXTS) else None
         for m in (msgs[:-1] if rel else msgs):
-            show_notification("Last.fm" if m.startswith("Last.fm") else "Mix", m, icon=cover,
-                              urgent=m.startswith("Last.fm: error"))
+            servicio = next((x for x in ("ListenBrainz", "Last.fm") if m.startswith(x)), None)
+            show_notification(servicio or "Mix", m, icon=cover,
+                              urgent=bool(servicio) and m.startswith(f"{servicio}: error"))
 
         # Lo que es de este PC, cuando Syncthing trae el archivo
         new_file = esperar_local(rel) if rel else None

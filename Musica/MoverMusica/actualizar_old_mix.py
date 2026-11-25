@@ -2,7 +2,7 @@
 """
 Script para actualizar archivos de música en subcarpetas:
 1. Renombrar archivos según formato "$artista - $song ($date $album) [$label]"
-2. Añadir todas las canciones a Last.fm loved tracks
+2. Marcar todas las canciones como favoritas en ListenBrainz (y en Last.fm, si hay claves de su API de pago)
 
 Autor: Basado en el script mover_mix_playerctl.py
 """
@@ -21,6 +21,10 @@ from dotenv import load_dotenv
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Token de https://listenbrainz.org/settings/
+LISTENBRAINZ_TOKEN = os.getenv("LISTENBRAINZ_TOKEN")
+LISTENBRAINZ_API = "https://api.listenbrainz.org/1/"
 
 # Configuración de Last.fm
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
@@ -123,6 +127,44 @@ def add_to_lastfm_loved(artist, title, session_key):
 
     except Exception as e:
         print(f"⚠️ Error añadiendo canción a Last.fm: {e}")
+        return False
+
+def listenbrainz_call(method, path, **kw):
+    """Petición a ListenBrainz respetando su límite de peticiones"""
+    for _ in range(3):
+        response = requests.request(method, LISTENBRAINZ_API + path, timeout=20,
+                                    headers={"Authorization": f"Token {LISTENBRAINZ_TOKEN}"}, **kw)
+        if response.status_code != 429:
+            break
+        time.sleep(float(response.headers.get("X-RateLimit-Reset-In", 10)) + 1)
+    response.raise_for_status()
+    return response.json()
+
+def recording_mbid(file_path, artist, title):
+    """MBID de la grabación: la etiqueta de Picard o, si no la lleva, la búsqueda de ListenBrainz"""
+    try:
+        import mutagen
+        tags = mutagen.File(file_path, easy=True) or {}
+        mbid = (tags.get('musicbrainz_trackid') or [''])[0].strip()
+        if re.fullmatch(r'[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', mbid, re.I):
+            return mbid.lower()
+    except Exception:
+        pass
+    found = listenbrainz_call("GET", "metadata/lookup/", params={"artist_name": artist, "recording_name": title})
+    return found.get('recording_mbid')
+
+def add_to_listenbrainz_loved(file_path, artist, title):
+    """Marcar la canción como favorita en ListenBrainz"""
+    try:
+        mbid = recording_mbid(file_path, artist, title)
+        if not mbid:
+            print(f"⚠️ '{artist} - {title}' no está en MusicBrainz: no se puede marcar en ListenBrainz")
+            return False
+        listenbrainz_call("POST", "feedback/recording-feedback", json={"recording_mbid": mbid, "score": 1})
+        print(f"✓ Canción '{artist} - {title}' añadida a favoritas de ListenBrainz")
+        return True
+    except (requests.RequestException, ValueError) as e:
+        print(f"⚠️ Error añadiendo '{artist} - {title}' a ListenBrainz: {e}")
         return False
 
 def get_file_metadata(file_path):
@@ -261,7 +303,8 @@ def rename_file_with_metadata(file_path, metadata):
         print(f"⚠️ Error renombrando {file_path}: {e}")
         return file_path
 
-def process_music_directory(base_path, add_to_lastfm=True, session_key=None, dry_run=False, verbose=False):
+def process_music_directory(base_path, add_to_lastfm=True, session_key=None, dry_run=False, verbose=False,
+                            add_to_listenbrainz=False):
     """Procesar todos los archivos de música en una ruta y sus subcarpetas"""
     # Extensiones de archivos de música
     music_extensions = ['.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus']
@@ -271,6 +314,7 @@ def process_music_directory(base_path, add_to_lastfm=True, session_key=None, dry
         'total_files': 0,
         'renamed_files': 0,
         'lastfm_loved': 0,
+        'listenbrainz_loved': 0,
         'errors': 0
     }
 
@@ -330,6 +374,15 @@ def process_music_directory(base_path, add_to_lastfm=True, session_key=None, dry
                 new_filename = re.sub(r'[/\\?%*:|"<>]', '-', new_filename) + file_ext
                 print(f"🔄 [DRY RUN] Renombrar: {file} -> {new_filename}")
 
+            # Marcar como favorita en ListenBrainz
+            if add_to_listenbrainz and dry_run:
+                print(f"❤️ [DRY RUN] Marcar favorita en ListenBrainz: {metadata['artist']} - {metadata['title']}")
+            elif add_to_listenbrainz:
+                # Una petición por segundo
+                time.sleep(1)
+                if add_to_listenbrainz_loved(file_path, metadata['artist'], metadata['title']):
+                    stats['listenbrainz_loved'] += 1
+
             # Añadir a Last.fm loved tracks
             if add_to_lastfm and session_key and not dry_run:
                 # Pausa para evitar demasiadas peticiones rápidas a Last.fm
@@ -344,8 +397,9 @@ def process_music_directory(base_path, add_to_lastfm=True, session_key=None, dry
 
 def main():
     """Función principal del script"""
-    parser = argparse.ArgumentParser(description='Actualizar archivos de música: renombrar y añadir a Last.fm loved.')
+    parser = argparse.ArgumentParser(description='Actualizar archivos de música: renombrar y marcar como favoritas en ListenBrainz (y Last.fm).')
     parser.add_argument('path', help='Ruta base donde buscar archivos de música')
+    parser.add_argument('--no-listenbrainz', action='store_true', help='No marcar favoritas en ListenBrainz')
     parser.add_argument('--no-lastfm', action='store_true', help='No añadir canciones a Last.fm loved')
     parser.add_argument('--dry-run', action='store_true', help='Mostrar qué se haría sin realizar cambios')
     parser.add_argument('--verbose', '-v', action='store_true', help='Mostrar información detallada')
@@ -384,6 +438,9 @@ def main():
     print(f"✓ Herramientas disponibles: {', '.join(tools_available)}")
 
     # Obtener session key para Last.fm si es necesario
+    if not args.no_listenbrainz and not LISTENBRAINZ_TOKEN:
+        print("ℹ️ Sin LISTENBRAINZ_TOKEN en el .env: no se marcarán favoritas en ListenBrainz")
+
     session_key = None
     if not args.no_lastfm:
         if lastfm_credentials_valid:
@@ -410,6 +467,7 @@ def main():
     stats = process_music_directory(
         base_path,
         add_to_lastfm=not args.no_lastfm,
+        add_to_listenbrainz=bool(LISTENBRAINZ_TOKEN) and not args.no_listenbrainz,
         session_key=session_key,
         dry_run=args.dry_run,
         verbose=args.verbose
@@ -421,6 +479,8 @@ def main():
     print(f"  Total de archivos procesados: {stats['total_files']}")
     if not args.dry_run:
         print(f"  Archivos renombrados: {stats['renamed_files']}")
+        if LISTENBRAINZ_TOKEN and not args.no_listenbrainz:
+            print(f"  Favoritas en ListenBrainz: {stats['listenbrainz_loved']}")
         if not args.no_lastfm:
             print(f"  Canciones añadidas a Last.fm loved: {stats['lastfm_loved']}")
     print(f"  Errores: {stats['errors']}")

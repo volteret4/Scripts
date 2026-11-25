@@ -890,11 +890,13 @@ class VVMMPostCreator:
         # Diccionario de scripts de búsqueda (sin Spotify que lo manejamos directo)
         search_scripts = {
             'bandcamp': 'bandcamp.py',
-            'lastfm': 'lastfm.sh',
             'musicbrainz': 'musicbrainz.py',
             'youtube': 'youtube.py',
             'wikipedia': 'wikipedia.py'
         }
+        # La API de Last.fm es de pago: solo si hay clave. El enlace a ListenBrainz sale de fetch_online_info
+        if os.getenv('LASTFM_API_KEY'):
+            search_scripts['lastfm'] = 'lastfm.sh'
 
         # Buscar solo los que faltan
         for service, script in search_scripts.items():
@@ -937,6 +939,13 @@ class VVMMPostCreator:
         if discogs_url:
             self.links['url_discogs'] = discogs_url
             self.links['link_discogs'] = f'[![discogs](../links/svg/discogs.png (discogs))]({discogs_url})'
+
+        # Sin el icono en el blog la página mostraría una imagen rota
+        listenbrainz_url = self.online_info.get('listenbrainz_url')
+        icon = Path(self.config['blog_dir']) / 'content/posts/links/svg/listenbrainz.png'
+        if listenbrainz_url and icon.exists():
+            self.links['url_listenbrainz'] = listenbrainz_url
+            self.links['link_listenbrainz'] = f'[![listenbrainz](../links/svg/listenbrainz.png (listenbrainz))]({listenbrainz_url})'
 
         self.logger.info(f"Información en línea: {len(self.online_info.get('tracks', []))} pistas, "
                          f"{len(self.online_info.get('credits', {}))} créditos")
@@ -1080,7 +1089,7 @@ class VVMMPostCreator:
             ]
 
             # Añadir enlaces principales
-            main_services = ['spotify', 'bandcamp', 'youtube', 'lastfm',
+            main_services = ['spotify', 'bandcamp', 'youtube', 'listenbrainz', 'lastfm',
                            'discogs', 'musicbrainz', 'wikipedia', 'rateyourmusic']
 
             for service in main_services:
@@ -2017,7 +2026,7 @@ class VVMMPostCreator:
 
             # En una carpeta aparte: image.jpeg ya existe, es la foto genérica de la plantilla del post
             with tempfile.TemporaryDirectory() as download_dir:
-                # iTunes, Discogs, Last.fm y MusicBrainz, por este orden
+                # iTunes, Discogs, MusicBrainz y Last.fm (si hay clave), por este orden
                 subprocess.run([
                     'python3', str(self.modules_dir / 'caratula-alternativa.py'),
                     self.current_metadata['artist'], self.current_metadata['album'],
